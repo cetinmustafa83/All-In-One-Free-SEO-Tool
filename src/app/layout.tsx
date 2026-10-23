@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { headers } from "next/headers";
 import { Sidebar } from "@/components/shell/sidebar";
@@ -113,12 +114,17 @@ export default async function RootLayout({
           Runs before first paint, so a "system" user never sees a
           white flash before the dark class lands (or vice versa).
           Deliberately tiny and dependency-free — it blocks rendering.
+
+          Rendered via next/script (beforeInteractive) rather than a
+          raw <script> element: on the client next/script's app-router
+          branch renders null, so React never re-encounters a script
+          tag when a server action revalidates the layout. A raw tag
+          here made React log "Encountered a script tag while rendering
+          React component" on every layout re-render.
         */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=document.documentElement.dataset.theme;if(t==="system"){var d=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.classList.toggle("dark",d);}}catch(e){}})();`,
-          }}
-        />
+        <Script id="theme-init" strategy="beforeInteractive">
+          {`(function(){try{var t=document.documentElement.dataset.theme;if(t==="system"){var d=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.classList.toggle("dark",d);}}catch(e){}})();`}
+        </Script>
       </head>
       <body className="h-screen overflow-hidden bg-background text-foreground">
         <ConfirmDialogProvider>

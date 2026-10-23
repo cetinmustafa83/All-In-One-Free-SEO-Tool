@@ -6,6 +6,17 @@ const nextConfig: NextConfig = {
   // so end-users can run the app by double-clicking, no Node install required.
   output: "standalone",
 
+  experimental: {
+    // Turbopack compiles this app's ~100 routes with a large native
+    // working set (peak anon-rss observed at 3.2 GB). On memory-capped
+    // sandboxes the kernel OOM-kills next-server mid-compile and the
+    // dev server dies without a trace in dev.log. A tighter limit makes
+    // Turbopack collect its compile state aggressively instead of
+    // ballooning; routes compile marginally slower and the server
+    // survives. The on-disk .next/dev cache keeps restarts cheap.
+    turbopackMemoryLimit: 1536,
+  },
+
   // Native modules and ones that load files from disk at runtime must not be
   // bundled by Next — let Node's normal resolution handle them.
   serverExternalPackages: [

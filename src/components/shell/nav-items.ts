@@ -157,11 +157,19 @@ export const NAV_GROUPS: NavGroup[] = [
     title: "Paid ads",
     defaultOpen: true,
     items: [
+      // Ported from AdCrewOS: the ad watchdog that auto-pauses losers and
+      // approval-gates scaling winners. Newest flagship — ⭐ like /tools.
+      {
+        href: "/ads",
+        label: "Ads Autopilot ⭐",
+        icon: Megaphone,
+        guided: true,
+      },
       // The ⭐ marks this as the newest / most-recommended entry —
       // matches the same treatment on /tools and the per-client launcher.
       {
         href: "/tools/ads-funnel",
-        label: "Ad Funnel Architect ⭐",
+        label: "Ad Funnel Architect",
         icon: Megaphone,
       },
       { href: "/tools/branded-split", label: "Branded vs non-branded", icon: Target },

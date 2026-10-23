@@ -152,6 +152,71 @@ function isPublicPath(pathname: string): boolean {
 }
 
 /**
+ * Normalise `x-forwarded-host` to match the browser's `origin` when a
+ * proxy chain has rewritten it.
+ *
+ * Why this exists: Next.js validates every forwarded Server Actions
+ * request by comparing the `origin` header against `x-forwarded-host`
+ * and aborts with "Invalid Server Actions request." on a mismatch.
+ * Behind a multi-hop gateway (terminating TLS, then re-proxying through
+ * an internal hostname), the outer hop stamps `x-forwarded-host` with
+ * its INTERNAL host while `origin` still carries the public host the
+ * browser actually sees. Every form submission and every action call
+ * then fails validation — not because the action is wrong, but because
+ * two proxies disagreed about the name of the same server.
+ *
+ * The fix is to trust `origin` (the browser is the one thing in the
+ * chain that cannot be spoofed by an intermediary hop): when both
+ * headers exist and disagree, rewrite `x-forwarded-host` to the origin's
+ * host so the downstream validation sees one consistent value.
+ */
+function normaliseForwardedHost(req: NextRequest, requestHeaders: Headers): void {
+  const origin = req.headers.get("origin");
+  // A sandboxed iframe (or a stripped-down client) can send the literal
+  // string "null" — there is no usable host in it, and rewriting against
+  // it would just trade one mismatch for another.
+  if (!origin || origin === "null") return;
+
+  let originHost: string | null = null;
+  try {
+    originHost = new URL(origin).host;
+  } catch {
+    // Malformed origin — leave the headers untouched rather than
+    // guessing; the downstream check will decide.
+    return;
+  }
+  if (!originHost) return;
+
+  // x-forwarded-host can be a comma list when several proxies append;
+  // validation cares about the first (client-facing) entry.
+  const forwarded = requestHeaders.get("x-forwarded-host");
+  const forwardedHost = forwarded?.split(",")[0]?.trim();
+
+  // Already consistent — nothing to do. This is the direct-access case
+  // (browser → Next with no rewriting hop): host and origin agree.
+  if (forwardedHost === originHost) return;
+
+  // Two ways to get here, and BOTH used to break every Server Action:
+  //
+  //   1. A proxy hop stamped x-forwarded-host with its INTERNAL host
+  //      (the outer gateway's name for this machine) while origin still
+  //      carries the public host the browser sees.
+  //   2. NO x-forwarded-host at all — the chain only forwarded `host`,
+  //      and Next then compares origin against that, which disagrees
+  //      for exactly the same reason. (The first cut of this fix only
+  //      handled case 1 and the error kept firing on installs whose
+  //      gateway doesn't send the header.)
+  //
+  // Either way the repair is the same: force x-forwarded-host to the
+  // origin's host. The validation in the action handler prefers
+  // x-forwarded-host over host, so setting it — even when it was
+  // previously absent — makes both cases pass, and it is also the
+  // semantically correct value: the browser's origin is the one thing
+  // in the chain that cannot be spoofed by an intermediary hop.
+  requestHeaders.set("x-forwarded-host", originHost);
+}
+
+/**
  * Read `?embed=1` once at the edge and forward the bit to the rest of
  * the request as an `x-embed` request header. The root layout reads
  * that header via `next/headers` and skips rendering the shell chrome
@@ -194,6 +259,7 @@ function applyEmbedHeader(req: NextRequest): Headers {
 
 export async function proxy(req: NextRequest) {
   const requestHeaders = applyEmbedHeader(req);
+  normaliseForwardedHost(req, requestHeaders);
   const passthrough = () =>
     NextResponse.next({ request: { headers: requestHeaders } });
 

@@ -1,5 +1,12 @@
 import { sql } from "drizzle-orm";
-import { integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import {
+  index,
+  integer,
+  real,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 
 const timestamps = {
   createdAt: integer("created_at", { mode: "timestamp" })
@@ -2512,3 +2519,131 @@ export const gbpReviews = sqliteTable(
   ],
 );
 export type GbpReviewRow = typeof gbpReviews.$inferSelect;
+
+// ─────────────────────────────────────────────────────────────────────
+// Ads Autopilot — ported from AdCrewOS (google + meta ad watchdog).
+//
+// One row per connected ad account, with the guardrail thresholds the
+// engine evaluates against flattened onto the account itself (AdCrewOS
+// modelled them as a separate Target table, but every read took
+// targets[0]; SQLite + one account = one target). Snapshots feed the
+// charts and the engine; automation events are the alert feed.
+// ─────────────────────────────────────────────────────────────────────
+
+export const adAccounts = sqliteTable(
+  "ad_accounts",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    /** "google" | "meta" — lowercase for display friendliness. */
+    platform: text("platform", { enum: ["google", "meta"] }).notNull(),
+    /** Platform id (customer id / act_ id) or "demo-…" for demo rows. */
+    externalId: text("external_id").notNull(),
+    name: text("name").notNull(),
+    currency: text("currency").default("USD").notNull(),
+    /** Optional link into the SEO tool's client list. */
+    clientId: integer("client_id").references(() => clients.id, {
+      onDelete: "set null",
+    }),
+    isDemo: integer("is_demo", { mode: "boolean" }).default(false).notNull(),
+    status: text("status", {
+      enum: ["ACTIVE", "PAUSED", "DISCONNECTED"],
+    })
+      .default("ACTIVE")
+      .notNull(),
+    dailyBudget: real("daily_budget").default(50).notNull(),
+    /** Guardrail metric: CPC / CPA are lower-is-better, ROAS higher-is. */
+    metric: text("metric", { enum: ["CPC", "CPA", "ROAS"] })
+      .default("ROAS")
+      .notNull(),
+    /** What "good" looks like — shown on the cockpit, advisory only. */
+    targetValue: real("target_value").default(3).notNull(),
+    /** Breach → the engine auto-pauses (or alerts, in monitor mode). */
+    pauseThreshold: real("pause_threshold").default(1.6).notNull(),
+    /** Beat → the engine proposes a scale, approval-gated. */
+    scaleThreshold: real("scale_threshold").default(4.2).notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("ad_accounts_platform_external_idx").on(
+      t.platform,
+      t.externalId,
+    ),
+  ],
+);
+export type AdAccountRow = typeof adAccounts.$inferSelect;
+
+export const adMetricSnapshots = sqliteTable(
+  "ad_metric_snapshots",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    adAccountId: integer("ad_account_id")
+      .notNull()
+      .references(() => adAccounts.id, { onDelete: "cascade" }),
+    ts: integer("ts", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+    spend: real("spend").default(0).notNull(),
+    clicks: integer("clicks").default(0).notNull(),
+    impressions: integer("impressions").default(0).notNull(),
+    conversions: real("conversions").default(0).notNull(),
+    /** conversions × aov — kept so ROAS is auditable after the fact. */
+    revenue: real("revenue").default(0).notNull(),
+    ctr: real("ctr").default(0).notNull(),
+    cpc: real("cpc").default(0).notNull(),
+    cpa: real("cpa").default(0).notNull(),
+    roas: real("roas").default(0).notNull(),
+  },
+  (t) => [
+    index("ad_metric_snapshots_account_ts_idx").on(t.adAccountId, t.ts),
+  ],
+);
+export type AdMetricSnapshotRow = typeof adMetricSnapshots.$inferSelect;
+
+export const adAutomationEvents = sqliteTable(
+  "ad_automation_events",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    adAccountId: integer("ad_account_id")
+      .notNull()
+      .references(() => adAccounts.id, { onDelete: "cascade" }),
+    type: text("type", {
+      enum: [
+        "AUTO_PAUSE",
+        "MONITOR_ALERT",
+        "SCALE_PROPOSAL",
+        "SCALE_APPLIED",
+        "RESUME",
+        "POLL_ERROR",
+      ],
+    }).notNull(),
+    /**
+     * LOGGED for informational events; PENDING → APPROVED / DISMISSED
+     * for the scale-proposal lifecycle. Approved rows flip to EXECUTED
+     * once the budget bump is applied.
+     */
+    status: text("status", {
+      enum: ["LOGGED", "PENDING", "APPROVED", "DISMISSED", "EXECUTED", "EXPIRED"],
+    })
+      .default("LOGGED")
+      .notNull(),
+    reason: text("reason").notNull(),
+    metric: text("metric", { enum: ["CPC", "CPA", "ROAS"] }),
+    observed: real("observed"),
+    threshold: real("threshold"),
+    proposedPct: integer("proposed_pct"),
+    /** Budget after the proposed bump — pre-computed for the approve tap. */
+    proposedBudget: real("proposed_budget"),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+    resolvedAt: integer("resolved_at", { mode: "timestamp" }),
+  },
+  (t) => [
+    index("ad_automation_events_account_created_idx").on(
+      t.adAccountId,
+      t.createdAt,
+    ),
+    index("ad_automation_events_status_idx").on(t.status),
+  ],
+);
+export type AdAutomationEventRow = typeof adAutomationEvents.$inferSelect;
