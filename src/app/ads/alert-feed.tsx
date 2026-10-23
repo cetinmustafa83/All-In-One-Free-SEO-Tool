@@ -21,6 +21,7 @@ import {
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { AdAutomationEventRow } from "@/db/schema";
 import { resolveProposal, type ActionResult } from "./actions";
+import { useWrappedActionState } from "./safe-action";
 
 type EventRow = AdAutomationEventRow;
 
@@ -54,8 +55,12 @@ function when(d: Date | string): string {
 }
 
 function ProposalActions({ event }: { event: EventRow }) {
+  const wrapped = useWrappedActionState<ActionResult>();
+  // The action goes through the recovery wrapper: a stale/dead action
+  // POST (dev restart, gateway hiccup) toasts + refreshes instead of
+  // leaving the Approve button spinning forever.
   const [state, formAction] = useActionState<ActionResult | null, FormData>(
-    resolveProposal,
+    (prev, formData) => wrapped(resolveProposal, prev, formData),
     null,
   );
   const router = useRouter();

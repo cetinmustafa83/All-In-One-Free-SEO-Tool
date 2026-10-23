@@ -13,10 +13,14 @@ import { Label } from "@/components/ui/label";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { AdAccountRow } from "@/db/schema";
 import { updateGuardrails, type ActionResult } from "../../actions";
+import { useWrappedActionState } from "../../safe-action";
 
 export function GuardrailsForm({ account }: { account: AdAccountRow }) {
+  const wrapped = useWrappedActionState<ActionResult>();
+  // Recovery wrapper: a stale action POST (dev restarted since load)
+  // toasts + refreshes instead of leaving the save button spinning.
   const [state, formAction] = useActionState<ActionResult | null, FormData>(
-    updateGuardrails,
+    (prev, formData) => wrapped(updateGuardrails, prev, formData),
     null,
   );
   const router = useRouter();

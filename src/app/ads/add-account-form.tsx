@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { addAdAccount, type AddAccountResult } from "./actions";
+import { useSafeCall } from "./safe-action";
 
 type ClientOption = { id: number; name: string };
 
@@ -49,13 +50,19 @@ export function AddAccountForm({ clients }: { clients: ClientOption[] }) {
   const [metric, setMetric] = useState("ROAS");
   const [pending, startTransition] = useTransition();
   const router = useRouter();
+  const safeCall = useSafeCall();
 
   // Direct-call pattern: the handler awaits the server action and
   // toasts/closes in the same transition — no effect, no setState-in-
   // effect cascade (the compiler lint rightly rejects that shape).
+  // safeCall adds the recovery path: a stale action POST (dev restart)
+  // toasts + refreshes instead of dying silently inside the transition.
   function handleAction(formData: FormData) {
     startTransition(async () => {
-      const res: AddAccountResult = await addAdAccount(null, formData);
+      const res: AddAccountResult | null = await safeCall(() =>
+        addAdAccount(null, formData),
+      );
+      if (!res) return;
       if (res.ok) {
         toast.success(res.message || "Account connected.");
         setDemo(false);

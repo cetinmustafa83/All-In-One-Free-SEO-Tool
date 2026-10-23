@@ -6,11 +6,15 @@ import { toast } from "sonner";
 import { Play } from "lucide-react";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { resumeAdAccount, type ActionResult } from "./actions";
+import { useWrappedActionState } from "./safe-action";
 
 /** One-tap "turn it back on" for an engine-paused account. */
 export function ResumeButton({ accountId }: { accountId: number }) {
+  const wrapped = useWrappedActionState<ActionResult>();
+  // Recovery wrapper: a dead action POST (stale dev build) recovers
+  // with a toast + refresh instead of an eternal "Resuming…" spinner.
   const [state, formAction] = useActionState<ActionResult | null, FormData>(
-    resumeAdAccount,
+    (prev, formData) => wrapped(resumeAdAccount, prev, formData),
     null,
   );
   const router = useRouter();

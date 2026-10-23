@@ -13,14 +13,19 @@ import { Play, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AddAccountForm } from "./add-account-form";
 import { runEngineNow, syncDemoData } from "./actions";
+import { useSafeCall } from "./safe-action";
 
 export function AdsToolbar({ clients }: { clients: { id: number; name: string }[] }) {
   const [pending, startTransition] = useTransition();
   const router = useRouter();
+  const safeCall = useSafeCall();
 
   function runAction(fn: () => Promise<{ ok: boolean; message?: string; error?: string }>) {
     startTransition(async () => {
-      const res = await fn();
+      // safeCall: a failed action POST (stale dev build, reset connection)
+      // toasts + refreshes here; we just bail — the error UI is handled.
+      const res = await safeCall(fn);
+      if (!res) return;
       if (res.ok) {
         toast.success(res.message ?? "Done.");
         router.refresh();

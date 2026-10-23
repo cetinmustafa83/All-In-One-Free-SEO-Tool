@@ -8,13 +8,16 @@ const nextConfig: NextConfig = {
 
   experimental: {
     // Turbopack compiles this app's ~100 routes with a large native
-    // working set (peak anon-rss observed at 3.2 GB). On memory-capped
+    // working set (peak anon-rss observed at 3.3 GB). On memory-capped
     // sandboxes the kernel OOM-kills next-server mid-compile and the
     // dev server dies without a trace in dev.log. A tighter limit makes
     // Turbopack collect its compile state aggressively instead of
     // ballooning; routes compile marginally slower and the server
     // survives. The on-disk .next/dev cache keeps restarts cheap.
-    turbopackMemoryLimit: 1536,
+    // 1024 (down from 1536): peak RSS was still OOMing at ~3.3 GB when a
+    // browser shared the box — the lower cap trims the spike enough for
+    // both to fit in a 4 GB sandbox.
+    turbopackMemoryLimit: 1024,
   },
 
   // Native modules and ones that load files from disk at runtime must not be
