@@ -153,3 +153,22 @@ Stage Summary:
 - Tier-3 audit: 18 more routes verified clean; combined with tasks 10-13, 46 of 229 routes exercised end-to-end with zero product defects found beyond task 13's env-collision fix. The app's route surface is remarkably solid; remaining ~180 routes are mostly /tools/* variants sharing the same shell + form patterns as the audited sample.
 - Operational root cause banked: stale-running-bash-script supervisor. Sandbox baseline math documented (2.05GB intrinsic + ~0.4GB per GB of .next/dev cache; OOM at 3.2GB; audit batch size = 2-3 routes).
 - Commit includes: supervisor script warning + usage fix, worklog task 14.
+
+---
+Task ID: 14.0
+Agent: Z.ai Code (main)
+Task: Proje 3 parçaya bölme planı (devops tarzı): frontend Next.js (olduğu gibi, importlar yenilenecek) / backend Rust (yeni) / db SQLite (olduğu gibi). Plan dokümanı + todo listesi + Rust toolchain kurulumu + backend scaffold.
+
+Work Log:
+- Recon: envanter ölçümü — 36 API route dosyası + 19 dış route handler (CSV×11, PDF×4, r/[slug], screenshots) + 158 server actions dosyası (~90'ı tools/*) + 150 dosya @/lib/db veya @/db direkt import ediyor. data.db 733KB, 80 tablo, zaten WAL modda.
+- Strateji kararı: big-bang yerine strangler-fig — Rust backend domain-domain büyür, frontend kontratı sabit kalır.
+- docs/architecture-split-plan.md yazıldı: ölçümler, hedef mimari (R1-R5 kuralları), 11 fazlı plan (14.0-14.10), kararlar, risk tablosu.
+- Rust toolchain kuruldu: rustup 1.99.1 minimal profile (background nohup sandbox'ta öldüğü için foreground'da), PATH ~/.bashrc'ye kalıcı eklendi.
+- backend/ scaffold: Cargo.toml (axum 0.7, tokio, rusqlite bundled, tower-http trace/cors), src/main.rs (/health canlı DB smoke: tablo sayısı + journal mode, /api/health alias), run-dev.sh + up.sh (up|stop|status pidfile supervisor), README, .gitignore (target/log/pid).
+- İlk derleme hatası: json! makrosu DbHealth struct'ını serileştiremedi → #[derive(Serialize)] eklendi. İkinci sorun: up.sh içinde cargo PATH'te yoktu (taze shell) → scriptlere export PATH="$HOME/.cargo/bin:$PATH" eklendi.
+- Doğrulama: :3100/health direkt ✓, :81 gateway XTransformPort=3100 ✓ (aynı JSON), /api/health alias ✓, Next :3000 etkilenmedi ✓ (200, actions çalışıyor).
+
+Stage Summary:
+- backend/ canlı: Rust 1.99.1 + axum, port 3100, /health → {"status":"ok","db":{"ok":true,"tables":80,"journal_mode":"wal"}}
+- Plan dokümanı commit'lendi: docs/architecture-split-plan.md (R1: frontend DB'ye asla dokunmaz, R2: Rust tek DB client, R3: DB olduğu gibi/Drizzle schema sahibi, R4: kontrat parity, R5: server actions → REST + client wrapper)
+- Sonraki faz 14.1: api-contract.md envanteri + parity harness.
