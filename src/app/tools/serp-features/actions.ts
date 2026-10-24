@@ -2,11 +2,16 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import {
-  captureSerpSnapshot,
-  deleteSnapshot,
-} from "@/lib/serp-feature-tracker";
+import { captureSerpSnapshot } from "@/lib/serp-feature-tracker";
+import { callBackend } from "@/lib/backend";
 import { guardAction } from "@/lib/action-guard";
+
+// ---------------------------------------------------------------------------
+// Task 14.6a: removeSnapshot is a thin proxy over
+// /api/internal/tools/serp-features/delete (backend/src/tools_basic.rs).
+// runCapture is NOT ported: captureSerpSnapshot performs the outbound SERP
+// scan (scanSerp) and stays Next-side.
+// ---------------------------------------------------------------------------
 
 const captureSchema = z.object({
   query: z.string().trim().min(2).max(200),
@@ -42,7 +47,9 @@ export async function runCapture(
 
 export async function removeSnapshot(id: number): Promise<{ ok: true }> {
   await guardAction("edit");
-  await deleteSnapshot(id);
+  await callBackend("/api/internal/tools/serp-features/delete", {
+    body: { id },
+  });
   revalidatePath("/tools/serp-features");
   return { ok: true };
 }

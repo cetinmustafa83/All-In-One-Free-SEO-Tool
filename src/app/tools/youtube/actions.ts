@@ -4,25 +4,37 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import {
   aggregateKeywords,
-  clearYouTubeApiKey,
   searchYouTube,
-  setYouTubeApiKey,
   type YouTubeVideo,
 } from "@/lib/youtube-research";
 import { saveToolRun } from "@/lib/tool-runs";
+import { callBackend } from "@/lib/backend";
 import { guardAction } from "@/lib/action-guard";
+
+// ---------------------------------------------------------------------------
+// Task 14.6a: saveYouTubeKey/clearYouTubeKey are thin proxies over
+// /api/internal/tools/settings/set|delete — the workspace_settings upsert /
+// delete (setYouTubeApiKey wraps the settings store with key
+// "youtube.api_key") lives in backend/src/tools_basic.rs.
+// researchOnYouTube is NOT ported: searchYouTube calls the YouTube Data API
+// over the network and stays Next-side.
+// ---------------------------------------------------------------------------
 
 export async function saveYouTubeKey(formData: FormData): Promise<void> {
   await guardAction("edit", formData.get("clientId"));
   const key = String(formData.get("key") ?? "").trim();
   if (!key) return;
-  await setYouTubeApiKey(key);
+  await callBackend("/api/internal/tools/settings/set", {
+    body: { key: "youtube.api_key", value: key },
+  });
   revalidatePath("/tools/youtube");
 }
 
 export async function clearYouTubeKey(): Promise<void> {
   await guardAction("edit");
-  await clearYouTubeApiKey();
+  await callBackend("/api/internal/tools/settings/delete", {
+    body: { key: "youtube.api_key" },
+  });
   revalidatePath("/tools/youtube");
 }
 

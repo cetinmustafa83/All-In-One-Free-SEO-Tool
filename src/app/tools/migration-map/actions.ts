@@ -1,15 +1,23 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { db } from "@/db/client";
-import { redirectRules } from "@/db/schema";
 import {
   buildMigrationMap,
   renderRedirectMap,
   type MigrationMap,
 } from "@/lib/migration-mapper";
 import { saveToolRun } from "@/lib/tool-runs";
+import { callBackend } from "@/lib/backend";
 import { guardAction } from "@/lib/action-guard";
+
+// ---------------------------------------------------------------------------
+// Task 14.6a: importToRedirectRules keeps the COMPUTE half Next-side
+// (buildMigrationMap is pure fuzzy matching — a later wave) and sends the
+// pre-shaped rows to /api/internal/tools/migration-map/import, which does
+// the redirect_rules inserts in backend/src/tools_basic.rs (14.5b
+// verdicts-over-the-wire). runMapping stays entirely Next-side: it writes
+// tool_runs via saveToolRun and renders config output, no port yet.
+// ---------------------------------------------------------------------------
 
 export type MigrationState =
   | {
@@ -57,26 +65,32 @@ export async function importToRedirectRules(
         error: "No high-confidence matches to import. Review the table first.",
       };
 
-    let inserted = 0;
+    // Row shaping uses the exact `new URL` semantics the original used;
+    // rows that fail to parse are skipped like the original's per-row
+    // try/catch. The note text is baked here so it is byte-identical.
+    const rows: { sourcePath: string; targetUrl: string; note: string }[] = [];
     for (const r of usable) {
       try {
         const u = new URL(
           /^https?:\/\//i.test(r.oldUrl) ? r.oldUrl : `https://x${r.oldUrl}`,
         );
         const sourcePath = u.pathname + (u.search ?? "");
-        await db.insert(redirectRules).values({
+        rows.push({
           sourcePath,
           targetUrl: r.newUrl ?? "",
-          statusCode: 301,
           note: `Auto-imported from migration map (${(r.confidence * 100).toFixed(0)}% confidence)`,
         });
-        inserted += 1;
       } catch {
         // skip invalid rows
       }
     }
+
+    const result = await callBackend<{ ok: boolean; inserted: number }>(
+      "/api/internal/tools/migration-map/import",
+      { body: { rows } },
+    );
     revalidatePath("/tools/redirects-manager");
-    return { ok: true, inserted };
+    return { ok: true, inserted: result.inserted };
   } catch (err) {
     return { ok: false, error: (err as Error).message ?? "Import failed" };
   }

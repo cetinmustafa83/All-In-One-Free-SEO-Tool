@@ -22,6 +22,11 @@
 //!
 //! 14.5b scope: the clients domain (CRUD, quick-add, template seeding,
 //! redetect-stack, share tokens) on the same internal API.
+//!
+//! 14.6a scope: tools wave 1 — the pure-DB `tools/*` action effects
+//! (redirects + 404 log, uptime targets, person-schema tool-run,
+//! migration-map import, serp snapshot delete, robots snapshot list,
+//! settings set/delete for the bing/youtube API keys) in tools_basic.rs.
 
 mod audits;
 mod auth;
@@ -41,6 +46,7 @@ mod password;
 mod ratelimit;
 mod session;
 mod tasks;
+mod tools_basic;
 mod util;
 mod v1;
 
@@ -132,6 +138,60 @@ async fn main() {
         .route(
             "/api/internal/clients/:id/share-token",
             post(clients::share_token),
+        )
+        // ---- 14.6a: tools wave 1 (pure-DB tool actions) ----
+        .route(
+            "/api/internal/tools/redirects/add",
+            post(tools_basic::redirect_add),
+        )
+        .route(
+            "/api/internal/tools/redirects/delete",
+            post(tools_basic::redirect_delete),
+        )
+        .route(
+            "/api/internal/tools/redirects/404/record",
+            post(tools_basic::notfound_record),
+        )
+        .route(
+            "/api/internal/tools/redirects/404/resolve",
+            post(tools_basic::notfound_resolve),
+        )
+        .route(
+            "/api/internal/tools/redirects/404/delete",
+            post(tools_basic::notfound_delete),
+        )
+        .route("/api/internal/tools/uptime/add", post(tools_basic::uptime_add))
+        .route(
+            "/api/internal/tools/uptime/delete",
+            post(tools_basic::uptime_delete),
+        )
+        .route(
+            "/api/internal/tools/uptime/toggle",
+            post(tools_basic::uptime_toggle),
+        )
+        .route(
+            "/api/internal/tools/person-schema/save",
+            post(tools_basic::person_schema_save),
+        )
+        .route(
+            "/api/internal/tools/migration-map/import",
+            post(tools_basic::migration_import),
+        )
+        .route(
+            "/api/internal/tools/serp-features/delete",
+            post(tools_basic::serp_snapshot_delete),
+        )
+        .route(
+            "/api/internal/tools/robots-history/list",
+            post(tools_basic::robots_list),
+        )
+        .route(
+            "/api/internal/tools/settings/set",
+            post(tools_basic::settings_set),
+        )
+        .route(
+            "/api/internal/tools/settings/delete",
+            post(tools_basic::settings_delete),
         )
         .route_layer(axum::middleware::from_fn_with_state(
             state.clone(),

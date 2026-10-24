@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { setSetting, deleteSetting } from "@/lib/settings-store";
 import {
   getBingTopPages,
   getBingTopQueries,
@@ -12,19 +11,32 @@ import {
   listBingSites,
 } from "@/lib/bing-webmaster";
 import { saveToolRun } from "@/lib/tool-runs";
+import { callBackend } from "@/lib/backend";
 import { guardAction } from "@/lib/action-guard";
+
+// ---------------------------------------------------------------------------
+// Task 14.6a: saveBingKey/clearBingKey are thin proxies over
+// /api/internal/tools/settings/set|delete — the workspace_settings upsert /
+// delete (the settings-store path) lives in backend/src/tools_basic.rs.
+// fetchBingInsights / submitBingUrls / fetchBingSites are NOT ported: they
+// call the Bing webmaster API over the network and stay Next-side.
+// ---------------------------------------------------------------------------
 
 export async function saveBingKey(formData: FormData): Promise<void> {
   await guardAction("edit", formData.get("clientId"));
   const key = String(formData.get("key") ?? "").trim();
   if (!key) return;
-  await setSetting("bing.api_key", key);
+  await callBackend("/api/internal/tools/settings/set", {
+    body: { key: "bing.api_key", value: key },
+  });
   revalidatePath("/tools/bing");
 }
 
 export async function clearBingKey(): Promise<void> {
   await guardAction("edit");
-  await deleteSetting("bing.api_key");
+  await callBackend("/api/internal/tools/settings/delete", {
+    body: { key: "bing.api_key" },
+  });
   revalidatePath("/tools/bing");
 }
 
