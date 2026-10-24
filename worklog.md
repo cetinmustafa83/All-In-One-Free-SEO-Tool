@@ -192,3 +192,22 @@ Stage Summary:
 - Kontrat dokümanları commit'lendi: api-contract.md (88 satır, normatif auth semantik tablosu + 55 route satırı) + api-actions-inventory.md (173 satır, 158 dosya/376 fonksiyon) + api-inventory.json (makine-okunur, 2364 satır).
 - Üretici script commit'te: API değişince `bun backend/tools/api-inventory.ts` ile yeniden üret → diff = kontrat değişikliği (review'da görünür).
 - Sonraki faz 14.2: Rust core infra (config, SQLite katmanı, error envelope, auth middleware).
+
+---
+Task ID: 14.2
+Agent: Z.ai Code (main)
+Task: Rust core infra — config/env, SQLite katmanı (WAL + busy_timeout), error envelope parity, auth middleware port'u (CSRF Sec-Fetch-Site, admin modları, Bearer v1).
+
+Work Log:
+- Next kaynaklarından kontrat okundu: src/lib/admin-auth.ts (isCrossSiteRequest, isLocalRequest, guardAdminRequest üç mod), src/lib/api-auth.ts (authenticateRequest sha256+api_keys, jsonError/jsonOk, requireScope, parseLimit), src/lib/edge-token.ts (sabit-zamanlı karşılaştırma), src/lib/auth.ts accountsEnabled (users tablosu > 0, sticky cache).
+- Rust modülleri: config.rs (PORT/DATABASE_PATH/TRUSTED_PROXY/APP_PASSWORD-presence — value hiç okunmaz), db.rs (Arc<Mutex<Connection>>, WAL, busy_timeout 5s, accounts_enabled sticky port'u, smoke()), error.rs (İKİ zarf: {"error"} v1+edge / {"ok":false,"error"} admin — mesajlar byte-for-byte Next kaynaklarından), auth.rs (is_cross_site, is_local_request TRUSTED_PROXY mantığıyla, guard_admin üç mod, bearer_token/KEY_PREFIX/sha256_hex/scope_allows/parse_limit/ct_eq).
+- main.rs güncellendi: AppState cfg+db, /health ortak Db üzerinden, /__dev/admin-guard + /__dev/bearer probe route'ları (açıkça scaffold, kontrat değil).
+- Derleme düzeltmeleri: IntoResponse import scope; serde_json preserve_order feature (varsayılan BTreeMap alfabetik sıralıyordu, Next insertion-order — CSRF/local zarflarında {"ok"} önce gelmeli).
+- BYTE-FOR-BYTE PARITY DOĞRULANDI (diff ile): ① CSRF 403 gövdesi = Next POST /api/restore + Sec-Fetch-Site:cross-site (güvenli: katman-1'de reddedilir, action çalışmaz) ② local-only 403 gövdesi = Host: evil.com ③ Bearer 401 gövdesi = GET /api/v1/clients. Üçü de IDENTICAL.
+- Open-mode geçiş: POST /__dev/admin-guard → {"ok":true,"mode":"open"} ✓.
+- Parity probe seti 7→11: admin-open-pass 200, admin-csrf-blocked 403, bearer-required 401, bearer-invalid-key 401 (__dev path'lerinde Next 404 beklenir). Harness: 11/11 PASS.
+
+Stage Summary:
+- Rust tarafında auth çekirdeği tamam: CSRF → mod → local-socket zinciri ve Bearer anahtar doğrulama (sha256+api_keys+scope) Next ile birebir.
+- 14.3 için hazır: health-ping, errors/env, edge/fixes (ct_eq + cache-control + graceful-empty hazır), v1 9 endpoint (scope_allows + parse_limit hazır).
+- Kullanıcı-vurabilir karar: accounts modunda Rust proxy'nin cookie doğrulamasına güvenir (middleware rewrite'tan önce koşar), in-route owner re-check Next'te kalır — fail-closed owner'ı admin aksiyonlarından kilitleyecekti. R4 dokümanına not düşüldü.

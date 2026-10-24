@@ -1,20 +1,30 @@
-//! SEO Tool Rust backend — scaffold (Task 14.0).
+//! SEO Tool Rust backend — core infra (Task 14.2).
 //!
 //! Three-part split (docs/architecture-split-plan.md):
 //!   frontend (Next.js, unchanged) -> backend (Rust, THIS service) -> db (SQLite, unchanged)
 //!
-//! Phase 0 scope: service skeleton + `/health` with a live DB smoke check.
-//! Later phases port API domains behind the same contract (R4 parity).
+//! 14.2 scope: config, shared SQLite handle, error-envelope parity, the
+//! auth middleware port (CSRF / local-socket / admin modes / bearer keys)
+//! and `/__dev/*` probe routes that exercise each mechanism. The probes
+//! are clearly-namespaced scaffolding — they are NOT part of the public
+//! contract and never will be.
 
-use axum::{extract::State, http::StatusCode, routing::get, Json, Router};
-use rusqlite::Connection;
-use serde::Serialize;
+mod auth;
+mod config;
+mod db;
+mod error;
+
+use axum::{extract::State, http::HeaderMap, http::StatusCode, response::IntoResponse, routing::get, routing::post, Json, Router};
+use config::Config;
+use db::Db;
+use error::MSG_BEARER_REQUIRED;
 use serde_json::{json, Value};
-use std::{path::PathBuf, sync::Arc, time::Instant};
+use std::{sync::Arc, time::Instant};
 
 #[derive(Clone)]
 struct AppState {
-    db_path: Arc<PathBuf>,
+    cfg: Arc<Config>,
+    db: Db,
     started_at: Instant,
 }
 
@@ -27,14 +37,14 @@ async fn main() {
         )
         .init();
 
-    let port: u16 = std::env::var("PORT")
-        .ok()
-        .and_then(|p| p.parse().ok())
-        .unwrap_or(3100);
-    let db_path = std::env::var("DATABASE_PATH").unwrap_or_else(|_| "../data.db".into());
+    let cfg = Config::from_env();
+    let db = Db::open(&cfg.db_path)
+        .unwrap_or_else(|e| panic!("cannot open database {}: {e}", cfg.db_path));
+    let port = cfg.port;
 
     let state = AppState {
-        db_path: Arc::new(PathBuf::from(&db_path)),
+        cfg: Arc::new(cfg),
+        db,
         started_at: Instant::now(),
     };
 
@@ -42,6 +52,9 @@ async fn main() {
         .route("/", get(root))
         .route("/health", get(health))
         .route("/api/health", get(health)) // alias so the frontend contract can stay /api/*
+        // ---- /__dev/* scaffolding probes (14.2) — middleware regression checks ----
+        .route("/__dev/admin-guard", post(dev_admin_guard))
+        .route("/__dev/bearer", get(dev_bearer))
         .with_state(state)
         .layer(tower_http::trace::TraceLayer::new_for_http());
 
@@ -49,7 +62,7 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind(&addr)
         .await
         .unwrap_or_else(|e| panic!("failed to bind {addr}: {e}"));
-    tracing::info!("seo-backend listening on {addr} (db: {db_path})");
+    tracing::info!("seo-backend listening on {addr}");
     axum::serve(listener, app).await.expect("server error");
 }
 
@@ -59,71 +72,75 @@ async fn root() -> Json<Value> {
         "role": "backend",
         "split": ["frontend:nextjs", "backend:rust", "db:sqlite"],
         "plan": "docs/architecture-split-plan.md",
+        "phase": "14.2",
     }))
 }
 
 async fn health(State(state): State<AppState>) -> (StatusCode, Json<Value>) {
-    let db = check_db(&state.db_path);
-    let ok = db.ok;
+    let (tables, journal) = state
+        .db
+        .smoke()
+        .map(|(t, j)| (Some(t), Some(j)))
+        .unwrap_or((None, None));
+    let ok = tables.is_some();
     (
         if ok { StatusCode::OK } else { StatusCode::SERVICE_UNAVAILABLE },
         Json(json!({
             "status": if ok { "ok" } else { "degraded" },
             "service": "seo-backend",
             "version": env!("CARGO_PKG_VERSION"),
+            "phase": "14.2",
             "uptime_secs": state.started_at.elapsed().as_secs(),
-            "db": db,
+            "db": { "ok": ok, "path": state.cfg.db_path, "tables": tables, "journal_mode": journal },
         })),
     )
 }
 
-#[derive(Serialize)]
-struct DbHealth {
-    ok: bool,
-    path: String,
-    tables: Option<i64>,
-    journal_mode: Option<String>,
-    error: Option<String>,
+/// Exercises the full guardAdminRequest port: cross-site → mode → local.
+/// 200 {"ok":true,"mode":...} on pass, byte-identical envelopes on denial.
+async fn dev_admin_guard(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> axum::response::Response {
+    match auth::guard_admin(&headers, &state.db, &state.cfg) {
+        Ok(mode) => Json(json!({ "ok": true, "mode": format!("{mode:?}").to_lowercase() })).into_response(),
+        Err(resp) => resp,
+    }
 }
 
-fn check_db(path: &PathBuf) -> DbHealth {
-    let path_str = path.display().to_string();
-    match Connection::open_with_flags(
-        path,
-        rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
-    ) {
-        Ok(conn) => {
-            let _ = conn.busy_timeout(std::time::Duration::from_millis(5000));
-            let tables: Result<i64, _> = conn.query_row(
-                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table'",
-                [],
-                |r| r.get(0),
-            );
-            let journal: Result<String, _> =
-                conn.query_row("PRAGMA journal_mode", [], |r| r.get(0));
-            match (tables, journal) {
-                (Ok(t), Ok(j)) => DbHealth {
-                    ok: true,
-                    path: path_str,
-                    tables: Some(t),
-                    journal_mode: Some(j),
-                    error: None,
+/// Exercises the bearer path of src/lib/api-auth.ts authenticateRequest():
+/// parse header → seo_live_ prefix → sha256 → api_keys row (not revoked,
+/// not expired) → scope echo. 401 with the exact Next message otherwise.
+async fn dev_bearer(State(state): State<AppState>, headers: HeaderMap) -> axum::response::Response {
+    let Some(raw) = auth::bearer_token(&headers) else {
+        return error::api_error(StatusCode::UNAUTHORIZED, MSG_BEARER_REQUIRED);
+    };
+    if !raw.starts_with(auth::KEY_PREFIX) {
+        return error::api_error(StatusCode::UNAUTHORIZED, MSG_BEARER_REQUIRED);
+    }
+    let hash = auth::sha256_hex(&raw);
+    let row = state
+        .db
+        .with_conn(|c| {
+            c.query_row(
+                "SELECT id, scopes FROM api_keys WHERE key_hash = ?1 \
+                 AND revoked_at IS NULL \
+                 AND (expires_at IS NULL OR expires_at > strftime('%Y-%m-%dT%H:%M:%fZ','now')) \
+                 LIMIT 1",
+                [&hash],
+                |r| {
+                    let scopes_json: String = r.get::<_, String>(1)?;
+                    Ok((r.get::<_, i64>(0)?, scopes_json))
                 },
-                (Err(e), _) | (_, Err(e)) => DbHealth {
-                    ok: false,
-                    path: path_str,
-                    tables: None,
-                    journal_mode: None,
-                    error: Some(e.to_string()),
-                },
-            }
+            )
+        })
+        .ok();
+    match row {
+        Some((id, scopes_json)) => {
+            // scopes column is TEXT JSON (Drizzle text storage mode)
+            let scopes: Vec<String> = serde_json::from_str(&scopes_json).unwrap_or_default();
+            Json(json!({ "ok": true, "key_id": id, "scopes": scopes })).into_response()
         }
-        Err(e) => DbHealth {
-            ok: false,
-            path: path_str,
-            tables: None,
-            journal_mode: None,
-            error: Some(e.to_string()),
-        },
+        None => error::api_error(StatusCode::UNAUTHORIZED, MSG_BEARER_REQUIRED),
     }
 }
