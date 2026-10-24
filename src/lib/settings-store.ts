@@ -73,6 +73,7 @@ export type SettingKey =
   | "api.cerebras"
   | "api.together"
   | "api.github"
+  | "api.codegpt"
   | "api.ollama_url"
   | "ai.active_provider"
   // Google OAuth — user supplies their own Cloud OAuth client (free, ~5 min).

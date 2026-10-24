@@ -279,6 +279,8 @@ export const aiVisibilityChecks = sqliteTable("ai_visibility_checks", {
       "cerebras",
       "together",
       "github",
+      // One-key aggregator (OpenAI-compatible pass-through):
+      "codegpt",
       // Browser-scraped AI-search surfaces (no API key required):
       "google_ai_mode",
       "copilot",

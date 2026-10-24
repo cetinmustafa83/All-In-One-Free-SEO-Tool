@@ -329,6 +329,90 @@ export const MODEL_PRESETS: Record<ActiveProvider, ModelPreset[]> = {
       outputPer1M: 0,
     },
   ],
+  codegpt: [
+    // CodeGPT aggregates other vendors' models behind one OpenAI-compatible
+    // API (api.codegpt.co/v1), so rates mirror the underlying vendor's
+    // published list prices — CodeGPT bills per-token on top of pass-through.
+    // First entry = dispatch default. Verified against their catalog at
+    // integration time; their /v1/models endpoint is the live truth.
+    {
+      id: "gpt-4o-mini",
+      label: "GPT-4o mini",
+      hint: "Cheap · fast · default",
+      inputPer1M: 0.15,
+      outputPer1M: 0.6,
+    },
+    {
+      id: "gpt-4o",
+      label: "GPT-4o",
+      hint: "Balanced flagship",
+      inputPer1M: 2.5,
+      outputPer1M: 10,
+    },
+    {
+      id: "gpt-4.1",
+      label: "GPT-4.1",
+      hint: "Newer generation",
+      inputPer1M: 2,
+      outputPer1M: 8,
+    },
+    {
+      id: "o4-mini",
+      label: "o4-mini",
+      hint: "Reasoning",
+      inputPer1M: 1.1,
+      outputPer1M: 4.4,
+    },
+    {
+      id: "claude-3-5-haiku",
+      label: "Claude 3.5 Haiku",
+      hint: "Fast Claude",
+      inputPer1M: 0.8,
+      outputPer1M: 4,
+    },
+    {
+      id: "claude-3-5-sonnet",
+      label: "Claude 3.5 Sonnet",
+      hint: "Strong writing",
+      inputPer1M: 3,
+      outputPer1M: 15,
+    },
+    {
+      id: "gemini-2.0-flash",
+      label: "Gemini 2.0 Flash",
+      hint: "Fast Google model",
+      inputPer1M: 0.1,
+      outputPer1M: 0.4,
+    },
+    {
+      id: "llama-3.3-70b-instruct",
+      label: "Llama 3.3 70B",
+      hint: "Open weights · cheap",
+      inputPer1M: 0.59,
+      outputPer1M: 0.79,
+    },
+    {
+      id: "mixtral-8x7b-instruct",
+      label: "Mixtral 8x7B",
+      hint: "Open weights · fast",
+      inputPer1M: 0.6,
+      outputPer1M: 0.6,
+    },
+    {
+      id: "deepseek-chat",
+      label: "DeepSeek V3",
+      hint: "Cheapest capable",
+      inputPer1M: 0.27,
+      outputPer1M: 1.1,
+    },
+    {
+      id: "deepseek-reasoner",
+      label: "DeepSeek R1",
+      hint: "Reasoning",
+      inputPer1M: 0.55,
+      outputPer1M: 2.19,
+    },
+  ],
 };
 
 /** Every preset across every provider, flattened. */
@@ -370,6 +454,7 @@ export const PROVIDER_LABEL: Record<ActiveProvider, string> = {
   cerebras: "Cerebras",
   together: "Together AI",
   github: "GitHub Models",
+  codegpt: "CodeGPT",
 };
 
 /**

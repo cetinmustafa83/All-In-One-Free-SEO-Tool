@@ -108,6 +108,11 @@ export const PROVIDER_DISPATCH: Record<ActiveProvider, ProviderSpec> = {
     kind: "openai-compat",
     endpoint: "https://models.inference.ai.azure.com/chat/completions",
   },
+  codegpt: {
+    id: "codegpt",
+    kind: "openai-compat",
+    endpoint: "https://api.codegpt.co/v1/chat/completions",
+  },
 };
 
 export type DispatchArgs = {

@@ -14,7 +14,8 @@ export type Provider =
   | "deepseek"
   | "cerebras"
   | "together"
-  | "github";
+  | "github"
+  | "codegpt";
 
 export const PROVIDER_CATALOG: {
   id: Provider | "ollama";
@@ -220,6 +221,23 @@ export const PROVIDER_CATALOG: {
       "Get $1 free credit on signup.",
       "Settings → API keys → Generate.",
       "Copy + paste below + Save.",
+    ],
+  },
+  {
+    id: "codegpt",
+    label: "CodeGPT",
+    tier: "free-tier",
+    description:
+      "One account, many frontier models (GPT-4o, Claude, Gemini, Llama, DeepSeek) through a single OpenAI-compatible API. Free credits on signup.",
+    keyUrl: "https://app.codegpt.co",
+    keyUrlLabel: "CodeGPT Platform",
+    envVar: "CODEGPT_API_KEY",
+    notes: "One key covers 11 models — good for trying paid models without N accounts.",
+    steps: [
+      "Click 'Open CodeGPT Platform' → sign up (email or Google).",
+      "Open your organization → API Keys → Create new key.",
+      "Copy the long token shown (JWT-style) — it is only displayed once.",
+      "Paste it below and click Save, then Test.",
     ],
   },
   {

@@ -61,6 +61,7 @@ export const PROVIDER_GROUNDING: Record<LlmProvider, GroundingMode> = {
   cerebras: "memory",
   together: "memory",
   github: "memory",
+  codegpt: "memory",
 };
 
 export type CitationCheckResult = {

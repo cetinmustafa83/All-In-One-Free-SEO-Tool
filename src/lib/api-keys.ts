@@ -17,6 +17,7 @@ const ENV_VAR: Record<Provider, string> = {
   cerebras: "CEREBRAS_API_KEY",
   together: "TOGETHER_API_KEY",
   github: "GITHUB_TOKEN",
+  codegpt: "CODEGPT_API_KEY",
 };
 
 const SETTING_KEY: Record<Provider, `api.${Provider}`> = {
@@ -31,6 +32,7 @@ const SETTING_KEY: Record<Provider, `api.${Provider}`> = {
   cerebras: "api.cerebras",
   together: "api.together",
   github: "api.github",
+  codegpt: "api.codegpt",
 };
 
 export async function getApiKey(provider: Provider): Promise<string | null> {

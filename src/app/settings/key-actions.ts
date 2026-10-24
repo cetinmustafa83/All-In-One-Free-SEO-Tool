@@ -22,6 +22,7 @@ const ALLOWED_KEYS: Record<Provider, SettingKey> = {
   cerebras: "api.cerebras",
   together: "api.together",
   github: "api.github",
+  codegpt: "api.codegpt",
 };
 
 export async function saveApiKey(

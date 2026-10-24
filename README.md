@@ -420,7 +420,7 @@ The home view when you log in. Multi-client overview, today's priorities, and wh
 ✅ Webflow integration  
 ✅ Slack / Discord / Microsoft Teams webhooks  
 ✅ Email digests (SMTP)  
-✅ **AI providers (BYO key, all optional):** OpenAI · Anthropic · Gemini · Groq · OpenRouter · DeepSeek · Perplexity · **Ollama (local, fully offline)**
+✅ **AI providers (BYO key, all optional):** OpenAI · Anthropic · Gemini · Groq · OpenRouter · DeepSeek · Perplexity · Mistral · Cerebras · Together · GitHub Models · CodeGPT · **Ollama (local, fully offline)**
 
 ### 🎨 Tech-stack-aware recommendations
 > The killer feature most tools don't have. Every fix is tailored to YOUR site's CMS.

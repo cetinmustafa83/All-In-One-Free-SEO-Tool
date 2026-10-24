@@ -31,6 +31,7 @@ const VALID: ReadonlySet<ActiveProvider> = new Set([
   "cerebras",
   "together",
   "github",
+  "codegpt",
   "ollama",
 ]);
 
@@ -307,6 +308,12 @@ export async function POST(req: Request) {
         endpoint: "https://models.inference.ai.azure.com/chat/completions",
         apiKey: key,
         model: "gpt-4o",
+      });
+    } else if (provider === "codegpt") {
+      result = await probeOpenAICompat({
+        endpoint: "https://api.codegpt.co/v1/chat/completions",
+        apiKey: key,
+        model: "gpt-4o-mini",
       });
     } else {
       result = { ok: false, error: `Unknown provider: ${provider}` };
