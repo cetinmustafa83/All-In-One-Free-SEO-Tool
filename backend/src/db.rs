@@ -27,6 +27,10 @@ impl Db {
         conn.busy_timeout(std::time::Duration::from_millis(5000))?;
         // Node side (better-sqlite3) runs WAL — match it exactly.
         let _: String = conn.query_row("PRAGMA journal_mode=WAL", [], |r| r.get(0))?;
+        // better-sqlite3 enforces foreign keys (PRAGMA foreign_keys = 1 on a
+        // stock connection); several actions rely on it — deleteClient's
+        // cascade delete and the FK-violation surfacing fixed in 14.5a.
+        conn.execute_batch("PRAGMA foreign_keys = ON")?;
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),
             sticky_accounts: Arc::new(AtomicBool::new(false)),

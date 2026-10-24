@@ -2,52 +2,40 @@
 
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
-import { randomBytes } from "node:crypto";
 import { db } from "@/db/client";
 import { clients } from "@/db/schema";
+import { callBackend } from "@/lib/backend";
+import { guardAction } from "@/lib/action-guard";
 
-function generateToken(): string {
-  // 24 random bytes → 32 chars urlsafe base64. Plenty of entropy for an
-  // unlisted share link.
-  return randomBytes(24)
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-}
+// Task 14.5b: generateShareToken / revokeShareToken are thin proxies over
+// /api/internal/clients/:id/share-token — the 24-random-byte base64url
+// token format and the 5-attempt retry loop live in backend/src/clients.rs.
+// emailPortalLink stays Next-side (SMTP).
 
 export async function generateShareToken(clientId: number): Promise<void> {
   await guardAction("edit", clientId);
   if (!Number.isFinite(clientId) || clientId <= 0) return;
-  let attempts = 0;
-  while (attempts < 5) {
-    const token = generateToken();
-    try {
-      await db
-        .update(clients)
-        .set({ shareToken: token, updatedAt: new Date() })
-        .where(eq(clients.id, clientId));
-      revalidatePath(`/clients/${clientId}`);
-      return;
-    } catch {
-      attempts++;
-    }
+  try {
+    await callBackend(`/api/internal/clients/${clientId}/share-token`, {
+      body: { action: "generate" },
+    });
+    revalidatePath(`/clients/${clientId}`);
+  } catch {
+    // 5 attempts failed backend-side — silent, like the original catch loop.
   }
 }
 
 export async function revokeShareToken(clientId: number): Promise<void> {
   await guardAction("edit", clientId);
   if (!Number.isFinite(clientId) || clientId <= 0) return;
-  await db
-    .update(clients)
-    .set({ shareToken: null, updatedAt: new Date() })
-    .where(eq(clients.id, clientId));
+  await callBackend(`/api/internal/clients/${clientId}/share-token`, {
+    body: { action: "revoke" },
+  });
   revalidatePath(`/clients/${clientId}`);
 }
 
 import { sendMail } from "@/lib/mailer";
 import { getSetting } from "@/lib/settings-store";
-import { guardAction } from "@/lib/action-guard";
 
 export type EmailPortalResult =
   | { ok: true }

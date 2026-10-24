@@ -1,0 +1,682 @@
+     1→type Priority = "high" | "medium" | "low";
+     2→type Niche = "local" | "ecommerce" | "saas" | "blog" | "services";
+     3→
+     4→export type NicheTaskTemplate = {
+     5→  title: string;
+     6→  description: string;
+     7→  whyItMatters: string;
+     8→  priority: Priority;
+     9→};
+    10→
+    11→const local: NicheTaskTemplate[] = [
+    12→  {
+    13→    title: "Claim and verify your Google Business Profile",
+    14→    description:
+    15→      "Search your business name on Google. If the GBP card on the right shows 'Own this business?', click it and verify.",
+    16→    whyItMatters:
+    17→      "Google Business Profile is the single biggest local-SEO ranking factor. Until it's verified, you can't appear in the local 3-pack at all.",
+    18→    priority: "high",
+    19→  },
+    20→  {
+    21→    title: "Confirm NAP consistency across the web",
+    22→    description:
+    23→      "Make sure Name, Address, and Phone match exactly across your site, GBP, Yelp, Facebook, and major directories.",
+    24→    whyItMatters:
+    25→      "Google uses NAP consistency as a trust signal for local businesses. Even small mismatches (St. vs Street) can dilute local rankings.",
+    26→    priority: "high",
+    27→  },
+    28→  {
+    29→    title: "Set up a system to request Google reviews",
+    30→    description:
+    31→      "Generate a short review link from your GBP and add it to email signatures, receipts, and follow-up messages.",
+    32→    whyItMatters:
+    33→      "Review count and recency are direct ranking factors for the local pack. Aim for at least 1–2 new reviews per month.",
+    34→    priority: "high",
+    35→  },
+    36→  {
+    37→    title: "Add LocalBusiness schema to your homepage",
+    38→    description:
+    39→      "Add JSON-LD structured data with name, address, telephone, openingHours, and geo coordinates.",
+    40→    whyItMatters:
+    41→      "LocalBusiness schema helps Google understand you're a physical-location business and powers rich features in search.",
+    42→    priority: "medium",
+    43→  },
+    44→  {
+    45→    title: "Build dedicated landing pages for each service area",
+    46→    description:
+    47→      "If you serve multiple cities, create one page per city with unique content (not just a swap of city name).",
+    48→    whyItMatters:
+    49→      "Generic 'we serve all of California' pages don't rank for city-level searches. Dedicated city pages do.",
+    50→    priority: "medium",
+    51→  },
+    52→  {
+    53→    title: "Audit local citations for accuracy",
+    54→    description:
+    55→      "Check listings on Yelp, Facebook, BBB, Apple Maps, Bing Places, plus 5–10 niche directories for your industry.",
+    56→    whyItMatters:
+    57→      "Outdated citations confuse Google about your real address and phone — clean them up to consolidate signals.",
+    58→    priority: "medium",
+    59→  },
+    60→];
+    61→
+    62→const ecommerce: NicheTaskTemplate[] = [
+    63→  {
+    64→    title: "Add Product schema to every product page",
+    65→    description:
+    66→      "Use JSON-LD with name, image, description, sku, brand, offers (price, availability), and aggregateRating.",
+    67→    whyItMatters:
+    68→      "Product schema unlocks rich results in Google: price, stock status, ratings — directly improving CTR and qualified clicks.",
+    69→    priority: "high",
+    70→  },
+    71→  {
+    72→    title: "Optimize product image file sizes and alt text",
+    73→    description:
+    74→      "Run a bulk image audit. Convert to WebP, target under 100KB each, and write descriptive alt text using product name + key attributes.",
+    75→    whyItMatters:
+    76→      "Images drive product-page LCP and unlock Google Images traffic, which converts well for ecommerce.",
+    77→    priority: "high",
+    78→  },
+    79→  {
+    80→    title: "Audit faceted navigation for indexable junk URLs",
+    81→    description:
+    82→      "Check filters and sort parameters. Anything that creates near-duplicate URLs (color=red&size=L vs size=L&color=red) needs canonicals or noindex.",
+    83→    whyItMatters:
+    84→      "Uncontrolled facets can generate millions of low-value pages, wasting crawl budget and creating duplicate-content problems.",
+    85→    priority: "high",
+    86→  },
+    87→  {
+    88→    title: "Write unique copy for category and collection pages",
+    89→    description:
+    90→      "Add a 100–300 word intro to each major category page above the product grid, covering buyer intent and key attributes.",
+    91→    whyItMatters:
+    92→      "Category pages often rank for the highest-volume commercial queries — but only if they have content beyond a product grid.",
+    93→    priority: "medium",
+    94→  },
+    95→  {
+    96→    title: "Set up clean breadcrumb navigation with schema",
+    97→    description:
+    98→      "Visible breadcrumbs (Home › Category › Subcategory › Product) plus BreadcrumbList JSON-LD.",
+    99→    whyItMatters:
+   100→      "Breadcrumbs improve internal linking, navigation depth, and unlock breadcrumb display in Google search results.",
+   101→    priority: "medium",
+   102→  },
+   103→  {
+   104→    title: "Plan how to handle out-of-stock products",
+   105→    description:
+   106→      "Decide: keep page live with 'out of stock' (good for SEO), redirect to category, or 410. Document the rule.",
+   107→    whyItMatters:
+   108→      "Killing pages too aggressively destroys earned rankings and backlinks. Keeping them live with proper schema is usually best.",
+   109→    priority: "low",
+   110→  },
+   111→];
+   112→
+   113→const saas: NicheTaskTemplate[] = [
+   114→  {
+   115→    title: "Build comparison pages for each major competitor",
+   116→    description:
+   117→      "Create '[Your product] vs [Competitor]' pages — fair, detailed, with feature tables. Aim for 5–10 of these.",
+   118→    whyItMatters:
+   119→      "Comparison queries are bottom-of-funnel and high-intent. Owning these pages captures buyers actively evaluating you.",
+   120→    priority: "high",
+   121→  },
+   122→  {
+   123→    title: "Build integration pages for every tool you connect to",
+   124→    description:
+   125→      "One page per integration (e.g. '/integrations/slack') describing the use case, setup, and benefit.",
+   126→    whyItMatters:
+   127→      "Buyers search for 'X integration Y' before purchase. Integration pages capture that intent and double as sales collateral.",
+   128→    priority: "high",
+   129→  },
+   130→  {
+   131→    title: "Set up programmatic SEO for use-case landing pages",
+   132→    description:
+   133→      "Identify a templatable pattern (e.g. 'Time tracking for [industry]') and ship 20–100 variants powered from a single template + dataset.",
+   134→    whyItMatters:
+   135→      "Programmatic SEO is one of the highest-leverage tactics for SaaS — it scales coverage of long-tail use cases dramatically.",
+   136→    priority: "medium",
+   137→  },
+   138→  {
+   139→    title: "Write SoftwareApplication schema for your homepage",
+   140→    description:
+   141→      "Add JSON-LD with applicationCategory, offers (pricing tiers), aggregateRating from real reviews.",
+   142→    whyItMatters:
+   143→      "Helps Google place you in software-specific search features and review-rich snippets when applicable.",
+   144→    priority: "medium",
+   145→  },
+   146→  {
+   147→    title: "Build a deep, hub-and-spoke help center",
+   148→    description:
+   149→      "Central /docs hub linking to every feature article. Articles target informational queries from users — and rank.",
+   150→    whyItMatters:
+   151→      "Documentation is high-quality, naturally linked content. SaaS sites often rank for product-related questions through docs alone.",
+   152→    priority: "medium",
+   153→  },
+   154→  {
+   155→    title: "Add FAQ schema to pricing and feature pages",
+   156→    description:
+   157→      "Wrap real questions and answers in FAQPage JSON-LD on pages where users have purchase questions.",
+   158→    whyItMatters:
+   159→      "FAQ rich results take up extra real estate in search and improve CTR on commercial-intent pages.",
+   160→    priority: "low",
+   161→  },
+   162→];
+   163→
+   164→const blog: NicheTaskTemplate[] = [
+   165→  {
+   166→    title: "Build a content calendar for the next 90 days",
+   167→    description:
+   168→      "Plan 1–2 posts per week mapped to topic clusters, with target keywords and pillar links.",
+   169→    whyItMatters:
+   170→      "Consistent publishing on a clear topic plan beats sporadic posts. Topic depth signals authority to Google.",
+   171→    priority: "high",
+   172→  },
+   173→  {
+   174→    title: "Identify your top 3 topic clusters and pillar pages",
+   175→    description:
+   176→      "Pick the 3 broadest topics you want to own. For each, plan a 3000+ word pillar page and 5–10 supporting articles.",
+   177→    whyItMatters:
+   178→      "Topical authority — covering a subject deeply — is one of Google's strongest content-quality signals after the helpful-content updates.",
+   179→    priority: "high",
+   180→  },
+   181→  {
+   182→    title: "Audit content decay — flag posts losing traffic",
+   183→    description:
+   184→      "Pull GSC data, identify posts that lost >30% of clicks YoY. For each, decide: refresh, merge, or retire.",
+   185→    whyItMatters:
+   186→      "Refreshing decaying content recovers traffic at a fraction of the cost of new posts. It's the highest-ROI content task.",
+   187→    priority: "high",
+   188→  },
+   189→  {
+   190→    title: "Add Article schema with author + datePublished + dateModified",
+   191→    description:
+   192→      "Especially for YMYL or expertise-heavy content — make author bylines, credentials, and update dates explicit.",
+   193→    whyItMatters:
+   194→      "E-E-A-T (Experience, Expertise, Authoritativeness, Trust) is now a major Google signal, especially after the helpful-content updates.",
+   195→    priority: "medium",
+   196→  },
+   197→  {
+   198→    title: "Improve internal linking on top-performing posts",
+   199→    description:
+   200→      "On each top-traffic article, add 5–10 contextual links to related pillar/cluster pages.",
+   201→    whyItMatters:
+   202→      "Internal links pass authority from your strongest pages to weaker ones, lifting cluster-wide rankings.",
+   203→    priority: "medium",
+   204→  },
+   205→  {
+   206→    title: "Set up author pages with E-E-A-T signals",
+   207→    description:
+   208→      "Real photo, bio with credentials, links to past work, social profiles, schema with sameAs links.",
+   209→    whyItMatters:
+   210→      "Strong author signals separate trustworthy content from AI-generated noise — increasingly important post-helpful-content updates.",
+   211→    priority: "low",
+   212→  },
+   213→];
+   214→
+   215→const services: NicheTaskTemplate[] = [
+   216→  {
+   217→    title: "Build dedicated pages for each service you offer",
+   218→    description:
+   219→      "Don't bundle services on one page. One page per service, each ~800–1500 words, addressing the specific buyer's questions.",
+   220→    whyItMatters:
+   221→      "Buyers search for specific services, not bundles. Dedicated pages rank for those specific queries.",
+   222→    priority: "high",
+   223→  },
+   224→  {
+   225→    title: "Add Service schema to each service page",
+   226→    description:
+   227→      "Use Service or ProfessionalService JSON-LD with serviceType, areaServed, provider, and offers if you have pricing.",
+   228→    whyItMatters:
+   229→      "Schema helps Google place you in service-related searches and unlock rich features for service businesses.",
+   230→    priority: "medium",
+   231→  },
+   232→  {
+   233→    title: "Publish 3–5 detailed case studies",
+   234→    description:
+   235→      "Real client, real outcome with numbers (or anonymized if needed), the process you used, and lessons learned.",
+   236→    whyItMatters:
+   237→      "Case studies are the strongest trust signal on a services site — both for ranking E-E-A-T and converting buyers who land.",
+   238→    priority: "high",
+   239→  },
+   240→  {
+   241→    title: "Build prominent trust signals on every page",
+   242→    description:
+   243→      "Awards, certifications, client logos, real testimonials with names and photos, real team photos.",
+   244→    whyItMatters:
+   245→      "Service buyers are evaluating risk. Trust signals reduce perceived risk and improve both rankings (E-E-A-T) and conversion.",
+   246→    priority: "medium",
+   247→  },
+   248→  {
+   249→    title: "Create a clear About page with team and credentials",
+   250→    description:
+   251→      "Real names, photos, credentials, years of experience. Link to LinkedIn profiles via sameAs schema.",
+   252→    whyItMatters:
+   253→      "Anonymous service businesses underperform. Real people with credentials are a major trust + E-E-A-T win.",
+   254→    priority: "medium",
+   255→  },
+   256→  {
+   257→    title: "Set up a FAQ section addressing buyer objections",
+   258→    description:
+   259→      "Mine sales calls for the 10 most common questions. Answer them on a page with FAQPage schema.",
+   260→    whyItMatters:
+   261→      "Answering buyer objections directly improves conversion rate and unlocks FAQ rich results in search.",
+   262→    priority: "low",
+   263→  },
+   264→];
+   265→
+   266→export const nicheTemplates: Record<Niche, NicheTaskTemplate[]> = {
+   267→  local,
+   268→  ecommerce,
+   269→  saas,
+   270→  blog,
+   271→  services,
+   272→};
+   273→
+   274→export function getNicheTemplates(
+   275→  niche: string | null | undefined,
+   276→): NicheTaskTemplate[] {
+   277→  if (!niche) return [];
+   278→  return nicheTemplates[niche as Niche] ?? [];
+   279→}
+   280→
+   281→/**
+   282→ * Universal task playbooks. Each playbook is a named bundle of tasks that
+   283→ * applies to any client regardless of niche or tech stack. These cover the
+   284→ * common day-to-day / weekly / monthly SEO routines that every site needs.
+   285→ *
+   286→ * Apply via the /tasks/templates page — clones every task into the chosen
+   287→ * client with optional staggered due dates.
+   288→ */
+   289→export type Playbook = {
+   290→  id: string;
+   291→  name: string;
+   292→  description: string;
+   293→  category: "weekly" | "monthly" | "quarterly" | "launch" | "recovery";
+   294→  /** Estimated total hours to complete the playbook. */
+   295→  estimatedHours: number;
+   296→  /** Tasks in suggested order. The first task gets dueDate today + offsetDays. */
+   297→  tasks: (NicheTaskTemplate & { offsetDays?: number })[];
+   298→};
+   299→
+   300→export const playbooks: Playbook[] = [
+   301→  {
+   302→    id: "weekly-health-check",
+   303→    name: "Weekly health check",
+   304→    description:
+   305→      "What every SEO does first thing Monday — catch ranking drops, indexing issues, broken pages before clients notice.",
+   306→    category: "weekly",
+   307→    estimatedHours: 1,
+   308→    tasks: [
+   309→      {
+   310→        title: "Review GSC for sudden traffic drops",
+   311→        description:
+   312→          "Open Search Console → Performance. Compare last 7 days vs prior 7. Flag any query/page with >25% click drop and investigate.",
+   313→        whyItMatters:
+   314→          "Catching drops early lets you correlate against algorithm updates, your own deploys, or content changes — and recover before the loss compounds.",
+   315→        priority: "high",
+   316→        offsetDays: 0,
+   317→      },
+   318→      {
+   319→        title: "Check Coverage / Pages report for new errors",
+   320→        description:
+   321→          "GSC → Indexing → Pages. Look for any new errors (404, redirect issues, soft-404, server errors).",
+   322→        whyItMatters:
+   323→          "Indexing errors block pages from earning traffic. Most are easy fixes if caught the same week they appear.",
+   324→        priority: "high",
+   325→        offsetDays: 0,
+   326→      },
+   327→      {
+   328→        title: "Re-check rank tracker for tracked keywords",
+   329→        description:
+   330→          "Look at rank changes >5 positions on tracked keywords. Verify any drops aren't temporary SERP volatility.",
+   331→        whyItMatters:
+   332→          "Tracked keywords are the ones tied to revenue. Big drops here demand same-week investigation, not month-end discovery.",
+   333→        priority: "medium",
+   334→        offsetDays: 0,
+   335→      },
+   336→      {
+   337→        title: "Run a fresh site audit on key pages",
+   338→        description:
+   339→          "Audit the homepage + top 3 traffic pages. Confirm titles, metas, schema, and CWV haven't regressed.",
+   340→        whyItMatters:
+   341→          "Deploys and CMS edits silently break SEO. Weekly audits catch regressions before they hurt rankings.",
+   342→        priority: "medium",
+   343→        offsetDays: 1,
+   344→      },
+   345→    ],
+   346→  },
+   347→  {
+   348→    id: "monthly-content-refresh",
+   349→    name: "Monthly content refresh",
+   350→    description:
+   351→      "Find decaying pages, update them, and re-promote. The single highest-ROI ongoing SEO activity for content sites.",
+   352→    category: "monthly",
+   353→    estimatedHours: 6,
+   354→    tasks: [
+   355→      {
+   356→        title: "Identify top 5 decaying pages from GSC",
+   357→        description:
+   358→          "Use the Content decay tool. Pick pages with meaningful prior traffic and >20% click drop.",
+   359→        whyItMatters:
+   360→          "Refreshing existing top performers is 5–10× faster than ranking new content, and Google rewards freshness signals on previously trusted pages.",
+   361→        priority: "high",
+   362→        offsetDays: 0,
+   363→      },
+   364→      {
+   365→        title: "Audit each decaying page against current SERP",
+   366→        description:
+   367→          "Search the target keyword. Note what the top 3 results cover that yours doesn't. Check for outdated stats, year mentions, and screenshots.",
+   368→        whyItMatters:
+   369→          "SERPs evolve. The page that ranked 18 months ago may now miss key subtopics, schema, or freshness signals competitors have added.",
+   370→        priority: "high",
+   371→        offsetDays: 1,
+   372→      },
+   373→      {
+   374→        title: "Rewrite intro + add 1–2 new sections per page",
+   375→        description:
+   376→          "Update the intro with fresh framing, current year, and updated stats. Add new sections covering subtopics from your SERP audit.",
+   377→        whyItMatters:
+   378→          "Substantial content updates (not just changing a date) trigger Google's freshness re-evaluation and typically lift rankings within 2–4 weeks.",
+   379→        priority: "high",
+   380→        offsetDays: 3,
+   381→      },
+   382→      {
+   383→        title: "Update internal links pointing into refreshed pages",
+   384→        description:
+   385→          "Find pages already linking to the refreshed page. Update anchor text to match the new focus, add 2–3 fresh internal links from related posts.",
+   386→        whyItMatters:
+   387→          "Internal link signals reinforce the refresh — Google re-crawls linked pages faster, and updated anchor text helps with semantic relevance.",
+   388→        priority: "medium",
+   389→        offsetDays: 5,
+   390→      },
+   391→      {
+   392→        title: "Re-submit refreshed URLs in GSC",
+   393→        description:
+   394→          "GSC → URL Inspection → Request Indexing for each refreshed URL. Speeds up the re-crawl from days to hours.",
+   395→        whyItMatters:
+   396→          "Manual re-indexing accelerates Google's evaluation of your changes. The faster Google sees the new content, the faster you see ranking lift.",
+   397→        priority: "medium",
+   398→        offsetDays: 7,
+   399→      },
+   400→    ],
+   401→  },
+   402→  {
+   403→    id: "monthly-technical-audit",
+   404→    name: "Monthly technical audit",
+   405→    description:
+   406→      "The technical SEO health pass — broken links, redirects, schema, CWV, indexability. Catch debt before it accumulates.",
+   407→    category: "monthly",
+   408→    estimatedHours: 4,
+   409→    tasks: [
+   410→      {
+   411→        title: "Run a full broken-link scan",
+   412→        description:
+   413→          "Crawl the site. Fix any internal 404s, update outbound dead links, redirect orphaned pages.",
+   414→        whyItMatters:
+   415→          "Broken links waste crawl budget, frustrate users, and suggest poor maintenance to Google. They accumulate quietly with every CMS edit.",
+   416→        priority: "high",
+   417→        offsetDays: 0,
+   418→      },
+   419→      {
+   420→        title: "Audit redirect chains (>1 hop)",
+   421→        description:
+   422→          "Find any URL that redirects more than once before resolving. Replace each with a single direct redirect to the final URL.",
+   423→        whyItMatters:
+   424→          "Each redirect hop wastes crawl budget and adds latency. Long chains can cause Google to abandon the crawl entirely.",
+   425→        priority: "medium",
+   426→        offsetDays: 1,
+   427→      },
+   428→      {
+   429→        title: "Validate schema on key page types",
+   430→        description:
+   431→          "Test homepage, product/service template, blog template, and contact page through Google's Rich Results Test.",
+   432→        whyItMatters:
+   433→          "Schema breaks silently with theme/CMS updates. Broken schema means losing rich results — directly impacting SERP CTR.",
+   434→        priority: "medium",
+   435→        offsetDays: 2,
+   436→      },
+   437→      {
+   438→        title: "Review Core Web Vitals trend",
+   439→        description:
+   440→          "Open PageSpeed Insights for the homepage + 2 traffic pages. Confirm LCP < 2.5s, INP < 200ms, CLS < 0.1.",
+   441→        whyItMatters:
+   442→          "CWV is a confirmed ranking factor. Regressions usually come from new third-party scripts, image swaps, or theme updates.",
+   443→        priority: "medium",
+   444→        offsetDays: 3,
+   445→      },
+   446→      {
+   447→        title: "Check robots.txt + sitemap.xml health",
+   448→        description:
+   449→          "Validate both files. Confirm sitemap submits cleanly in GSC and contains only canonical URLs returning 200.",
+   450→        whyItMatters:
+   451→          "A broken sitemap or wrong robots.txt rule can deindex large parts of a site overnight. Worth a 5-minute check.",
+   452→        priority: "low",
+   453→        offsetDays: 4,
+   454→      },
+   455→    ],
+   456→  },
+   457→  {
+   458→    id: "monthly-competitor-watch",
+   459→    name: "Monthly competitor watch",
+   460→    description:
+   461→      "What your top 3 competitors did this month — content, backlinks, ranking gains. Steal what works.",
+   462→    category: "monthly",
+   463→    estimatedHours: 3,
+   464→    tasks: [
+   465→      {
+   466→        title: "List new content competitors published this month",
+   467→        description:
+   468→          "Check 3 competitors' /blog or sitemaps. Note new posts, target keywords, format, length.",
+   469→        whyItMatters:
+   470→          "Knowing what they're investing in tells you which keywords are heating up in your niche before they show in your rank tracker.",
+   471→        priority: "medium",
+   472→        offsetDays: 0,
+   473→      },
+   474→      {
+   475→        title: "Identify keywords competitors gained on this month",
+   476→        description:
+   477→          "Use SERP overlap tooling — find queries where they now rank top 10 and you don't.",
+   478→        whyItMatters:
+   479→          "Their wins are your roadmap. New rankings = a topic Google is currently rewarding in your niche.",
+   480→        priority: "medium",
+   481→        offsetDays: 1,
+   482→      },
+   483→      {
+   484→        title: "Check competitors for new high-quality backlinks",
+   485→        description:
+   486→          "Use GSC + Ahrefs Webmaster Tools (free). Note any new domain-rating-30+ links. Investigate the linking page — can you earn the same?",
+   487→        whyItMatters:
+   488→          "Reverse-engineering link sources is the highest-yield link-building research. Sites that link to one competitor often link to others.",
+   489→        priority: "low",
+   490→        offsetDays: 2,
+   491→      },
+   492→      {
+   493→        title: "Note any major page changes on competitor key pages",
+   494→        description:
+   495→          "Diff their homepage + top traffic pages from last month. Look for new sections, schema changes, repositioning.",
+   496→        whyItMatters:
+   497→          "Big competitor edits often correlate with their own ranking movements — a leading indicator for what's about to work in the niche.",
+   498→        priority: "low",
+   499→        offsetDays: 3,
+   500→      },
+   501→    ],
+   502→  },
+   503→  {
+   504→    id: "new-client-onboarding",
+   505→    name: "New client onboarding",
+   506→    description:
+   507→      "First 14 days with a new client — get GSC/GA4 connected, baseline measurements, quick wins, and trust built.",
+   508→    category: "launch",
+   509→    estimatedHours: 8,
+   510→    tasks: [
+   511→      {
+   512→        title: "Connect Google Search Console",
+   513→        description:
+   514→          "Verify the property if not already, then connect via OAuth. Confirm 16 months of historical data is visible.",
+   515→        whyItMatters:
+   516→          "GSC is your single source of truth for what's actually ranking. Without it, every recommendation is guesswork.",
+   517→        priority: "high",
+   518→        offsetDays: 0,
+   519→      },
+   520→      {
+   521→        title: "Connect Google Analytics 4",
+   522→        description:
+   523→          "Get GA4 access (Read & Analyze role). Verify organic traffic data appears and matches GSC clicks within ~10%.",
+   524→        whyItMatters:
+   525→          "GA4 ties traffic to outcomes (conversions, revenue). Without it, you can't show the client what their SEO investment actually returned.",
+   526→        priority: "high",
+   527→        offsetDays: 0,
+   528→      },
+   529→      {
+   530→        title: "Run baseline full-site audit",
+   531→        description:
+   532→          "Crawl every URL. Capture initial health score, issue counts by severity, top 10 issues. Save as the baseline snapshot.",
+   533→        whyItMatters:
+   534→          "The baseline is your before-photo. Every monthly report compares against it — without it you have no measurable progress to show.",
+   535→        priority: "high",
+   536→        offsetDays: 1,
+   537→      },
+   538→      {
+   539→        title: "Identify and fix top 3 quick-win issues",
+   540→        description:
+   541→          "From the audit, pick the 3 issues with highest impact-to-effort ratio. Fix them in week 1 to show immediate movement.",
+   542→        whyItMatters:
+   543→          "Visible progress in the first 2 weeks is what builds client trust. A single ranking improvement they can see makes them advocates internally.",
+   544→        priority: "high",
+   545→        offsetDays: 2,
+   546→      },
+   547→      {
+   548→        title: "Build initial keyword tracking list (20–50 keywords)",
+   549→        description:
+   550→          "Start with their existing top GSC queries + 5–10 strategic targets they want to rank for. Don't track aspirational long-tail yet.",
+   551→        whyItMatters:
+   552→          "Tracking the wrong keywords (or too many) creates noise. Start narrow with what's already working + immediate goals.",
+   553→        priority: "medium",
+   554→        offsetDays: 4,
+   555→      },
+   556→      {
+   557→        title: "Document goals + first 90-day strategy",
+   558→        description:
+   559→          "Write a one-page strategy doc: client's 3 goals, your 3 priorities, first 30/60/90-day milestones. Share for sign-off.",
+   560→        whyItMatters:
+   561→          "Aligning on goals up front prevents 'why did you do X' conversations later. The signed-off plan is your shield + roadmap.",
+   562→        priority: "medium",
+   563→        offsetDays: 7,
+   564→      },
+   565→    ],
+   566→  },
+   567→  {
+   568→    id: "traffic-drop-recovery",
+   569→    name: "Traffic drop recovery",
+   570→    description:
+   571→      "Run when GSC shows a sudden drop. Diagnose the cause systematically before guessing — most drops have one of five causes.",
+   572→    category: "recovery",
+   573→    estimatedHours: 4,
+   574→    tasks: [
+   575→      {
+   576→        title: "Confirm the drop is real (not a tracking issue)",
+   577→        description:
+   578→          "Check GSC + GA4 + your rank tracker independently. Confirm the drop appears in all three.",
+   579→        whyItMatters:
+   580→          "Tracking glitches account for ~15% of perceived 'drops'. Eliminate this first before spending hours diagnosing a non-issue.",
+   581→        priority: "high",
+   582→        offsetDays: 0,
+   583→      },
+   584→      {
+   585→        title: "Check if a Google algorithm update overlaps the drop date",
+   586→        description:
+   587→          "Look at Google's Search Status Dashboard + algorithm-update tracker. Note if any update finished within ±3 days of the drop.",
+   588→        whyItMatters:
+   589→          "Algorithm updates are the #1 cause of unexplained drops. Knowing 'core update' vs 'spam update' vs 'helpful content' shapes the entire recovery strategy.",
+   590→        priority: "high",
+   591→        offsetDays: 0,
+   592→      },
+   593→      {
+   594→        title: "Identify which pages and queries dropped most",
+   595→        description:
+   596→          "GSC → Performance → compare 28 days before vs 28 days after. Sort by clicks lost. Focus on the top 10.",
+   597→        whyItMatters:
+   598→          "Drops are rarely site-wide. Finding the concentrated pages tells you whether it's content, technical, or SERP-feature related.",
+   599→        priority: "high",
+   600→        offsetDays: 0,
+   601→      },
+   602→      {
+   603→        title: "Audit the dropped pages for technical regressions",
+   604→        description:
+   605→          "Run a fresh audit on each. Check for new noindex, redirect issues, schema breaks, CWV regressions, recent CMS edits.",
+   606→        whyItMatters:
+   607→          "Technical regressions account for ~20% of drops and are the easiest to fix. Rule them out before assuming a content issue.",
+   608→        priority: "medium",
+   609→        offsetDays: 1,
+   610→      },
+   611→      {
+   612→        title: "Compare dropped pages to current top 3 in SERP",
+   613→        description:
+   614→          "Search each lost query. Compare your page's content depth, intent match, and freshness against the new top 3.",
+   615→        whyItMatters:
+   616→          "Most algorithm-driven drops are 'your page is no longer the best answer'. A side-by-side reveals exactly what's missing.",
+   617→        priority: "medium",
+   618→        offsetDays: 2,
+   619→      },
+   620→      {
+   621→        title: "Build the recovery plan + assign to content workflow",
+   622→        description:
+   623→          "Based on findings, write 3–7 specific changes per page. Add each as tasks. Set a 30-day re-evaluation reminder.",
+   624→        whyItMatters:
+   625→          "Recovery requires patience — Google takes 4–8 weeks to re-evaluate. Locking changes into tasks (not your head) keeps execution disciplined.",
+   626→        priority: "high",
+   627→        offsetDays: 3,
+   628→      },
+   629→    ],
+   630→  },
+   631→  {
+   632→    id: "quarterly-strategy-review",
+   633→    name: "Quarterly strategy review",
+   634→    description:
+   635→      "Step back from the daily grind every 90 days. Review what worked, kill what didn't, plan the next quarter.",
+   636→    category: "quarterly",
+   637→    estimatedHours: 4,
+   638→    tasks: [
+   639→      {
+   640→        title: "Review the past quarter's wins and losses",
+   641→        description:
+   642→          "Pull traffic, ranking, and conversion data over 90 days. Identify the 3 biggest wins and 3 biggest losses.",
+   643→        whyItMatters:
+   644→          "Patterns only emerge at quarterly scale. Weekly noise hides what's actually compounding over months.",
+   645→        priority: "high",
+   646→        offsetDays: 0,
+   647→      },
+   648→      {
+   649→        title: "Audit your tracked keywords — drop the dead ones",
+   650→        description:
+   651→          "Remove keywords with zero impressions for 90+ days. Add new strategic targets that emerged from competitor / GSC research.",
+   652→        whyItMatters:
+   653→          "Stale keyword lists waste tracking budget and dilute focus. Quarterly pruning keeps the dashboard a real signal.",
+   654→        priority: "medium",
+   655→        offsetDays: 1,
+   656→      },
+   657→      {
+   658→        title: "Review topical authority — which clusters compound, which don't",
+   659→        description:
+   660→          "Map topic clusters to actual traffic. Identify clusters earning compound traffic vs. dead-end ones.",
+   661→        whyItMatters:
+   662→          "Doubling down on what's working beats spreading thin. Quarterly cluster reviews redirect content investment to proven topics.",
+   663→        priority: "medium",
+   664→        offsetDays: 2,
+   665→      },
+   666→      {
+   667→        title: "Set next quarter's 3 priorities + measurable OKRs",
+   668→        description:
+   669→          "Pick exactly 3 priorities. For each, write a measurable target (clicks, rankings, conversions). Share with stakeholders.",
+   670→        whyItMatters:
+   671→          "Three priorities focus execution. Five priorities = no priorities. Measurable OKRs make the next quarterly review meaningful instead of vibes-based.",
+   672→        priority: "high",
+   673→        offsetDays: 3,
+   674→      },
+   675→    ],
+   676→  },
+   677→];
+   678→
+   679→export function getPlaybook(id: string): Playbook | undefined {
+   680→  return playbooks.find((p) => p.id === id);
+   681→}
+   682→

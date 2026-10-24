@@ -290,3 +290,39 @@ Stage Summary:
 - Rust 2982→~5900 satıra çıktı (6 yeni domain modülü). Port edilen toplam handler: 22→39.
 - Bilinen sapmalar: (1) importAhrefs/logBuiltLink activity log user_id artık proxy'den gelmiyor (null) — orijinalde de yoktu; (2) headless form-action submit artifact'ı dev-only, prod build etkilenmez.
 - 14.5b sıradaki: clients CRUD + templates + share-token. Her faz sonu push: bu commit o gereksinimin ilki.
+
+---
+Task ID: 14.5b
+Agent: Claude (sub-agent, clients-CRUD portu)
+Task: Faz 14.5b — clients domain çekirdek CRUD'unun Rust REST'e portu + Next action'larının proxy'ye çevrilmesi: create/update/delete/quick-add/redetect-stack/apply-templates/share-token. fetchClientMetadata + refreshClientMetadata(Form) (dış HTTP) ve emailPortalLink (SMTP) Next'te kaldı.
+
+Work Log:
+- Yeni Rust: backend/src/clients.rs (933 satır, 7 endpoint) + backend/src/client_templates.rs (ÜRETİLMİŞ veri modülü, 192 satır — backend/tools/gen-templates.ts ile src/lib/niche-templates.ts + tech-stack-templates.ts'ten EXPORT edildi; elle kopya yok, data drift'te generator pickStackTemplates ile doğrulama yapıp patlıyor). main.rs'e 7 route bağlandı (internal-token middleware altında).
+- Endpoint'ler: POST /api/internal/clients/create ({ok,id,redirect:"/clients/{id}/onboarding"}), /quick-add ({ok,id}), /:id/update ({ok,id,redirect:"/clients/{id}"}), /:id/delete ({ok,redirect:"/clients"}), /:id/redetect-stack, /:id/apply-templates ({kind:"stack"|"niche"}), /:id/share-token ({action:"generate"|"revoke"}).
+- Template motoru portu: insertNewTemplates (exact-title dedupe + multi-row insert status='todo') + logSkippedTemplates (task.template_skipped, dedupe:false, "Skipped N {source} task(s) this site already does: title — evidence; ...") Rust tarafında; niche (5 set) + stack (10 set + detectionLabelToKey + pickStackTemplates custom fallback) verisi sabit olarak Rust'ta.
+- SAPMA (dürüst kayıt): (1) detectTechStack / fetchSiteMetadata / siteFactsFor (readSiteFacts) dış HTTP işleri — Rust'ta HTTP client crate yok (NO new Cargo deps) → Next proxy'de kaldı; create/quick-add gövdesine techStack + meta alanları, apply/create'e de precheck:[{title,evidence}]verdiktleri body ile gidiyor (verdicts-over-the-wire; template-preflight CHECKS Rust'a port EDİLMEDİ — ~250 satır regex kontrol, regex crate'siz elle yazım yüksek risk, preflight hatasının doğal sonucu ekstra task oluşması). (2) redetect-stack'e mission "+ activity entry" diyordu ama kaynak aksiyonda activity YOK — kaynağa sadık kalındı, eklenmedi. (3) quick-add'te baseline snapshot (captureClientSnapshot dynamic-import) Next proxy'de, callBackend sonrası — orijinalde activity log'dan ÖNCEydi, şimdi Rust tek çağrıda activity yazdığı için snapshot activity'den SONRA geliyor (benign, sıra farkı). (4) Activity user_id artık proxy body'den geçiyor (tasks 14.5a prensibi).
+- DÜZELTME 1: Db::open'e PRAGMA foreign_keys=ON eklendi (better-sqlite3 default'u; deleteClient FK cascade'i buna bel bağlı; ilk denemede query_row ile set etmeye çalışınca "Query returned no rows" panic — execute_batch ile çözüldü). 14.5a smoke 12/12 hâlâ PASS.
+- DÜZELTME 2: multi-row task INSERT placeholder matematiği (satır başına 4 text + paylaşılan ?1 client_id; ilk denemede "Got 25, needed 31").
+- Next: src/app/clients/actions.ts — createClient/updateClient/deleteClient/quickAddClient/applyStackTemplates/applyNicheTemplates/redetectTechStack proxy (imzalar + zod + guardAction FIRST + revalidatePath + redirect(result.redirect) korundu; fire-and-forget runAuditForClient+runAiSiteAudit ve captureClientSnapshot dynamic-import blokları callBackend sonrası aynen duruyor). fetchClientMetadata/refreshClientMetadata/refreshClientMetadataForm hiç dokunulmadı. share-actions.ts: generate/revoke proxy; emailPortalLink aynen.
+- Smoke: backend/tools/internal-smoke.sh'a 14.5b bölümü (17 yeni assertion): create(+redirect+template seed+skip-log) → apply idempotent → update(+redirect) → redetect-stack (db doğrulama) → share-token generate (32-char urlsafe format db'den) / revoke (NULL) → quick-add (Shopify→ecommerce inference + social_links JSON) → delete + cascade (clients gone + tasks gone). TAM SCRIPT: 29/29 PASS.
+- cargo build green (yalnız pre-existing 6 warning; clients.rs/client_templates.rs'den sıfır warning). bunx tsc --noEmit: src/'den SIFIR hata (yalnız pre-existing backend/tools hataları). bun run lint: benim dosyalardan sıfır yeni hata (pre-existing skills/upload hataları aynen).
+
+Stage Summary:
+- Faz 14.5b TAMAM: 7 yeni Rust endpoint (toplam internal 24) + 9 proxy fonksiyon (7 actions + 2 share) canlı; smoke 29/29; tsc+lint temiz.
+- Rust ~5900→~7060 satır. Template verisi artık iki tarafda da var: Rust sabitleri (generated, doğrulanmış) + Next libs (google-import gibi diğer çağırıcılar için duruyor).
+- Bilinen sapmalar yukarıda 4 madde; en önemlisi preflight verdicts-over-the-wire mimarisi (dış HTTP Next'te kaldığı sürece kaçınılmaz).
+- 14.5 sıradaki: kalan action dosyaları (import/*, competitors, outreach, settings vb.) veya faz kapanışı — ana plana göre.
+
+---
+Task ID: 14.5b-verify
+Agent: Z.ai Code (main)
+Task: 14.5b bağımsız doğrulama + push
+
+Work Log:
+- Fresh binary rebuild + restart sonrası smoke tekrar koşturuldu: 29/29 PASS (agent iddiası doğrulandı).
+- tsc (src/ 0 hata) + lint (değişen dosyalar temiz) teyit edildi.
+- UI golden-path E2E: /clients/new formu → "14.5b E2E Client" → redirect /clients/13/onboarding → DB'de id=13 + 7 template task'ı (Rust template motoru) doğrulandı.
+- Not: dev-supervisor eski boot akışında db:push hatasıyla takılıyor (ayrı takip konusu); direkt bun run dev kullanıldı.
+
+Stage Summary:
+- Faz 14.5b doğrulandı ve push'landı. Toplam /api/internal endpoint: 24. Sıradaki faz 14.6 (tools wave) veya 14.7 (RSC renewal).

@@ -9,12 +9,26 @@ import { clients, type ClientSocialLinks } from "@/db/schema";
 import { detectTechStack } from "@/lib/tech-detect";
 import { fetchSiteMetadata, type SiteMetadata } from "@/lib/site-metadata";
 import { logActivity } from "@/lib/activity";
-import {
-  applyNicheTemplatesForClient,
-  applyStackTemplatesForClient,
-  siteFactsFor,
-} from "@/lib/apply-task-templates";
+import { currentUserId } from "@/lib/auth";
+import { callBackend } from "@/lib/backend";
 import { guardAction } from "@/lib/action-guard";
+import { siteFactsFor } from "@/lib/apply-task-templates";
+import {
+  CHECKED_TEMPLATE_TITLES,
+  templateSatisfied,
+} from "@/lib/template-preflight";
+
+// Task 14.5b: createClient, updateClient, deleteClient, quickAddClient,
+// applyStackTemplates, applyNicheTemplates and redetectTechStack are thin
+// proxies over /api/internal/clients/* — the DB effects (client rows, the
+// template engine, activity log, share tokens) live in
+// backend/src/clients.rs. The zod schemas stay Next-side so the UI error
+// strings are byte-identical; the Rust endpoint re-validates for direct
+// callers. What stays Next-side on purpose (no HTTP client in the Rust
+// backend — no new Cargo deps): detectTechStack, fetchSiteMetadata and the
+// template-preflight site read. The preflight verdicts travel with the
+// request as {title, evidence} pairs; a title without a verdict is kept,
+// which is exactly templateSatisfied(null-facts) behaviour.
 
 const niches = ["local", "ecommerce", "saas", "blog", "services"] as const;
 
@@ -48,6 +62,25 @@ const clientInput = z.object({
   youtube: optionalString,
   tiktok: optionalString,
 });
+
+/**
+ * The Rust template engine (candidate data, skip-logging, dedupe, insert)
+ * needs to know which templates the live site already satisfies. The facts
+ * come from reading the site — an HTTP job that stays here — so this reads
+ * the site once and turns it into per-title verdicts for the backend.
+ */
+async function templatePrecheck(
+  url: string | null | undefined,
+): Promise<{ title: string; evidence: string }[]> {
+  const facts = await siteFactsFor(url);
+  if (!facts || !facts.reachable) return [];
+  const out: { title: string; evidence: string }[] = [];
+  for (const title of CHECKED_TEMPLATE_TITLES) {
+    const verdict = templateSatisfied(title, facts);
+    if (verdict) out.push({ title, evidence: verdict.evidence });
+  }
+  return out;
+}
 
 export type ClientMetadataResult =
   | { ok: true; metadata: SiteMetadata }
@@ -126,48 +159,17 @@ export async function createClient(
     // We still create the client; user can retry detection from the detail page.
   }
 
-  const socialLinks: ClientSocialLinks = {};
-  if (parsed.data.facebook) socialLinks.facebook = parsed.data.facebook;
-  if (parsed.data.twitter) socialLinks.twitter = parsed.data.twitter;
-  if (parsed.data.instagram) socialLinks.instagram = parsed.data.instagram;
-  if (parsed.data.linkedin) socialLinks.linkedin = parsed.data.linkedin;
-  if (parsed.data.youtube) socialLinks.youtube = parsed.data.youtube;
-  if (parsed.data.tiktok) socialLinks.tiktok = parsed.data.tiktok;
-
-  const [row] = await db
-    .insert(clients)
-    .values({
-      name: parsed.data.name,
-      url: parsed.data.url,
-      niche: parsed.data.niche,
+  const result = await callBackend<{
+    ok: true;
+    id: number;
+    redirect: string;
+  }>("/api/internal/clients/create", {
+    body: {
+      ...parsed.data,
       techStack: detectedStack,
-      logoUrl: parsed.data.logoUrl ?? null,
-      description: parsed.data.description ?? null,
-      address: parsed.data.address ?? null,
-      phone: parsed.data.phone ?? null,
-      email: parsed.data.email ?? null,
-      gbpUrl: parsed.data.gbpUrl ?? null,
-      socialLinks: Object.keys(socialLinks).length > 0 ? socialLinks : null,
-    })
-    .returning({ id: clients.id });
-
-  // One read of the live site, shared by both template passes, so the
-  // checklist does not open with work this site finished years ago.
-  const facts = await siteFactsFor(parsed.data.url);
-
-  // Auto-seed niche-specific tasks (CLAUDE.md Part 3.3)
-  await applyNicheTemplatesForClient(row.id, parsed.data.niche, facts);
-
-  // Auto-seed tech-stack-aware checklist (CLAUDE.md Part 3.2 + Part 10)
-  await applyStackTemplatesForClient(row.id, detectedStack, facts);
-
-  await logActivity({
-    kind: "client.created",
-    message: `Added client ${parsed.data.name} (${parsed.data.url}).`,
-    level: "success",
-    clientId: row.id,
-    entityType: "client",
-    entityId: row.id,
+      precheck: await templatePrecheck(parsed.data.url),
+      userId: await currentUserId(),
+    },
   });
 
   revalidatePath("/");
@@ -187,13 +189,13 @@ export async function createClient(
   void (async () => {
     try {
       const { runAuditForClient } = await import("@/app/audits/actions");
-      await runAuditForClient(row.id);
+      await runAuditForClient(result.id);
     } catch {
       // Best-effort — re-runnable from the client page.
     }
     try {
       const { runAiSiteAudit } = await import("@/lib/ai-site-audit");
-      await runAiSiteAudit({ clientId: row.id, url: parsed.data.url });
+      await runAiSiteAudit({ clientId: result.id, url: parsed.data.url });
     } catch {
       // Silent — user can re-run from the AI audit page if it failed.
     }
@@ -202,22 +204,24 @@ export async function createClient(
   // First-add: drop into the smart-onboarding wizard so they get a 30-day
   // plan generated end-to-end. Existing clients still go straight to the
   // detail page (their wizard is reachable via the "Re-plan" button).
-  redirect(`/clients/${row.id}/onboarding`);
+  redirect(result.redirect);
 }
 export async function applyStackTemplates(clientId: number) {
   await guardAction("edit", clientId);
   const [client] = await db
-    .select()
+    .select({ url: clients.url })
     .from(clients)
     .where(eq(clients.id, clientId))
     .limit(1);
   if (!client) return;
 
-  await applyStackTemplatesForClient(
-    clientId,
-    client.techStack,
-    await siteFactsFor(client.url),
-  );
+  await callBackend(`/api/internal/clients/${clientId}/apply-templates`, {
+    body: {
+      kind: "stack",
+      precheck: await templatePrecheck(client.url),
+      userId: await currentUserId(),
+    },
+  });
 
   revalidatePath(`/clients/${clientId}`);
   revalidatePath("/tasks");
@@ -228,17 +232,19 @@ export async function applyStackTemplates(clientId: number) {
 export async function applyNicheTemplates(clientId: number) {
   await guardAction("edit", clientId);
   const [client] = await db
-    .select()
+    .select({ url: clients.url })
     .from(clients)
     .where(eq(clients.id, clientId))
     .limit(1);
   if (!client) return;
 
-  await applyNicheTemplatesForClient(
-    clientId,
-    client.niche,
-    await siteFactsFor(client.url),
-  );
+  await callBackend(`/api/internal/clients/${clientId}/apply-templates`, {
+    body: {
+      kind: "niche",
+      precheck: await templatePrecheck(client.url),
+      userId: await currentUserId(),
+    },
+  });
 
   revalidatePath(`/clients/${clientId}`);
   revalidatePath("/tasks");
@@ -248,7 +254,7 @@ export async function applyNicheTemplates(clientId: number) {
 export async function redetectTechStack(clientId: number) {
   await guardAction("edit", clientId);
   const [client] = await db
-    .select()
+    .select({ url: clients.url })
     .from(clients)
     .where(eq(clients.id, clientId))
     .limit(1);
@@ -256,13 +262,9 @@ export async function redetectTechStack(clientId: number) {
 
   try {
     const detection = await detectTechStack(client.url);
-    await db
-      .update(clients)
-      .set({
-        techStack: detection.technologies.map((t) => t.name),
-        updatedAt: new Date(),
-      })
-      .where(eq(clients.id, clientId));
+    await callBackend(`/api/internal/clients/${clientId}/redetect-stack`, {
+      body: { technologies: detection.technologies.map((t) => t.name) },
+    });
   } catch {
     // ignore — keep existing data
   }
@@ -312,43 +314,20 @@ export async function updateClient(
     return { ok: false, errors };
   }
 
-  const socialLinks: ClientSocialLinks = {};
-  if (parsed.data.facebook) socialLinks.facebook = parsed.data.facebook;
-  if (parsed.data.twitter) socialLinks.twitter = parsed.data.twitter;
-  if (parsed.data.instagram) socialLinks.instagram = parsed.data.instagram;
-  if (parsed.data.linkedin) socialLinks.linkedin = parsed.data.linkedin;
-  if (parsed.data.youtube) socialLinks.youtube = parsed.data.youtube;
-  if (parsed.data.tiktok) socialLinks.tiktok = parsed.data.tiktok;
-
-  await db
-    .update(clients)
-    .set({
-      name: parsed.data.name,
-      url: parsed.data.url,
-      niche: parsed.data.niche,
-      logoUrl: parsed.data.logoUrl ?? null,
-      description: parsed.data.description ?? null,
-      address: parsed.data.address ?? null,
-      phone: parsed.data.phone ?? null,
-      email: parsed.data.email ?? null,
-      gbpUrl: parsed.data.gbpUrl ?? null,
-      socialLinks: Object.keys(socialLinks).length > 0 ? socialLinks : null,
-      updatedAt: new Date(),
-    })
-    .where(eq(clients.id, parsed.data.id));
-
-  await logActivity({
-    kind: "client.created", // reuse "client.created" for now since edit isn't a kind
-    message: `Updated client ${parsed.data.name}.`,
-    level: "info",
-    clientId: parsed.data.id,
-    entityType: "client",
-    entityId: parsed.data.id,
+  const result = await callBackend<{
+    ok: true;
+    id: number;
+    redirect: string;
+  }>(`/api/internal/clients/${parsed.data.id}/update`, {
+    body: {
+      ...parsed.data,
+      userId: await currentUserId(),
+    },
   });
 
   revalidatePath("/clients");
   revalidatePath(`/clients/${parsed.data.id}`);
-  redirect(`/clients/${parsed.data.id}`);
+  redirect(result.redirect);
 }
 
 /**
@@ -429,8 +408,9 @@ export type QuickAddResult =
 
 /**
  * One-shot client onboarding: take a URL, do everything else automatically.
- * Fetches metadata (logo, name, description, social, address, phone),
- * detects tech stack, infers niche, seeds task templates, returns clientId.
+ * Metadata fetch + tech detection run here (external HTTP), the insert,
+ * template seeding and activity log happen in backend/src/clients.rs, and
+ * the baseline snapshot stays here (it dynamic-imports the capture stack).
  *
  * Used by the global "Add client" modal so onboarding is ~3 seconds.
  */
@@ -456,52 +436,28 @@ export async function quickAddClient(rawUrl: string): Promise<QuickAddResult> {
 
   const techStack = techDetection?.technologies.map((t) => t.name) ?? null;
 
-  // Auto-detect niche from tech stack
-  const niche: "ecommerce" | "blog" | null = (() => {
-    if (!techStack) return null;
-    const set = new Set(techStack.map((s) => s.toLowerCase()));
-    if (
-      set.has("shopify") ||
-      set.has("woocommerce") ||
-      set.has("magento") ||
-      set.has("bigcommerce")
-    )
-      return "ecommerce";
-    if (set.has("ghost") || set.has("hugo") || set.has("jekyll")) return "blog";
-    return null;
-  })();
-
-  const social = meta.socialLinks ?? {};
-
-  const fallbackName = (() => {
-    try {
-      return new URL(meta.url).hostname.replace(/^www\./, "");
-    } catch {
-      return normalized;
-    }
-  })();
-
-  const [row] = await db
-    .insert(clients)
-    .values({
-      name: meta.name ?? fallbackName,
-      url: meta.url,
-      niche,
-      techStack,
-      logoUrl: meta.logoUrl ?? null,
-      description: meta.description ?? null,
-      address: meta.address ?? null,
-      phone: meta.phone ?? null,
-      email: meta.email ?? null,
-      gbpUrl: meta.gbpUrl ?? null,
-      socialLinks: Object.keys(social).length > 0 ? social : null,
-    })
-    .returning({ id: clients.id });
-
-  // Seed niche + tech-stack tasks, minus anything the site already does
-  const quickAddFacts = await siteFactsFor(meta.url);
-  await applyNicheTemplatesForClient(row.id, niche, quickAddFacts);
-  await applyStackTemplatesForClient(row.id, techStack, quickAddFacts);
+  const result = await callBackend<QuickAddResult>(
+    "/api/internal/clients/quick-add",
+    {
+      body: {
+        url: normalized,
+        meta: {
+          name: meta.name,
+          url: meta.url,
+          logoUrl: meta.logoUrl,
+          description: meta.description,
+          address: meta.address,
+          phone: meta.phone,
+          email: meta.email,
+          gbpUrl: meta.gbpUrl,
+          socialLinks: meta.socialLinks ?? {},
+        },
+        techStack,
+        precheck: await templatePrecheck(meta.url),
+        userId: await currentUserId(),
+      },
+    },
+  );
 
   // Freeze the starting line now, not tonight.
   //
@@ -512,32 +468,27 @@ export async function quickAddClient(rawUrl: string): Promise<QuickAddResult> {
   // report then understates the work by exactly that much.
   //
   // Best-effort: a client that could not be measured is still a client.
-  try {
-    const { captureClientSnapshot } = await import("@/lib/client-snapshots");
-    await captureClientSnapshot({ clientId: row.id, kind: "baseline" });
-  } catch {
-    // The daily agent will take one. Nothing here is worth failing an
-    // add over.
+  if (result.ok) {
+    revalidatePath("/");
+    revalidatePath("/clients");
+    try {
+      const { captureClientSnapshot } = await import("@/lib/client-snapshots");
+      await captureClientSnapshot({ clientId: result.id, kind: "baseline" });
+    } catch {
+      // The daily agent will take one. Nothing here is worth failing an
+      // add over.
+    }
   }
-
-  await logActivity({
-    kind: "client.created",
-    message: `Quick-added ${meta.name ?? fallbackName} (${meta.url}).`,
-    level: "success",
-    clientId: row.id,
-    entityType: "client",
-    entityId: row.id,
-  });
-
-  revalidatePath("/");
-  revalidatePath("/clients");
-  return { ok: true, id: row.id };
+  return result;
 }
 
 export async function deleteClient(id: number) {
   await guardAction("settings", id);
-  await db.delete(clients).where(eq(clients.id, id));
+  const result = await callBackend<{ ok: true; redirect: string }>(
+    `/api/internal/clients/${id}/delete`,
+    { body: {} },
+  );
   revalidatePath("/");
   revalidatePath("/clients");
-  redirect("/clients");
+  redirect(result.redirect);
 }

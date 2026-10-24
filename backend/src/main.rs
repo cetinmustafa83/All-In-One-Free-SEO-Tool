@@ -19,11 +19,16 @@
 //! 14.5a scope: the internal action API (/api/internal/*) behind the
 //! X-Internal-Token middleware — the DB effects of the ported Next server
 //! actions (tasks, notifications, keywords, backlinks, audit issues).
+//!
+//! 14.5b scope: the clients domain (CRUD, quick-add, template seeding,
+//! redetect-stack, share tokens) on the same internal API.
 
 mod audits;
 mod auth;
 mod authweb;
 mod backlinks;
+mod client_templates;
+mod clients;
 mod config;
 mod db;
 mod errlog;
@@ -110,6 +115,23 @@ async fn main() {
         .route(
             "/api/internal/audits/:id/issues-type",
             post(audits::issues_type),
+        )
+        // ---- 14.5b: clients domain ----
+        .route("/api/internal/clients/create", post(clients::create))
+        .route("/api/internal/clients/quick-add", post(clients::quick_add))
+        .route("/api/internal/clients/:id/update", post(clients::update))
+        .route("/api/internal/clients/:id/delete", post(clients::delete))
+        .route(
+            "/api/internal/clients/:id/redetect-stack",
+            post(clients::redetect_stack),
+        )
+        .route(
+            "/api/internal/clients/:id/apply-templates",
+            post(clients::apply_templates),
+        )
+        .route(
+            "/api/internal/clients/:id/share-token",
+            post(clients::share_token),
         )
         .route_layer(axum::middleware::from_fn_with_state(
             state.clone(),
