@@ -248,8 +248,9 @@ export const PROVIDER_CATALOG: {
       "Free GPT-4o + Llama + Phi via GitHub. Free for any GitHub user — uses a Personal Access Token.",
     keyUrl: "https://github.com/settings/tokens",
     keyUrlLabel: "GitHub Settings",
-    envVar: "GITHUB_TOKEN",
-    notes: "True free tier; rate-limited but generous for non-commercial use.",
+    envVar: "GITHUB_MODELS_TOKEN",
+    notes:
+      "True free tier; rate-limited but generous for non-commercial use. Prefers GITHUB_MODELS_TOKEN; GITHUB_TOKEN still works but is also set by CI/git tooling — a stray GITHUB_TOKEN in the environment silently turns this provider on.",
     keyPrefix: "ghp_",
     steps: [
       "Click 'Open GitHub Settings' → Developer settings → Personal access tokens.",

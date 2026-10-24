@@ -108,3 +108,29 @@ Work Log:
 Stage Summary:
 - CodeGPT is back as provider #13 (12 + Ollama), fully wired and UI-verified; commit 8a70250, src lint/tsc clean.
 - Still missing from the lost sessions (unknown spec, low confidence to reconstruct): /ads/settings page (if it ever held more than the per-account guardrails editor) and whatever SubmitButton hardening was — grep shows form submits here use plain useActionState; no SubmitButton component exists to fix.
+
+---
+Task ID: 13
+Agent: Z.ai Code (main)
+Task: "geliştirmeye devam edelim" — API routes smoke audit (the last untested surface) + follow the ai-call failure symptom to an env-var collision fix
+
+Work Log:
+- Enumerated all 36 API route files (47 HTTP handlers); classified GET/POST + side effects. DANGEROUS ones (restart, shutdown, restore POST, update POST, desktop-shortcut POST) identified and NOT called — code review only.
+- Guard architecture verified by reading src/lib/admin-auth.ts: 3-layer protection (Sec-Fetch-Site CSRF check first in every mode; accounts mode = owner role; password mode = proxy cookie; open mode = local-socket only). Destructive POSTs all behind guardAdminRequest.
+- Live smoke suite (/home/z/.audit/api-smoke.sh): 26 probes, ALL as designed —
+  - open endpoints (auth/mode, auth/status, health-ping, v1/health, errors/env) → 200 sane JSON
+  - v1 Bearer API: 9/9 endpoints return 401 without token (clients, clients/1, audits, audits/1, keywords, rankings, reports, snapshots, capture)
+  - edge/fixes contract exact: 400 (no client / client=0), 401 (no token); cache headers + graceful-empty catch in code
+  - errors/by-digest: 400 on non-numeric digest (format validation is correct — Next digests are numeric), 200 {found:false} on valid-format miss
+  - google/auth + callback → 307 to /settings/google?error=no-credentials|missing-code (graceful, not configured here)
+  - report-archives/999999/pdf → 404; restore GET → db size+SQLite header check; update GET → local SHA vs remote (null remote degrades gracefully); desktop-shortcut GET → Windows-only message
+  - team/invite has 401/403 guards; errors POST truncates context/digest fields
+- SYMPTOM FOLLOW-UP (dev.log: recurring "[ai-call] gpt-4o-mini call failed: fetch failed" on every GET /): root-caused to an env-var collision — the `github` AI provider's env fallback is GITHUB_TOKEN; this session stored the user's repo-push PAT in .env as GITHUB_TOKEN → Next reloaded env → configuredProviders() counted github as configured → scheduler agents fired doomed AI calls (sandbox has no egress to models endpoint). ai-call.ts's no_provider short-circuit was correct all along; the input was wrong.
+- FIX (2 files): api-keys.ts — ENV_VAR map → ENV_VAR_CANDIDATES (priority list per provider) + envApiKey() helper; github = ["GITHUB_MODELS_TOKEN", "GITHUB_TOKEN"] with full collision rationale in comments (CI/git tooling set GITHUB_TOKEN universally). api-providers.ts — GitHub Models card envVar hint → GITHUB_MODELS_TOKEN, notes explain the stray-GITHUB_TOKEN hazard. GITHUB_TOKEN kept as fallback so explicit Actions/Codespaces setups still work.
+- Sandbox-side: renamed the push token in .env + ~/.bashrc from GITHUB_TOKEN to GITHUB_PAT (name the app never reads) — collision removed at the source.
+- Verified live: after Next's "Reload env: .env", two consecutive GET / produced ZERO new ai-call failures (previously every load logged one). tsc + eslint clean.
+
+Stage Summary:
+- API surface (36 route files) audited end-to-end: auth guards, contracts, and degradation paths all correct — no endpoint fixes needed. Combined with tasks 10–11 (28 page routes browser-verified), every user-facing surface has now been exercised.
+- Real bug found and fixed: GitHub Models AI provider silently activated by any environment GITHUB_TOKEN (CI collision class). New preferred env var GITHUB_MODELS_TOKEN; UI hint updated; sandbox token renamed to GITHUB_PAT.
+- Durable lesson: .env is app-env — never store generic-name secrets (GITHUB_TOKEN, OPENAI_API_KEY...) in it that collide with the app's provider env fallbacks; use suffixed names (GITHUB_PAT).

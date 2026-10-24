@@ -5,20 +5,39 @@ export type { Provider } from "./api-providers";
 export { PROVIDER_CATALOG } from "./api-providers";
 import type { Provider } from "./api-providers";
 
-const ENV_VAR: Record<Provider, string> = {
-  openai: "OPENAI_API_KEY",
-  anthropic: "ANTHROPIC_API_KEY",
-  gemini: "GEMINI_API_KEY",
-  perplexity: "PERPLEXITY_API_KEY",
-  openrouter: "OPENROUTER_API_KEY",
-  groq: "GROQ_API_KEY",
-  mistral: "MISTRAL_API_KEY",
-  deepseek: "DEEPSEEK_API_KEY",
-  cerebras: "CEREBRAS_API_KEY",
-  together: "TOGETHER_API_KEY",
-  github: "GITHUB_TOKEN",
-  codegpt: "CODEGPT_API_KEY",
+/**
+ * Env fallbacks per provider, in priority order.
+ *
+ * `github` (GitHub Models) deliberately prefers GITHUB_MODELS_TOKEN over
+ * GITHUB_TOKEN: CI systems (GitHub Actions) and many git tools set
+ * GITHUB_TOKEN universally, and any such token in the environment made
+ * this provider look "configured" — so the scheduler's agents started
+ * firing AI calls nobody asked for, and every dashboard load logged a
+ * fetch failure on installs without outbound access. GITHUB_TOKEN stays
+ * as a fallback so an explicit Actions/Codespaces setup still works.
+ */
+const ENV_VAR_CANDIDATES: Record<Provider, string[]> = {
+  openai: ["OPENAI_API_KEY"],
+  anthropic: ["ANTHROPIC_API_KEY"],
+  gemini: ["GEMINI_API_KEY"],
+  perplexity: ["PERPLEXITY_API_KEY"],
+  openrouter: ["OPENROUTER_API_KEY"],
+  groq: ["GROQ_API_KEY"],
+  mistral: ["MISTRAL_API_KEY"],
+  deepseek: ["DEEPSEEK_API_KEY"],
+  cerebras: ["CEREBRAS_API_KEY"],
+  together: ["TOGETHER_API_KEY"],
+  github: ["GITHUB_MODELS_TOKEN", "GITHUB_TOKEN"],
+  codegpt: ["CODEGPT_API_KEY"],
 };
+
+function envApiKey(provider: Provider): string | null {
+  for (const name of ENV_VAR_CANDIDATES[provider]) {
+    const v = process.env[name];
+    if (v && v.length > 0) return v;
+  }
+  return null;
+}
 
 const SETTING_KEY: Record<Provider, `api.${Provider}`> = {
   openai: "api.openai",
@@ -43,8 +62,7 @@ export async function getApiKey(provider: Provider): Promise<string | null> {
     // Decrypt failed — key missing or corrupt. Don't send `enc:v1:...`
     // ciphertext as the API key Bearer token. Fall through to env var.
     if (plain === null) {
-      const fromEnvFallback = process.env[ENV_VAR[provider]];
-      return fromEnvFallback && fromEnvFallback.length > 0 ? fromEnvFallback : null;
+      return envApiKey(provider);
     }
     // Lazy migration: if the row was stored plaintext, re-write encrypted
     // on first read so subsequent reads/backups carry the protected form.
@@ -56,10 +74,7 @@ export async function getApiKey(provider: Provider): Promise<string | null> {
     return plain;
   }
 
-  const fromEnv = process.env[ENV_VAR[provider]];
-  if (fromEnv && fromEnv.length > 0) return fromEnv;
-
-  return null;
+  return envApiKey(provider);
 }
 
 export async function getOllamaUrl(): Promise<string> {
