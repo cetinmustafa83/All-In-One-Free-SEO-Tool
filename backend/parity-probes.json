@@ -1,0 +1,9 @@
+[
+  { "name": "rust-root-health", "path": "/health", "expect": { "next": 404, "rust": 200 } },
+  { "name": "rust-api-health-alias", "path": "/api/health", "expect": { "next": 404, "rust": 200 } },
+  { "name": "next-health-ping", "path": "/api/health-ping", "expect": { "next": 200, "rust": 404 } },
+  { "name": "next-auth-status", "path": "/api/auth/status", "expect": { "next": 200, "rust": 404 } },
+  { "name": "next-v1-health-open", "path": "/api/v1/health", "expect": { "next": 200, "rust": 404 } },
+  { "name": "next-edge-fixes-no-client", "path": "/api/edge/fixes", "expect": { "next": 400, "rust": 404 } },
+  { "name": "next-errors-env-open", "path": "/api/errors/env", "expect": { "next": 200, "rust": 404 } }
+]

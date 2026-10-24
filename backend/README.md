@@ -30,3 +30,13 @@ Gateway (Caddy) probe from the browser side:
 Later phases port API domains per the parity contract (`docs/api-contract.md`,
 Task 14.1) — paths, auth semantics and response envelopes must match the
 existing Next.js API routes exactly.
+
+## Tools
+
+| Command | Purpose |
+|---|---|
+| `bun backend/tools/api-inventory.ts` | regenerate `docs/api-contract.md` + `docs/api-actions-inventory.md` + `docs/api-inventory.json` from `src/app` (36 API routes, 19 handlers, 158 action files) |
+| `bun backend/tools/parity.ts` | parity harness: runs `backend/parity-probes.json` against Next (:3000) and Rust (:3100), diffs statuses (and top-level JSON key sets when `compareKeys` is set) |
+
+Probes marked `rust: 404` document the port backlog — they flip to
+`"mirror"` as domains land in 14.3+.

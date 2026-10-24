@@ -172,3 +172,23 @@ Stage Summary:
 - backend/ canlı: Rust 1.99.1 + axum, port 3100, /health → {"status":"ok","db":{"ok":true,"tables":80,"journal_mode":"wal"}}
 - Plan dokümanı commit'lendi: docs/architecture-split-plan.md (R1: frontend DB'ye asla dokunmaz, R2: Rust tek DB client, R3: DB olduğu gibi/Drizzle schema sahibi, R4: kontrat parity, R5: server actions → REST + client wrapper)
 - Sonraki faz 14.1: api-contract.md envanteri + parity harness.
+
+---
+Task ID: 14.1
+Agent: Z.ai Code (main)
+Task: API contract envanteri + parity harness — 36 API route + 19 handler + 158 actions → docs/api-contract.md; Next vs Rust curl-diff probe seti.
+
+Work Log:
+- Sandbox restore tespit edildi (HEAD restore-marker 9775819, c8f2c2a'nın üstünde; tarihçe tam, worktree temiz, process'ler hayatta — Next 200, backend health 200).
+- Next endpoint gerçek durumları ölçüldü probe seeding için: /health 404, /api/health 404, /api/health-ping 200, /api/auth/status 200, /api/v1/health 200 (açık), /api/edge/fixes 400, /api/errors/env 200.
+- backend/tools/api-inventory.ts yazıldı: src/app'i gezip route.ts + actions.ts dosyalarından method/auth marker (adminGuard, bearer, csrf, localSocket, apiKey, oauth) / native dep (pdfkit, playwright, tesseract, resvg, satori, qrcode) / usesDb sinyalleri çıkarır; docs/api-contract.md + docs/api-actions-inventory.md + docs/api-inventory.json üretir; faz önerisi (14.3-14.8+BFF) heuristic.
+- Düzeltme 1: endsWith("actions.ts") preview-actions.ts gibi dosyaları da yakalıyordu (185→158) → basename kontrolüne geçildi.
+- Düzeltme 2: rg sayımıyla eşleşti — kesin envanter: 36 API route dosyası + 19 dış handler (65 HTTP method) + 158 action dosyası (376 export edilen fonksiyon).
+- backend/tools/parity.ts + backend/parity-probes.json: 7 probe, her ikisini stack'i (Next :3000, Rust :3100) curl'leyip status diff; compareKeys seçeneği top-level JSON key set karşılaştırması (14.3+ port edilen domainler için).
+- Sonuç: parity 7/7 PASS (exit 0). rust:404 probe'ları port backlog'unu belgeliyor — 14.3+'da "mirror"a dönecek.
+- backend/README.md'ye Tools bölümü eklendi.
+
+Stage Summary:
+- Kontrat dokümanları commit'lendi: api-contract.md (88 satır, normatif auth semantik tablosu + 55 route satırı) + api-actions-inventory.md (173 satır, 158 dosya/376 fonksiyon) + api-inventory.json (makine-okunur, 2364 satır).
+- Üretici script commit'te: API değişince `bun backend/tools/api-inventory.ts` ile yeniden üret → diff = kontrat değişikliği (review'da görünür).
+- Sonraki faz 14.2: Rust core infra (config, SQLite katmanı, error envelope, auth middleware).
