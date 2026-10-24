@@ -211,3 +211,23 @@ Stage Summary:
 - Rust tarafında auth çekirdeği tamam: CSRF → mod → local-socket zinciri ve Bearer anahtar doğrulama (sha256+api_keys+scope) Next ile birebir.
 - 14.3 için hazır: health-ping, errors/env, edge/fixes (ct_eq + cache-control + graceful-empty hazır), v1 9 endpoint (scope_allows + parse_limit hazır).
 - Kullanıcı-vurabilir karar: accounts modunda Rust proxy'nin cookie doğrulamasına güvenir (middleware rewrite'tan önce koşar), in-route owner re-check Next'te kalır — fail-closed owner'ı admin aksiyonlarından kilitleyecekti. R4 dokümanına not düşüldü.
+
+---
+Task ID: 14.3
+Agent: Z.ai Code (main)
+Task: Read-only + hafif-write domainlerin Rust'a port'u — health-ping, errors/env, edge/fixes (lib/edge-fixes + edge-token), /api/v1'in tamamı (health GET/OPTIONS, clients, clients/:id, keywords, rankings, reports, snapshots, audits, audits/:id, track-404 POST, capture GET/POST).
+
+Work Log:
+- DB introspection: kolonlar snake_case, 129 timestamp kolonu epoch-saniye (mode:"timestamp", timestamp_ms: 0) → API'de ISO string. activity_log kolonları + api_keys.scopes (text mode json) doğrulandı.
+- Rust modülleri: util.rs (iso_from_secs chrono, js_number/js_string JS semantiği, row_json explicit kolon listesi — JSON key order = Drizzle select order), misc.rs (health-ping t:ms, errors/env version/commit/node/platform/arch/mode, edge token ct_eq + JSON-unquote, buildFixSet: newest-first, path\0field dedupe, og_title→twitter_title +2 count, pathOf URL parse + leading-slash passthrough), v1.rs (require_key: sha256+api_keys+revoked/expired+last_used_at+scope, clients LONG 401 mesajı vs diğerleri kısa — route bazlı korundu).
+- İnce parity noktaları: /^Bearer\s+/i replace anchored (boşluksuz BearerXYZ değişmez), Number("")=0 (days), NaN days → boş sonuç (SQLite NULL compare davranışı), keywords clientId junk → impossible-filter, audit severity stable sort (SQL asc + JS rank map), credential blob'ların clients/:id'den strip'i, capture logActivity ÖNCE → sonra 413 size check, 24h dedupe window.
+- Derleme düzeltmeleri: parse_limit auth modülünden, OptionalExtension import, if/else branch temporaries borrow hatası (let v = ...; v deseni, 6 nokta), i64 validate sonrası güvenli inline SQL.
+- installRoot düzeltmesi: cwd backend/ → repo kökü canonicalize("..").
+- BYTE-FOR-BYTE IDENTICAL: v1/clients 401, keywords 401, edge/fixes 400, edge/fixes 401 (junk token). 
+- Parity probe seti 11→23: 4 probe mirror + compareKeys'e döndü (health-ping, v1/health, errors-env key set eş), edge/fixes 400/401 mirror, 10 v1 401 mirror probe. 23/23 PASS.
+- Next eşzamanlı erişimde etkilenmedi (WAL, 200).
+
+Stage Summary:
+- /api/v1'in 12 handler'ı + 3 misc endpoint Rust'ta canlı — her ikisi de aynı data.db'ye yazıp okuyor.
+- Port edilen handler sayısı: 15 (12 v1 + 3 misc). Cutover'da emekliye ayrılacak Next route'ları bu kadar.
+- Sonraki faz 14.4: settings/auth/workspace domainleri (admin auth endpoint'leri, api-keys CRUD, settings CRUD).

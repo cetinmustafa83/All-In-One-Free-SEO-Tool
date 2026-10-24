@@ -6,6 +6,7 @@ description = "All-In-One Free SEO Tool — Rust backend (Task 14 three-part spl
 
 [dependencies]
 axum = "0.7"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }

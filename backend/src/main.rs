@@ -13,6 +13,9 @@ mod auth;
 mod config;
 mod db;
 mod error;
+mod misc;
+mod util;
+mod v1;
 
 use axum::{extract::State, http::HeaderMap, http::StatusCode, response::IntoResponse, routing::get, routing::post, Json, Router};
 use config::Config;
@@ -52,6 +55,22 @@ async fn main() {
         .route("/", get(root))
         .route("/health", get(health))
         .route("/api/health", get(health)) // alias so the frontend contract can stay /api/*
+        // ---- 14.3: misc open endpoints + edge worker contract ----
+        .route("/api/health-ping", get(misc::health_ping))
+        .route("/api/errors/env", get(misc::errors_env))
+        .route("/api/edge/fixes", get(misc::edge_fixes))
+        // ---- 14.3: /api/v1 public Bearer API ----
+        .route("/api/v1/health", get(v1::v1_health_get).options(v1::v1_health_options))
+        .route("/api/v1/clients", get(v1::clients_list))
+        .route("/api/v1/clients/:id", get(v1::client_get))
+        .route("/api/v1/keywords", get(v1::keywords_list))
+        .route("/api/v1/rankings", get(v1::rankings_list))
+        .route("/api/v1/reports", get(v1::reports_list))
+        .route("/api/v1/snapshots", get(v1::snapshots_list))
+        .route("/api/v1/audits", get(v1::audits_list))
+        .route("/api/v1/audits/:id", get(v1::audit_get))
+        .route("/api/v1/track-404", post(v1::track_404_post))
+        .route("/api/v1/capture", get(v1::capture_get).post(v1::capture_post))
         // ---- /__dev/* scaffolding probes (14.2) — middleware regression checks ----
         .route("/__dev/admin-guard", post(dev_admin_guard))
         .route("/__dev/bearer", get(dev_bearer))
@@ -72,7 +91,7 @@ async fn root() -> Json<Value> {
         "role": "backend",
         "split": ["frontend:nextjs", "backend:rust", "db:sqlite"],
         "plan": "docs/architecture-split-plan.md",
-        "phase": "14.2",
+        "phase": "14.3",
     }))
 }
 
@@ -89,7 +108,7 @@ async fn health(State(state): State<AppState>) -> (StatusCode, Json<Value>) {
             "status": if ok { "ok" } else { "degraded" },
             "service": "seo-backend",
             "version": env!("CARGO_PKG_VERSION"),
-            "phase": "14.2",
+            "phase": "14.3",
             "uptime_secs": state.started_at.elapsed().as_secs(),
             "db": { "ok": ok, "path": state.cfg.db_path, "tables": tables, "journal_mode": journal },
         })),
