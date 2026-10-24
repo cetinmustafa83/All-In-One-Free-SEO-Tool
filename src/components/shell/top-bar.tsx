@@ -24,10 +24,15 @@ export async function TopBar({
       <SearchPalette />
       <NextStep />
       <div className="ml-auto flex items-center gap-1">
-        <AiUsagePill />
+        {/* Desktop-only affordances: both are wide, non-critical, and were
+            the reason the header overflowed a 390px viewport by ~111px.
+            Phones get the core actions (add client, theme, bell, profile). */}
+        <div className="hidden items-center gap-1 md:flex">
+          <AiUsagePill />
+          <ModeToggle mode={mode} />
+        </div>
         <AddClientButton />
         <ThemeToggle theme={theme} />
-        <ModeToggle mode={mode} />
         <NotificationsBell />
         <ProfileMenu />
       </div>

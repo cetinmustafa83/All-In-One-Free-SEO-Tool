@@ -1,11 +1,38 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import {
+  useState,
+  useSyncExternalStore,
+  useTransition,
+} from "react";
 import { Check, Copy, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { rotateEdgeTokenAction } from "./actions";
 
 type ClientRow = { id: number; name: string; url: string | null };
+
+const URL_PLACEHOLDER = "https://your-seo-tool";
+
+const noopSubscribe = () => () => {};
+
+/**
+ * The install's own origin, hydration-safe.
+ *
+ * Reading `window.location` during render (or branching on
+ * `typeof window`) produces different markup on the server and on the
+ * client's first render, which fails hydration and makes React throw the
+ * whole tree away and re-render it client-side. useSyncExternalStore is
+ * the sanctioned escape hatch: the server snapshot is a stable
+ * placeholder, the client snapshot is the real origin, and React
+ * re-renders with the real value *after* hydration instead of during it.
+ */
+function useInstallOrigin() {
+  return useSyncExternalStore(
+    noopSubscribe,
+    () => window.location.origin,
+    () => URL_PLACEHOLDER,
+  );
+}
 
 /**
  * The three values the worker needs, and the worker itself.
@@ -22,10 +49,10 @@ export function EdgeSetup({
   workerSource,
 }: {
   hasToken: boolean;
-  appUrl: string;
   clients: ClientRow[];
   workerSource: string;
 }) {
+  const origin = useInstallOrigin();
   const [token, setToken] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -103,7 +130,7 @@ export function EdgeSetup({
           <span className="text-foreground">Add three variables</span> under the
           worker&apos;s Settings, then Variables.
           <pre className="mt-2 overflow-x-auto rounded-lg bg-black/40 p-3 text-[12px] leading-relaxed text-foreground/90">
-            {`SEO_TOOL_URL    ${typeof window === "undefined" ? "https://your-seo-tool" : window.location.origin}
+            {`SEO_TOOL_URL    ${origin ?? URL_PLACEHOLDER}
 SEO_TOOL_TOKEN  the token from step 1
 SEO_CLIENT_ID   ${clientId ?? "…"}`}
           </pre>

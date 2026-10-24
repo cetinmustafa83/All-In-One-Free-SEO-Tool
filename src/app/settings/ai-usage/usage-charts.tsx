@@ -16,12 +16,12 @@ import {
   Cell,
   Pie,
   PieChart,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
 import { Activity, PieChart as PieChartIcon } from "lucide-react";
+import { ChartFrame } from "@/components/charts/chart-frame";
 
 type DailyPoint = {
   day: string;
@@ -80,8 +80,7 @@ export function UsageCharts({
             Hover bars for daily totals + estimated cost.
           </p>
         </header>
-        <div className="h-52">
-          <ResponsiveContainer width="100%" height="100%">
+        <ChartFrame className="h-52" initialHeight={208}>
             <BarChart data={days} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgb(255 255 255 / 0.05)" vertical={false} />
               <XAxis
@@ -109,8 +108,7 @@ export function UsageCharts({
               />
               <Bar dataKey="calls" fill={CYAN} radius={[2, 2, 0, 0]} />
             </BarChart>
-          </ResponsiveContainer>
-        </div>
+        </ChartFrame>
       </section>
 
       {/* Per-feature donut — 1/3 width */}
@@ -130,8 +128,7 @@ export function UsageCharts({
           </div>
         ) : (
           <>
-            <div className="h-44">
-              <ResponsiveContainer width="100%" height="100%">
+            <ChartFrame className="h-44" initialHeight={176}>
                 <PieChart>
                   <Pie
                     data={featureChart}
@@ -163,8 +160,7 @@ export function UsageCharts({
                     ]}
                   />
                 </PieChart>
-              </ResponsiveContainer>
-            </div>
+            </ChartFrame>
             <ul className="mt-3 flex flex-wrap justify-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
               {featureChart.map((f, i) => (
                 <li key={f.name} className="inline-flex items-center gap-1.5">

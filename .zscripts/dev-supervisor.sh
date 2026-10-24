@@ -15,7 +15,31 @@ cd "$(dirname "$0")/.."
 
 export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=2048}"
 
+# Pre-boot cache guard.
+#
+# The persistent .next/dev cache is what makes restarts cheap, but it
+# only ever grows — and a huge cache inflates next-server's anonymous
+# RSS until the 4 GB kernel OOM-kill returns. Before each (re)start,
+# if the cache exceeds CACHE_LIMIT_MB, drop the ephemeral compile
+# artifacts (keep config/lock files) so the next warm-up rebuilds from
+# a sane baseline instead of dying at boot.
+CACHE_LIMIT_MB="${CACHE_LIMIT_MB:-900}"
+
+cache_guard() {
+  local dir=".next/dev"
+  [ -d "$dir" ] || return 0
+  local mb
+  mb=$(( $(du -sm "$dir" 2>/dev/null | cut -f1) ))
+  if [ "$mb" -gt "$CACHE_LIMIT_MB" ]; then
+    echo "[$(date '+%F %T')] cache guard: .next/dev is ${mb}MB (limit ${CACHE_LIMIT_MB}MB) — pruning"
+    rm -rf "$dir/cache" "$dir/server" "$dir/static" "$dir/build" 2>/dev/null
+    mb=$(( $(du -sm "$dir" 2>/dev/null | cut -f1) ))
+    echo "[$(date '+%F %T')] cache guard: pruned, now ${mb}MB"
+  fi
+}
+
 while true; do
+  cache_guard
   echo "[$(date '+%F %T')] starting: pnpm dev (NODE_OPTIONS=$NODE_OPTIONS)"
   pnpm dev
   code=$?

@@ -115,12 +115,16 @@ export default async function RootLayout({
           white flash before the dark class lands (or vice versa).
           Deliberately tiny and dependency-free — it blocks rendering.
 
-          Rendered via next/script (beforeInteractive) rather than a
-          raw <script> element: on the client next/script's app-router
-          branch renders null, so React never re-encounters a script
-          tag when a server action revalidates the layout. A raw tag
-          here made React log "Encountered a script tag while rendering
-          React component" on every layout re-render.
+          Rendered via next/script (beforeInteractive). Verified against
+          node_modules/next/dist/client/script.js: in the app router the
+          beforeInteractive branch returns a REAL <script> element on
+          every client mount (both the inline `__next_s` shim variant and
+          the src variant — only afterInteractive renders null), so
+          dev-mode logs "Encountered a script tag" once per page. That
+          warning is dev-only, inherent, and harmless; every alternative
+          regresses (a raw tag remounts the same way, afterInteractive
+          loses the pre-paint timing, effect injection lands
+          post-paint). Keep inline, keep beforeInteractive.
         */}
         <Script id="theme-init" strategy="beforeInteractive">
           {`(function(){try{var t=document.documentElement.dataset.theme;if(t==="system"){var d=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.classList.toggle("dark",d);}}catch(e){}})();`}

@@ -15,11 +15,11 @@ import {
   Area,
   AreaChart as RechartsAreaChart,
   CartesianGrid,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
+import { ChartFrame } from "@/components/charts/chart-frame";
 
 type Point = { name: string; value: number };
 
@@ -89,71 +89,69 @@ export function AreaChart({
   }
 
   return (
-    <div style={{ height }} className={colorClass}>
-      <ResponsiveContainer width="100%" height="100%">
-        <RechartsAreaChart
-          data={data}
-          margin={{ top: 5, right: 0, left: 0, bottom: 0 }}
-        >
-          <defs>
-            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="currentColor" stopOpacity={0.3} />
-              <stop offset="100%" stopColor="currentColor" stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          {showAxes && (
-            <CartesianGrid
-              strokeDasharray="3 3"
-              stroke="oklch(1 0 0 / 0.06)"
-              vertical={false}
-            />
-          )}
-          {showAxes && (
-            <XAxis
-              dataKey="name"
-              stroke="oklch(0.708 0 0)"
-              fontSize={11}
-              tickLine={false}
-              axisLine={false}
-              minTickGap={20}
-            />
-          )}
-          {showAxes && (
-            <YAxis
-              stroke="oklch(0.708 0 0)"
-              fontSize={11}
-              tickLine={false}
-              axisLine={false}
-              tickFormatter={fmt}
-              width={40}
-            />
-          )}
-          <Tooltip
-            cursor={{ stroke: "oklch(1 0 0 / 0.12)", strokeWidth: 1 }}
-            contentStyle={{
-              backgroundColor: "oklch(0.205 0 0)",
-              border: "1px solid oklch(1 0 0 / 0.1)",
-              borderRadius: 8,
-              fontSize: 12,
-              padding: "6px 10px",
-              color: "oklch(0.985 0 0)",
-            }}
-            labelStyle={{ color: "oklch(0.708 0 0)", marginBottom: 2 }}
-            formatter={(value) =>
-              [fmt(Number(value) || 0), ""] as [string, string]
-            }
+    <ChartFrame style={{ height }} className={colorClass} initialHeight={height}>
+      <RechartsAreaChart
+        data={data}
+        margin={{ top: 5, right: 0, left: 0, bottom: 0 }}
+      >
+        <defs>
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="currentColor" stopOpacity={0.3} />
+            <stop offset="100%" stopColor="currentColor" stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        {showAxes && (
+          <CartesianGrid
+            strokeDasharray="3 3"
+            stroke="oklch(1 0 0 / 0.06)"
+            vertical={false}
           />
-          <Area
-            type="monotone"
-            dataKey="value"
-            stroke="currentColor"
-            strokeWidth={2}
-            fill={`url(#${gradientId})`}
-            dot={false}
-            activeDot={{ r: 4, strokeWidth: 0 }}
+        )}
+        {showAxes && (
+          <XAxis
+            dataKey="name"
+            stroke="oklch(0.708 0 0)"
+            fontSize={11}
+            tickLine={false}
+            axisLine={false}
+            minTickGap={20}
           />
-        </RechartsAreaChart>
-      </ResponsiveContainer>
-    </div>
+        )}
+        {showAxes && (
+          <YAxis
+            stroke="oklch(0.708 0 0)"
+            fontSize={11}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={fmt}
+            width={40}
+          />
+        )}
+        <Tooltip
+          cursor={{ stroke: "oklch(1 0 0 / 0.12)", strokeWidth: 1 }}
+          contentStyle={{
+            backgroundColor: "oklch(0.205 0 0)",
+            border: "1px solid oklch(1 0 0 / 0.1)",
+            borderRadius: 8,
+            fontSize: 12,
+            padding: "6px 10px",
+            color: "oklch(0.985 0 0)",
+          }}
+          labelStyle={{ color: "oklch(0.708 0 0)", marginBottom: 2 }}
+          formatter={(value) =>
+            [fmt(Number(value) || 0), ""] as [string, string]
+          }
+        />
+        <Area
+          type="monotone"
+          dataKey="value"
+          stroke="currentColor"
+          strokeWidth={2}
+          fill={`url(#${gradientId})`}
+          dot={false}
+          activeDot={{ r: 4, strokeWidth: 0 }}
+        />
+      </RechartsAreaChart>
+    </ChartFrame>
   );
 }

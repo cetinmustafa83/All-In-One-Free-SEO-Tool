@@ -28,6 +28,7 @@ type BeforeInstallPromptEvent = Event & {
 };
 
 const KEY = "seo:first-run-done";
+const HEADING_ID = "first-run-prompt-heading";
 
 export function FirstRunPrompt() {
   const [visible, setVisible] = useState(false);
@@ -132,13 +133,18 @@ export function FirstRunPrompt() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md overflow-hidden rounded-xl border border-border bg-popover shadow-2xl">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={HEADING_ID}
+        className="w-full max-w-md overflow-hidden rounded-xl border border-border bg-popover shadow-2xl"
+      >
         <div className="flex items-start gap-3 border-b border-border p-5">
           <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground">
             <Sparkles className="size-4" />
           </div>
           <div className="flex-1 space-y-1">
-            <h2 className="text-[15px] font-semibold text-foreground">
+            <h2 id={HEADING_ID} className="text-[15px] font-semibold text-foreground">
               Make SEO Tool feel like a real app
             </h2>
             <p className="text-[13px] text-muted-foreground">

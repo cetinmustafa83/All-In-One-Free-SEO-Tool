@@ -12,7 +12,8 @@
  * indicator, not a reading.
  */
 
-import { Area, AreaChart, ResponsiveContainer } from "recharts";
+import { Area, AreaChart } from "recharts";
+import { ChartFrame } from "@/components/charts/chart-frame";
 
 type Point = {
   checkedAt: Date;
@@ -49,8 +50,11 @@ export function RankSparkline({ history }: { history: Point[] }) {
   const gradientId = `rank-spark-${strokeColor.replace(/[^a-z0-9]/g, "")}`;
 
   return (
-    <div className="h-6 w-24">
-      <ResponsiveContainer width="100%" height="100%">
+    <ChartFrame
+      className="h-6 w-24"
+      initialWidth={96}
+      initialHeight={24}
+    >
         <AreaChart data={data} margin={{ top: 1, right: 0, bottom: 1, left: 0 }}>
           <defs>
             <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
@@ -67,7 +71,6 @@ export function RankSparkline({ history }: { history: Point[] }) {
             isAnimationActive={false}
           />
         </AreaChart>
-      </ResponsiveContainer>
-    </div>
+    </ChartFrame>
   );
 }

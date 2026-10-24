@@ -78,7 +78,6 @@ export default async function EdgeSettingsPage() {
 
       <EdgeSetup
         hasToken={Boolean(token)}
-        appUrl=""
         clients={rows.map((c) => ({ id: c.id, name: c.name, url: c.url }))}
         workerSource={worker}
       />

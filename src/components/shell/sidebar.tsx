@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { motion, LayoutGroup } from "motion/react";
 import { Search, PanelLeftClose, PanelLeftOpen, ChevronDown, ChevronRight } from "lucide-react";
 import { NAV_GROUPS, type NavGroup, type NavItem } from "./nav-items";
@@ -136,6 +136,35 @@ const parseOpenGroups = (raw: string) =>
   JSON.parse(raw) as Record<string, boolean>;
 const OPEN_GROUPS_KEY = "seo:sidebar-open-groups";
 
+const NARROW_QUERY = "(max-width: 767px)";
+
+function subscribeViewportChange(onChange: () => void) {
+  const mq = window.matchMedia(NARROW_QUERY);
+  mq.addEventListener("change", onChange);
+  return () => mq.removeEventListener("change", onChange);
+}
+
+/**
+ * Whether the viewport is phone-width, hydration-safe.
+ *
+ * At phone widths the expanded 260px sidebar overflows the viewport
+ * (390px phone − 260px rail leaves less than the main column's
+ * min-content width), so the rail must collapse automatically. The
+ * value comes from useSyncExternalStore — matching media queries in
+ * render or branching on `typeof window` would render different markup
+ * on the server and the client's first paint and fail hydration, the
+ * same class of bug the localStorage reads here were migrated off of.
+ * The server snapshot says "not narrow": a desktop first paint, which
+ * a phone client corrects right after hydration.
+ */
+function useIsNarrowViewport() {
+  return useSyncExternalStore(
+    subscribeViewportChange,
+    () => window.matchMedia(NARROW_QUERY).matches,
+    () => false,
+  );
+}
+
 function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
   return pathname === href || pathname.startsWith(href + "/");
@@ -167,7 +196,7 @@ export function Sidebar({
   // default, committed it to the DOM, then corrected itself — so a user
   // who kept the sidebar collapsed watched it flash open and snap shut
   // on every single page load.
-  const [collapsed, setCollapsedStored] = useStoredState<boolean>(
+  const [storedCollapsed, setCollapsedStored] = useStoredState<boolean>(
     COLLAPSED_KEY,
     false,
     parseCollapsed,
@@ -180,6 +209,10 @@ export function Sidebar({
   // doesn't silently rewrite what the user chose to leave collapsed.
   const [routeOpened, setRouteOpened] = useState<Record<string, boolean>>({});
   const openGroups = { ...storedOpenGroups, ...routeOpened };
+  // Phone-width viewports always get the 60px rail, regardless of the
+  // stored preference — the expanded rail physically cannot fit.
+  const isNarrowViewport = useIsNarrowViewport();
+  const collapsed = storedCollapsed || isNarrowViewport;
   const unread = unreadByHref ?? {};
 
   // Apply the guided/pro filter. In guided mode every item must opt-in
@@ -213,7 +246,10 @@ export function Sidebar({
   }
 
   function toggle() {
-    setCollapsedStored(!collapsed, (v) => (v ? "1" : "0"));
+    // Toggles the STORED preference, not the effective state: on a
+    // phone-width viewport the rail is forced collapsed, so the stored
+    // value only matters once the window (or device) is wide again.
+    setCollapsedStored(!storedCollapsed, (v) => (v ? "1" : "0"));
   }
 
   function toggleGroup(id: string) {
