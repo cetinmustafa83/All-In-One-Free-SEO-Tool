@@ -8,7 +8,15 @@
 # everything already-compiled and each warm-up is cheaper than the last.
 # This loop simply brings the server back when the kernel takes it down.
 #
-# Usage:  setsid nohup ./.zscripts/dev-supervisor.sh > dev.log 2>&1 &
+# Usage:  ( setsid ./.zscripts/dev-supervisor.sh < /dev/null > dev.log 2>&1 & )
+#
+# !! If you EDIT this file, RESTART the running supervisor. Bash reads
+# scripts lazily and a `while true` loop already parsed keeps executing
+# the OLD body forever — a 2026-10-24 session lost its cache guard this
+# way: the guard was added at 08:24 but the supervisor was started at
+# 08:22, the cache grew unchecked to 2.1 GB, next-server's baseline RSS
+# hit 2.5 GB, and every new-route compile OOM-killed at 3.2 GB in a
+# restart storm that looked like a turbopack bug.
 set -u
 
 cd "$(dirname "$0")/.."

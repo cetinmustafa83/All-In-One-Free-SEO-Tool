@@ -134,3 +134,22 @@ Stage Summary:
 - API surface (36 route files) audited end-to-end: auth guards, contracts, and degradation paths all correct — no endpoint fixes needed. Combined with tasks 10–11 (28 page routes browser-verified), every user-facing surface has now been exercised.
 - Real bug found and fixed: GitHub Models AI provider silently activated by any environment GITHUB_TOKEN (CI collision class). New preferred env var GITHUB_MODELS_TOKEN; UI hint updated; sandbox token renamed to GITHUB_PAT.
 - Durable lesson: .env is app-env — never store generic-name secrets (GITHUB_TOKEN, OPENAI_API_KEY...) in it that collide with the app's provider env fallbacks; use suffixed names (GITHUB_PAT).
+
+---
+Task ID: 14
+Agent: Z.ai Code (main)
+Task: "keep going" — Tier-3 route audit (settings subpages + tools + dashboard neighbors) + root-cause a restart storm that blocked it
+
+Work Log:
+- Enumerated ALL page routes: 229 total, 28 covered by tasks 10-11 → ~200 never browser-verified. Built Tier-3 sample of 18 representative routes (all 7 uncovered /settings/* subpages, 8 tools form pages, /activity, /automations, /digest, /news, /history, /monitor).
+- AUDIT STORM (blocked the first 3 attempts): dev server died every ~60s. Root-caused in three steps: (1) dmesg showed kernel OOM-kill of next-server at 3.24GB anon-rss; (2) live watch showed baseline RSS 2.47GB with ONLY / warm — .next/dev cache had grown to 2,134MB unchecked; (3) WHY the 900MB cache guard never fired: supervisor PID started 08:22:04, guard added to the script 08:24:49 — bash reads scripts lazily, the running `while true` loop kept executing the OLD guard-less body forever. Classic edit-a-running-bash-script hazard masquerading as a turbopack bug.
+- FIX: killed stale supervisor, pruned .next/dev (2,134MB → 2MB), restarted supervisor fully detached `( setsid ... < /dev/null > dev.log 2>&1 & )`. Guard now live. Documented the hazard in the script header so the next editor restarts the process.
+- Measured clean baseline: 2.0-2.1GB RSS with empty cache + / warm (intrinsic dev footprint; OOM ceiling ~3.2GB → ~1.1GB headroom, and Chrome + one new-route compile consumes exactly that). Consequence: audit in batches of 2-3 routes per server lifetime; the supervisor recovers between batches. Harness v3 hardened: curl pre-warm per route (server-side compile, tolerant of graceful exits), FRESH browser context per route (close→open — kills stale-chunk ChunkLoadError cascade AND gives trusted console reads), server health-check between steps.
+- RESULTS: 18/18 routes CLEAN — 0 console errors, 0 page errors, 0 horizontal overflow at 1440×900 AND 390×844 (sw==cw everywhere): /settings/{backup,errors,health,install,team,google,ai-learning} /tools/{robots,sitemap,headers,meta-tag-generator,llms-txt,serp-features,health-check,keyword-difficulty} /{activity,automations,digest,news,history,monitor}.
+- /digest PAGEERR=1 during batch: errors dump was an empty "✗" line; fresh-context repro = 0 errors, page renders ("Weekly digest"). Non-reproducible dev transient (HMR/chunk hiccup), not a defect.
+- Harness lives at /home/z/.audit/route-audit.sh (agent-browser gotcha: its eval output escapes quotes as \" — strip backslashes before parsing JSON).
+
+Stage Summary:
+- Tier-3 audit: 18 more routes verified clean; combined with tasks 10-13, 46 of 229 routes exercised end-to-end with zero product defects found beyond task 13's env-collision fix. The app's route surface is remarkably solid; remaining ~180 routes are mostly /tools/* variants sharing the same shell + form patterns as the audited sample.
+- Operational root cause banked: stale-running-bash-script supervisor. Sandbox baseline math documented (2.05GB intrinsic + ~0.4GB per GB of .next/dev cache; OOM at 3.2GB; audit batch size = 2-3 routes).
+- Commit includes: supervisor script warning + usage fix, worklog task 14.
