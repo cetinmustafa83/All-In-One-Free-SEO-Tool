@@ -251,3 +251,19 @@ Stage Summary:
 - Accounts-mode login/register HTTP üzerinden bu kurulumda (open mode) probe edilemez — kullanıcı satırı oluşturmak kalıcı mod değişimi olur; bunun yerine kripto katmanı kanıtlandı: scrypt interop + secret dosya paylaşımı + imza roundtrip. Cutover E2E (14.9) gerçek hesapla login/logout yapacak.
 - Bilinen sapma (kabul edilen, dökümante): POST /api/errors'ta body.stack yoksa V8 auto-stack yerine "Error: {msg}\n    at <anonymous>" saklanır (HTTP kontratı değil DB içeriği); non-string email/name gibi malformed girişlerde Next 500 verirken Rust zarifçe coerce eder (probe edilemez yüzey).
 - Sonraki faz 14.5: Domain CRUD wave 1 (clients, keywords, audits, backlinks, tasks, notifications) → REST + R5 client wrapper'lar; settings/* server actions da bu dalgada.
+
+---
+Task ID: 15
+Agent: Z.ai Code (main)
+Task: "push yap" — GitHub'a push (kullanıcı PAT sağladı, env'de saklanacak)
+
+Work Log:
+- Kullanıcı PAT (ghp_Xo7b…) verdi; ~/.bashrc, ~/.profile (GITHUB_PAT/GH_TOKEN) + ~/.git-credentials (credential.helper store) kalıcı olarak yazıldı. Proje .env'sine bilerek YAZILMADI (Task 13 dersi: app-env genel-adlı secret taşımaz).
+- İlk push IamRamgarhia/All-In-One-Free-SEO-Tool'a 403 verdi: token sahibi cetinmustafa83 fork'ta collaborator değil. Remote origin → cetinmustafa83/All-In-One-Free-SEO-Tool olarak değiştirildi (kullanıcının kendi repo'su, oradaki 14.x Rust işi zaten oradaydı).
+- Push "fetch first" reddi: remote'da 14.1–14.4 commit'leri (Rust auth/v1 port) vardı, lokalde 2 UUID snapshot commit. Rebase: worklog.md conflict → HEAD (remote) tarafı korundu (remote zengin/Yetkili versiyon; lokal snapshot task-11'de kesilmiş eskimiş kopya). .zscripts/dev.pid conflict → theirs (güncel PID). 
+- Push b7d372d..a6803b0 OK. GITHUB_TOKEN adı GITHUB_PAT'a çevrildi (GitHub Models provider env-fallback çarpışması — Task 13 düzeltmesiyle uyumlu).
+
+Stage Summary:
+- origin artık cetinmustafa83/All-In-One-Free-SEO-Tool; main = Rust backend işi (14.x) + sandbox snapshot'ları, linear tarih.
+- Kalıcı config: GITHUB_PAT + GH_TOKEN (bashrc/profile), credential store ~/.git-credentials. Push/pull artık token gerekmez.
+- Not: IamRamgarhia repo'suna push için ya collaborator daveti ya o hesabın PAT'i gerekli.
