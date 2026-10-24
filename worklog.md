@@ -231,3 +231,23 @@ Stage Summary:
 - /api/v1'in 12 handler'ı + 3 misc endpoint Rust'ta canlı — her ikisi de aynı data.db'ye yazıp okuyor.
 - Port edilen handler sayısı: 15 (12 v1 + 3 misc). Cutover'da emekliye ayrılacak Next route'ları bu kadar.
 - Sonraki faz 14.4: settings/auth/workspace domainleri (admin auth endpoint'leri, api-keys CRUD, settings CRUD).
+---
+Task ID: 14.4
+Agent: Z.ai Code (main)
+Task: Settings/auth domain — auth web routes (login/logout/mode/register/status) + error sink (/api/errors, /api/errors/by-digest) Rust'a port edildi; sessions, scrypt, invites, rate-limit dahil.
+
+Work Log:
+- Ayrıca bu oturum başında Task 14.3'ün önceki oturumdan kalma commit'i (0ab3000) yeniden doğrulandı: parity 23/23 + 4 byte-for-byte diff IDENTICAL. Remote kafa karışıklığı çözüldü: origin = IamRamgarhia fork kaynağı; gerçek repo push hedefi explicit URL (cetinmustafa83) ve 14.3 zaten oradaydı.
+- Yeni Rust modülleri: password.rs (scrypt N=16384,r=8,p=1,len=64 — Node defaults; KRİTİK: salt hex TEXT olarak KDF'e girer, decode edilmez — Node crypto.scrypt string davranışı), session.rs (v1.{uid}.{expMs}.{fp}.{hmac-b64url} token; secret çözümleme SEO_SESSION_SECRET → data/.seo-session-secret(≥32) → generate+persist 0600 → APP_PASSWORD fallback → ephemeral; current_user = imza+active+fingerprint), ratelimit.rs (login fail-bucket'ları; XFF SON giriş = clientKey — admin-auth'un ILK girişinden farklı, kaynak öyle), errlog.rs (logError dedupe: (source,context,message) → occurrences++/unresolve/stack COALESCE; >1000 satır trim; by-digest regex ^[0-9]{4,32}$ + LIKE '%digest X%' + 12 satır stack), authweb.rs (5 handler + acceptInvite/findInvite + register_user/isFirst→owner).
+- Config'e app_password DEĞERI eklendi (sadece in-memory; password-mode login + secret fallback), cookie_secure_env (SEO_COOKIE_SECURE), data_dir() (SEO_DATA_DIR → SEO_DB_PATH dirname → canonicalize("..")).
+- Set-Cookie formatı cookie@1 serializer sırası: `name=value; Max-Age; Path=/; HttpOnly; [Secure;] SameSite=Lax`. Login: stb_auth=sha256(pw+".v1") 30d; accounts: stb_session 14d (TTL_MS=1209600000, maxAge=1209600). Logout her iki cookie'yi Max-Age=0 temizler; secure=protocol-only (kaynağa sadık).
+- /__dev/session (imza→doğrula→tamper-red; secret_source raporu) ve /__dev/scrypt (SABIT input) scaffold probe'ları eklendi.
+- parity.ts genişletildi: body? + exactBody? (raw text equality — deterministik endpoint'ler için compareKeys'ten sıkı).
+- 11 yeni probe (auth×6, errors×5) exactBody'li; harness 23→34.
+- Kanıtlar: 34/34 PASS; 11/11 byte-for-byte curl diff IDENTICAL; scrypt interop Node↔Rust IDENTICAL (node -e crypto.scrypt vs /__dev/scrypt, aynı salt+pw); secret_source:"file" → Next ile AYNI secret dosyası; Next eşzamanlı erişimde etkilenmedi (WAL, 200).
+
+Stage Summary:
+- Port edilen handler: +7 (auth×5, errors×2) → toplam 22 Next handler Rust'ta canlı (15 v1/misc + 7 auth/errors).
+- Accounts-mode login/register HTTP üzerinden bu kurulumda (open mode) probe edilemez — kullanıcı satırı oluşturmak kalıcı mod değişimi olur; bunun yerine kripto katmanı kanıtlandı: scrypt interop + secret dosya paylaşımı + imza roundtrip. Cutover E2E (14.9) gerçek hesapla login/logout yapacak.
+- Bilinen sapma (kabul edilen, dökümante): POST /api/errors'ta body.stack yoksa V8 auto-stack yerine "Error: {msg}\n    at <anonymous>" saklanır (HTTP kontratı değil DB içeriği); non-string email/name gibi malformed girişlerde Next 500 verirken Rust zarifçe coerce eder (probe edilemez yüzey).
+- Sonraki faz 14.5: Domain CRUD wave 1 (clients, keywords, audits, backlinks, tasks, notifications) → REST + R5 client wrapper'lar; settings/* server actions da bu dalgada.

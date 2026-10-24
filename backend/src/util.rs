@@ -102,3 +102,10 @@ pub fn qparam<'a>(query: Option<&'a str>, key: &str) -> Option<&'a str> {
         (k == key).then_some(v)
     })
 }
+
+/// JS `String.prototype.slice(0, n)` on a UTF-16 string. Approximated with
+/// char boundaries — only ever used for truncation of user text where the
+/// exact split point between astral chars cannot matter.
+pub fn js_slice(s: &str, n: usize) -> String {
+    s.chars().take(n).collect()
+}

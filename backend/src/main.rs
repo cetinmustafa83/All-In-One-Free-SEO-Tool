@@ -1,4 +1,4 @@
-//! SEO Tool Rust backend — core infra (Task 14.2).
+//! SEO Tool Rust backend — core infra (Task 14.2) + auth domain (14.4).
 //!
 //! Three-part split (docs/architecture-split-plan.md):
 //!   frontend (Next.js, unchanged) -> backend (Rust, THIS service) -> db (SQLite, unchanged)
@@ -8,12 +8,24 @@
 //! and `/__dev/*` probe routes that exercise each mechanism. The probes
 //! are clearly-namespaced scaffolding — they are NOT part of the public
 //! contract and never will be.
+//!
+//! 14.3 scope: health-ping, errors/env, edge/fixes and the full /api/v1
+//! Bearer API.
+//!
+//! 14.4 scope: the auth web domain (login/logout/mode/register/status)
+//! and the error sink (/api/errors, /api/errors/by-digest) — sessions,
+//! scrypt passwords, invite acceptance, rate limiting.
 
 mod auth;
+mod authweb;
 mod config;
 mod db;
+mod errlog;
 mod error;
 mod misc;
+mod password;
+mod ratelimit;
+mod session;
 mod util;
 mod v1;
 
@@ -21,6 +33,7 @@ use axum::{extract::State, http::HeaderMap, http::StatusCode, response::IntoResp
 use config::Config;
 use db::Db;
 use error::MSG_BEARER_REQUIRED;
+use ratelimit::Limiter;
 use serde_json::{json, Value};
 use std::{sync::Arc, time::Instant};
 
@@ -29,6 +42,8 @@ struct AppState {
     cfg: Arc<Config>,
     db: Db,
     started_at: Instant,
+    /// Port of the module-level buckets map in src/lib/rate-limit.ts.
+    rl: Arc<Limiter>,
 }
 
 #[tokio::main]
@@ -49,6 +64,7 @@ async fn main() {
         cfg: Arc::new(cfg),
         db,
         started_at: Instant::now(),
+        rl: Arc::new(Limiter::default()),
     };
 
     let app = Router::new()
@@ -71,9 +87,20 @@ async fn main() {
         .route("/api/v1/audits/:id", get(v1::audit_get))
         .route("/api/v1/track-404", post(v1::track_404_post))
         .route("/api/v1/capture", get(v1::capture_get).post(v1::capture_post))
+        // ---- 14.4: auth web domain ----
+        .route("/api/auth/login", post(authweb::login))
+        .route("/api/auth/logout", post(authweb::logout))
+        .route("/api/auth/mode", get(authweb::mode))
+        .route("/api/auth/register", post(authweb::register))
+        .route("/api/auth/status", get(authweb::status))
+        // ---- 14.4: error sink ----
+        .route("/api/errors", post(errlog::errors_post))
+        .route("/api/errors/by-digest", get(errlog::errors_by_digest))
         // ---- /__dev/* scaffolding probes (14.2) — middleware regression checks ----
         .route("/__dev/admin-guard", post(dev_admin_guard))
         .route("/__dev/bearer", get(dev_bearer))
+        .route("/__dev/session", get(authweb::dev_session))
+        .route("/__dev/scrypt", get(authweb::dev_scrypt))
         .with_state(state)
         .layer(tower_http::trace::TraceLayer::new_for_http());
 
@@ -91,7 +118,7 @@ async fn root() -> Json<Value> {
         "role": "backend",
         "split": ["frontend:nextjs", "backend:rust", "db:sqlite"],
         "plan": "docs/architecture-split-plan.md",
-        "phase": "14.3",
+        "phase": "14.4",
     }))
 }
 
@@ -108,7 +135,7 @@ async fn health(State(state): State<AppState>) -> (StatusCode, Json<Value>) {
             "status": if ok { "ok" } else { "degraded" },
             "service": "seo-backend",
             "version": env!("CARGO_PKG_VERSION"),
-            "phase": "14.3",
+            "phase": "14.4",
             "uptime_secs": state.started_at.elapsed().as_secs(),
             "db": { "ok": ok, "path": state.cfg.db_path, "tables": tables, "journal_mode": journal },
         })),

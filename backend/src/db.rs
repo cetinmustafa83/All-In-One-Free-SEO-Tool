@@ -58,6 +58,13 @@ impl Db {
         enabled
     }
 
+    /// Port of markAccountsEnabled(): the sticky cache flips on after the
+    /// first user registers, so the next accountsEnabled() call doesn't
+    /// need the query (the DB flip itself is a one-way door).
+    pub fn set_accounts_enabled(&self) {
+        self.sticky_accounts.store(true, Ordering::Relaxed);
+    }
+
     /// Table count + journal mode for /health.
     pub fn smoke(&self) -> Result<(i64, String), rusqlite::Error> {
         self.with_conn(|c| {

@@ -9,18 +9,22 @@
  *   bun backend/tools/parity.ts             # run probes
  *   NEXT=http://127.0.0.1:3000 RUST=http://127.0.0.1:3100 bun backend/tools/parity.ts
  *
- * Probe fields: name, path, method?, headers?, expect{next, rust},
+ * Probe fields: name, path, method?, headers?, body?, expect{next, rust},
  * rust: number | "mirror" (= same status as next) | "skip". compareKeys:
  * when both return 200 JSON objects, their top-level key sets must match —
  * used once a domain is ported so both stacks serve the same contract.
+ * exactBody: raw response-body text must be identical on both stacks —
+ * for deterministic endpoints (no timestamps), stricter than compareKeys.
  */
 type Probe = {
   name: string;
   path: string;
   method?: string;
   headers?: Record<string, string>;
+  body?: string;
   expect: { next: number; rust: number | "mirror" | "skip" };
   compareKeys?: boolean;
+  exactBody?: boolean;
 };
 
 const NEXT = process.env.NEXT ?? "http://127.0.0.1:3000";
@@ -28,28 +32,30 @@ const RUST = process.env.RUST ?? "http://127.0.0.1:3100";
 const file = new URL("../parity-probes.json", import.meta.url);
 const probes: Probe[] = JSON.parse(await Bun.file(file).text());
 
-type Res = { status: number; keys: string[] | null };
+type Res = { status: number; keys: string[] | null; text: string | null };
 async function hit(base: string, p: Probe): Promise<Res> {
   try {
     const r = await fetch(base + p.path, {
       method: p.method ?? "GET",
       headers: p.headers ?? {},
+      body: p.body,
       redirect: "manual",
       signal: AbortSignal.timeout(10_000),
     });
+    const text = await r.text();
     let keys: string[] | null = null;
     const ct = r.headers.get("content-type") ?? "";
     if (ct.includes("application/json")) {
       try {
-        const body = await r.json();
+        const body = JSON.parse(text);
         if (body && typeof body === "object" && !Array.isArray(body)) keys = Object.keys(body).sort();
       } catch {
         /* non-JSON body despite header */
       }
     }
-    return { status: r.status, keys };
+    return { status: r.status, keys, text };
   } catch {
-    return { status: 0, keys: null };
+    return { status: 0, keys: null, text: null };
   }
 }
 
@@ -72,7 +78,13 @@ for (const p of probes) {
         : r.status === rustExpect;
   let keyNote = "—";
   let okKeys = true;
-  if (p.compareKeys) {
+  if (p.exactBody) {
+    const same = n.status === r.status && n.text !== null && n.text === r.text;
+    okKeys = same;
+    keyNote = same
+      ? "exact"
+      : `body diff: next=${JSON.stringify(n.text?.slice(0, 120))} rust=${JSON.stringify(r.text?.slice(0, 120))}`;
+  } else if (p.compareKeys) {
     if (n.status === 200 && r.status === 200 && n.keys && r.keys) {
       const same = n.keys.length === r.keys.length && n.keys.every((k, i) => k === r.keys[i]);
       okKeys = same;
