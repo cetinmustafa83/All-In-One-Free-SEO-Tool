@@ -1,0 +1,19 @@
+[package]
+name = "seo-backend"
+version = "0.1.0"
+edition = "2021"
+description = "All-In-One Free SEO Tool — Rust backend (Task 14 three-part split: frontend Next.js / backend Rust / db SQLite)"
+
+[dependencies]
+axum = "0.7"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rusqlite = { version = "0.32", features = ["bundled"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tower-http = { version = "0.5", features = ["trace", "cors"] }
+
+[profile.dev]
+opt-level = 0
+debug = 1
