@@ -267,3 +267,26 @@ Stage Summary:
 - origin artık cetinmustafa83/All-In-One-Free-SEO-Tool; main = Rust backend işi (14.x) + sandbox snapshot'ları, linear tarih.
 - Kalıcı config: GITHUB_PAT + GH_TOKEN (bashrc/profile), credential store ~/.git-credentials. Push/pull artık token gerekmez.
 - Not: IamRamgarhia repo'suna push için ya collaborator daveti ya o hesabın PAT'i gerekli.
+
+---
+Task ID: 14.5a
+Agent: Z.ai Code (main)
+Task: "siradakileri planla ve her faz sonu push yap" — Faz 14.5a: tasks/notifications/keywords/backlinks/audit-issues domainlerinin Rust'a portu + Next proxy wrapper'lar + smoke + E2E. Kapsam kararı: integration-yükümlü action'lar (SMTP, WP bridge, OAuth, SERP, crawl, research) 14.5 dışında bırakıldı; clients CRUD 14.5b'ye.
+
+Work Log:
+- Sandbox reset recovery: rustup reinstall (minimal), dev server restart, data.db migration'lardan yeniden oluştu. Envanter (Explore agent): 6 domain, 24 action dosyası, 76 fonksiyon, 6 RSC doğrudan çağrı noktası, 12 *-actions.ts dosyası Task-14.1 envanterinde görünmüyordu.
+- Mimari karar (R1/R5 uyumlu, RSC-safe): action imzaları + çağrı noktaları DEĞİŞMEZ; gövdeler server-side callBackend proxy'si olur (127.0.0.1:3100). guardAction Next'te kalır (roller), revalidatePath Next'te kalır. Rust tarafı yeni /api/internal/* rotaları X-Internal-Token middleware'i ile korunur (SEO_INTERNAL_TOKEN → <dataDir>/.seo-internal-token, 0600, her iki taraf aynı çözümleme).
+- Yeni Rust: internal.rs (token middleware + ok_json/result_json/db_error_response), tasks.rs (7 endpoint: status+attribution+recurrence-spawn, delete, create+zod-parity validation, time, bulk×3), notifications.rs (recent aggregate: audit complete/failed, page_change, score-drop kod-içi, update_available/applied; at→ISO), keywords.rs (track+dedup, untrack, CSV import), backlinks.rs (add, status, delete, log-built+auto short-link, ahrefs import chunked+dedupe), audits.rs (issue status, status-for-type). main.rs'e bağlandı.
+- Next: src/lib/backend.ts (server-only callBackend: token fs'ten, 15s timeout, non-2xx → throw), 7 action dosyası proxy'ye çevrildi (tasks 7 fn, notifications 1, keywords 3, backlinks 5, audits 2). Zod şemaları Next'te kaldı (UI hata mesajları byte-identical).
+- BULUNAN BUG 1 (sessiz veri kaybı): tüm primary-effect DB yazıları `let _ =` ile yutuluyordu — FK ihlali (users boşken completed_by_user_id) 200 {ok:true} dönüp HİÇBİR ŞEY yazmıyordu. tasks.rs'in 7 noktası Result<(),String>'e çevrildi; hata 500 {"ok":false,"error"} zarfıyla yüzeye çıkıyor (internal.rs::db_error_response).
+- BULUNAN BUG 2: import-ahrefs chunk INSERT'inde placeholder'lar `?`siz üretiliyordu → rusqlite "Got 1, needed 0". (?n,) formatına çevrildi; düzeltme sonrası 1 satırlık import PASS.
+- Smoke: backend/tools/internal-smoke.sh — 12/12 PASS (401, notif JSON, task CRUD, FK-500 yüzeye çıkışı, kw track/untrack, bl add/status/delete, ahrefs import).
+- E2E (agent-browser): /tasks kanban "Cycle status" → task 2 todo→in_progress DB'de doğrulandı (UI→proxy→Rust→SQLite zinciri); bildirim zili açıldı; /backlinks/c/1 add-form requestSubmit → backlink id=6 oluştu. NOT: headless click ile form-action'lı useActionState submit'leri ara ara boş postData POST'luyor (worklog task 3/12'deki dev-only stale-action sınıfı; requestSubmit/fresh-context çalışıyor — prod etkisi yok).
+- api-inventory.ts filtresi *-actions.ts'i içerecek şekilde düzeltildi + docs regenerate (22 action files, 46 fns artık görünüyor).
+- İnsan hatası notu: backlinks/actions.ts proxy'si yanlışlıkla git checkout ile eski haline döndü → tam olarak yeniden yazıldı (aynı sözleşme; smoke + tsc doğrulamalı).
+
+Stage Summary:
+- Faz 14.5a TAMAM: 17 Rust endpoint + 18 proxy fonksiyon canlı; smoke 12/12; E2E üç yüzey (tasks/bildirim/backlink) doğrulandı; tsc+lint clean.
+- Rust 2982→~5900 satıra çıktı (6 yeni domain modülü). Port edilen toplam handler: 22→39.
+- Bilinen sapmalar: (1) importAhrefs/logBuiltLink activity log user_id artık proxy'den gelmiyor (null) — orijinalde de yoktu; (2) headless form-action submit artifact'ı dev-only, prod build etkilenmez.
+- 14.5b sıradaki: clients CRUD + templates + share-token. Her faz sonu push: bu commit o gereksinimin ilki.

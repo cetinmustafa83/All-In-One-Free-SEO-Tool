@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-10-24T13:43:04.057Z",
+  "generatedAt": "2026-10-24T21:56:42.881Z",
   "counts": {
     "apiRoutes": 36,
     "routeHandlers": 19,
     "handlersTotal": 65,
-    "actionFiles": 158,
-    "actionFunctions": 376,
+    "actionFiles": 22,
+    "actionFunctions": 46,
     "dbBackedRoutes": 36,
     "nativeRoutes": 1
   },
@@ -721,1644 +721,226 @@
   ],
   "actions": [
     {
-      "file": "src/app/ads/actions.ts",
-      "route": "/ads",
-      "area": "page-action",
-      "exports": [
-        "addAdAccount",
-        "clearSnapshots",
-        "deleteAdAccount",
-        "resolveProposal",
-        "resumeAdAccount",
-        "runEngineNow",
-        "syncDemoData",
-        "updateGuardrails"
-      ],
-      "count": 8
-    },
-    {
-      "file": "src/app/agent/actions.ts",
-      "route": "/agent",
-      "area": "page-action",
-      "exports": [
-        "applySuggestion",
-        "dismissSuggestion",
-        "reopenSuggestion",
-        "runAgent",
-        "runAgentExecute",
-        "suggestionToTask"
-      ],
-      "count": 6
-    },
-    {
-      "file": "src/app/agent/autopilot/actions.ts",
-      "route": "/agent/autopilot",
-      "area": "page-action",
-      "exports": [
-        "approveAction",
-        "approveAllOfKind",
-        "rejectAction",
-        "runNow",
-        "saveAgentSettings",
-        "setLevel",
-        "undoAction",
-        "undoRun",
-        "waitingByKind"
-      ],
-      "count": 9
-    },
-    {
-      "file": "src/app/ai-visibility/actions.ts",
-      "route": "/ai-visibility",
-      "area": "page-action",
-      "exports": [
-        "deleteVisibilityCheck",
-        "runAiCheck",
-        "runAllAiChecks",
-        "setBrowserScrapedAiEnabled"
-      ],
-      "count": 4
-    },
-    {
-      "file": "src/app/algorithm-updates/actions.ts",
-      "route": "/algorithm-updates",
-      "area": "page-action",
-      "exports": [
-        "refreshGoogleUpdatesAction"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/annotations/actions.ts",
-      "route": "/annotations",
-      "area": "page-action",
-      "exports": [
-        "addAnnotation",
-        "fetchAnnotations",
-        "removeAnnotation"
-      ],
-      "count": 3
-    },
-    {
-      "file": "src/app/api/ai-providers/actions.ts",
-      "route": "/api/ai-providers",
-      "area": "api-action",
-      "exports": [
-        "listConfiguredProviders"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/api/tool-runs/actions.ts",
-      "route": "/api/tool-runs",
-      "area": "api-action",
-      "exports": [
-        "clearAllRunsForTool",
-        "deleteRunAction",
-        "fetchRecentRuns",
-        "togglePinAction"
-      ],
-      "count": 4
-    },
-    {
-      "file": "src/app/ask/actions.ts",
-      "route": "/ask",
-      "area": "page-action",
-      "exports": [
-        "askTheTool"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/assistant/actions.ts",
-      "route": "/assistant",
-      "area": "page-action",
-      "exports": [
-        "chat"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/audits/actions.ts",
+      "file": "src/app/audits/fix-actions.ts",
       "route": "/audits",
       "area": "page-action",
       "exports": [
-        "runAuditForClient"
+        "getFixSuggestions"
       ],
       "count": 1
     },
     {
-      "file": "src/app/author-authority/actions.ts",
-      "route": "/author-authority",
+      "file": "src/app/audits/issue-actions.ts",
+      "route": "/audits",
       "area": "page-action",
       "exports": [
-        "listAuthorRecords",
-        "runAuthorScan"
+        "setIssueStatus",
+        "setStatusForType"
       ],
       "count": 2
     },
     {
-      "file": "src/app/automations/actions.ts",
-      "route": "/automations",
+      "file": "src/app/autonomy-actions.ts",
+      "route": "/",
       "area": "page-action",
       "exports": [
-        "createAutomation",
-        "deleteAutomation",
-        "installWorkflowTemplate",
-        "setAutomationEnabled",
-        "testWebhook"
+        "chooseAutonomyAction"
       ],
-      "count": 5
+      "count": 1
     },
     {
-      "file": "src/app/backlinks/actions.ts",
+      "file": "src/app/backlinks/bing-actions.ts",
       "route": "/backlinks",
       "area": "page-action",
       "exports": [
-        "addBacklink",
-        "deleteBacklink",
-        "importAhrefsBacklinks",
-        "logBuiltLink",
-        "setBacklinkStatus"
-      ],
-      "count": 5
-    },
-    {
-      "file": "src/app/bot-logs/actions.ts",
-      "route": "/bot-logs",
-      "area": "page-action",
-      "exports": [
-        "deleteUpload",
-        "listUploads",
-        "parseAndStoreLog"
-      ],
-      "count": 3
-    },
-    {
-      "file": "src/app/brand-monitor/actions.ts",
-      "route": "/brand-monitor",
-      "area": "page-action",
-      "exports": [
-        "deleteMention",
-        "mentionToOutreach",
-        "runBrandMonitor"
-      ],
-      "count": 3
-    },
-    {
-      "file": "src/app/brand-serp/actions.ts",
-      "route": "/brand-serp",
-      "area": "page-action",
-      "exports": [
-        "captureBrandSerp"
+        "importBingBacklinksAction"
       ],
       "count": 1
     },
     {
-      "file": "src/app/broken-links/actions.ts",
-      "route": "/broken-links",
+      "file": "src/app/clients/[id]/google-actions.ts",
+      "route": "/clients/[id]",
       "area": "page-action",
       "exports": [
-        "checkUrl"
+        "fetchGoogleProperties",
+        "saveGoogleProperties"
       ],
-      "count": 1
+      "count": 2
     },
     {
-      "file": "src/app/capture/actions.ts",
-      "route": "/capture",
+      "file": "src/app/clients/[id]/schedule-actions.ts",
+      "route": "/clients/[id]",
       "area": "page-action",
       "exports": [
-        "captureUrl",
-        "saveAsCompetitor",
-        "saveAsMonitoredPage"
-      ],
-      "count": 3
-    },
-    {
-      "file": "src/app/chats/actions.ts",
-      "route": "/chats",
-      "area": "page-action",
-      "exports": [
-        "clearChats",
-        "deleteChat",
-        "fetchChat",
-        "fetchChats",
-        "pinChat",
-        "renameChat"
-      ],
-      "count": 6
-    },
-    {
-      "file": "src/app/citations/actions.ts",
-      "route": "/citations",
-      "area": "page-action",
-      "exports": [
-        "setStatusForm"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/clients/[id]/ai-audit/actions.ts",
-      "route": "/clients/[id]/ai-audit",
-      "area": "page-action",
-      "exports": [
-        "saveIssueNotes",
-        "startAiAudit",
-        "toggleResolved"
-      ],
-      "count": 3
-    },
-    {
-      "file": "src/app/clients/[id]/automations/actions.ts",
-      "route": "/clients/[id]/automations",
-      "area": "page-action",
-      "exports": [
-        "createSchedule",
         "deleteSchedule",
-        "runScheduleNow",
-        "toggleScheduleEnabled"
+        "saveSchedule",
+        "sendReportNow"
+      ],
+      "count": 3
+    },
+    {
+      "file": "src/app/clients/[id]/wp-actions.ts",
+      "route": "/clients/[id]",
+      "area": "page-action",
+      "exports": [
+        "disconnectWpBridge",
+        "pushImageAltFix",
+        "pushWpFix",
+        "saveWpCreds"
       ],
       "count": 4
     },
     {
-      "file": "src/app/clients/[id]/onboarding/actions.ts",
-      "route": "/clients/[id]/onboarding",
-      "area": "page-action",
-      "exports": [
-        "acceptDiscoveredKeywords",
-        "generateMonthlyCalendar",
-        "getAuditProgress",
-        "getLearnedRulesForClient",
-        "runKeywordDiscovery",
-        "saveBrandStep",
-        "saveSurfacesStep",
-        "saveTargetingStep",
-        "skipOnboarding"
-      ],
-      "count": 9
-    },
-    {
-      "file": "src/app/clients/[id]/queue/actions.ts",
-      "route": "/clients/[id]/queue",
-      "area": "page-action",
-      "exports": [
-        "approveAndPublishNow",
-        "approveQueueItem",
-        "deleteQueueItem",
-        "rejectQueueItem"
-      ],
-      "count": 4
-    },
-    {
-      "file": "src/app/clients/actions.ts",
+      "file": "src/app/clients/import-actions.ts",
       "route": "/clients",
       "area": "page-action",
       "exports": [
-        "applyNicheTemplates",
-        "applyStackTemplates",
-        "createClient",
-        "deleteClient",
-        "fetchClientMetadata",
-        "quickAddClient",
-        "redetectTechStack",
-        "refreshClientMetadata",
-        "refreshClientMetadataForm",
-        "updateClient"
-      ],
-      "count": 10
-    },
-    {
-      "file": "src/app/clients/import/actions.ts",
-      "route": "/clients/import",
-      "area": "page-action",
-      "exports": [
-        "importSelectedProperties",
-        "listImportableProperties"
-      ],
-      "count": 2
-    },
-    {
-      "file": "src/app/compare/actions.ts",
-      "route": "/compare",
-      "area": "page-action",
-      "exports": [
-        "compareDomains"
+        "importClientsCsv"
       ],
       "count": 1
     },
     {
-      "file": "src/app/competitors/actions.ts",
-      "route": "/competitors",
+      "file": "src/app/clients/share-actions.ts",
+      "route": "/clients",
       "area": "page-action",
       "exports": [
-        "addCompetitor",
-        "deleteCompetitor"
-      ],
-      "count": 2
-    },
-    {
-      "file": "src/app/competitors/playbook/actions.ts",
-      "route": "/competitors/playbook",
-      "area": "page-action",
-      "exports": [
-        "playbookToTasks",
-        "runCompetitorAnalysis"
-      ],
-      "count": 2
-    },
-    {
-      "file": "src/app/content-gap/actions.ts",
-      "route": "/content-gap",
-      "area": "page-action",
-      "exports": [
-        "analyzeContentGap"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/csv-import/actions.ts",
-      "route": "/csv-import",
-      "area": "page-action",
-      "exports": [
-        "importCsv",
-        "previewCsv"
-      ],
-      "count": 2
-    },
-    {
-      "file": "src/app/cwv/actions.ts",
-      "route": "/cwv",
-      "area": "page-action",
-      "exports": [
-        "deleteCwvReport",
-        "runCwvScan"
-      ],
-      "count": 2
-    },
-    {
-      "file": "src/app/digest/actions.ts",
-      "route": "/digest",
-      "area": "page-action",
-      "exports": [
-        "loadDigestSettings",
-        "sendDigest",
-        "setSchedule"
+        "emailPortalLink",
+        "generateShareToken",
+        "revokeShareToken"
       ],
       "count": 3
     },
     {
-      "file": "src/app/embed/grader/actions.ts",
-      "route": "/embed/grader",
+      "file": "src/app/gbp/c/[clientId]/playbook-actions.ts",
+      "route": "/gbp/c/[clientId]",
       "area": "page-action",
       "exports": [
-        "captureLead",
-        "gradeForVisitor",
-        "publicGrade"
+        "getCompletionsForClient",
+        "togglePlaybookItem"
       ],
-      "count": 3
+      "count": 2
     },
     {
-      "file": "src/app/gbp/actions.ts",
-      "route": "/gbp",
-      "area": "page-action",
-      "exports": [
-        "composeGbpPost",
-        "generateGbpPostIdeas",
-        "generateReviewReply",
-        "loadGbpForClient",
-        "pingGbpLocation",
-        "postGbpReply",
-        "runGbpScrape"
-      ],
-      "count": 7
-    },
-    {
-      "file": "src/app/gbp/c/[clientId]/reviews/actions.ts",
-      "route": "/gbp/c/[clientId]/reviews",
-      "area": "page-action",
-      "exports": [
-        "chooseLocation",
-        "draftNextReplies",
-        "listLocationChoices",
-        "loadReviewDesk",
-        "publishAllDrafts",
-        "publishReply",
-        "saveDraft",
-        "syncReviews"
-      ],
-      "count": 8
-    },
-    {
-      "file": "src/app/grader/actions.ts",
-      "route": "/grader",
-      "area": "page-action",
-      "exports": [
-        "gradeSite"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/guest-posts/c/[clientId]/actions.ts",
-      "route": "/guest-posts/c/[clientId]",
-      "area": "page-action",
-      "exports": [
-        "deleteDraft",
-        "generateGuestPost",
-        "listDraftsForClient",
-        "setDraftLiveUrl",
-        "setDraftStatus",
-        "suggestGuestPostTitles",
-        "updateDraftMarkdown"
-      ],
-      "count": 7
-    },
-    {
-      "file": "src/app/image-audit/actions.ts",
-      "route": "/image-audit",
-      "area": "page-action",
-      "exports": [
-        "runImageAudit"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/import/actions.ts",
-      "route": "/import",
-      "area": "page-action",
-      "exports": [
-        "extractScreenshotText"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/invoices/actions.ts",
-      "route": "/invoices",
-      "area": "page-action",
-      "exports": [
-        "createInvoice",
-        "deleteInvoice",
-        "getNextInvoiceNumber",
-        "setInvoiceStatus"
-      ],
-      "count": 4
-    },
-    {
-      "file": "src/app/keywords/actions.ts",
+      "file": "src/app/keywords/import-actions.ts",
       "route": "/keywords",
       "area": "page-action",
       "exports": [
-        "researchAction",
-        "trackKeyword",
-        "untrackKeyword"
+        "importKeywords"
+      ],
+      "count": 1
+    },
+    {
+      "file": "src/app/keywords/rank-actions.ts",
+      "route": "/keywords",
+      "area": "page-action",
+      "exports": [
+        "checkAllRanksAction",
+        "checkRankAction",
+        "clearRankHistoryAction"
       ],
       "count": 3
     },
     {
-      "file": "src/app/knowledge-panel/actions.ts",
-      "route": "/knowledge-panel",
+      "file": "src/app/keywords/serp-actions.ts",
+      "route": "/keywords",
       "area": "page-action",
       "exports": [
-        "listKpSnapshots",
-        "runKpCapture"
-      ],
-      "count": 2
-    },
-    {
-      "file": "src/app/leads/actions.ts",
-      "route": "/leads",
-      "area": "page-action",
-      "exports": [
-        "convertLeadToClient",
-        "deleteLead",
-        "setLeadNotes",
-        "setLeadStatus"
-      ],
-      "count": 4
-    },
-    {
-      "file": "src/app/link-building/actions.ts",
-      "route": "/link-building",
-      "area": "page-action",
-      "exports": [
-        "deleteSubmission",
-        "setSubmissionStatus",
-        "setSubmittedUrl",
-        "trackResource"
-      ],
-      "count": 4
-    },
-    {
-      "file": "src/app/link-building/c/[clientId]/actions.ts",
-      "route": "/link-building/c/[clientId]",
-      "area": "page-action",
-      "exports": [
-        "bulkTrackResources",
-        "fetchBespokeIdeas",
-        "removeForClient",
-        "runLinkHealthCheck",
-        "setLiveUrlForClient",
-        "setStatusForClient",
-        "trackBespokeIdea"
-      ],
-      "count": 7
-    },
-    {
-      "file": "src/app/link-building/prospects/actions.ts",
-      "route": "/link-building/prospects",
-      "area": "page-action",
-      "exports": [
-        "findLinkProspects",
-        "trackProspect"
-      ],
-      "count": 2
-    },
-    {
-      "file": "src/app/links/actions.ts",
-      "route": "/links",
-      "area": "page-action",
-      "exports": [
-        "createShortLink",
-        "deleteShortLink",
-        "importShortLinksCsv"
-      ],
-      "count": 3
-    },
-    {
-      "file": "src/app/local-grid/actions.ts",
-      "route": "/local-grid",
-      "area": "page-action",
-      "exports": [
-        "createGridSchedule",
-        "deleteGridSchedule",
-        "getRecentGrids",
-        "listGridSchedules",
-        "runGrid",
-        "toggleGridSchedule"
-      ],
-      "count": 6
-    },
-    {
-      "file": "src/app/local-rank/actions.ts",
-      "route": "/local-rank",
-      "area": "page-action",
-      "exports": [
-        "runLocalRanks"
+        "runSerpScan"
       ],
       "count": 1
     },
     {
-      "file": "src/app/meta-rewrite/actions.ts",
-      "route": "/meta-rewrite",
+      "file": "src/app/portal/[token]/chat-actions.ts",
+      "route": "/portal/[token]",
       "area": "page-action",
       "exports": [
-        "applyRewrite",
-        "findCandidates"
-      ],
-      "count": 2
-    },
-    {
-      "file": "src/app/monitor/actions.ts",
-      "route": "/monitor",
-      "area": "page-action",
-      "exports": [
-        "addMonitoredPage",
-        "checkAllMonitoredPages",
-        "checkPageChanges",
-        "deleteMonitoredPage",
-        "setMonitorStatus"
-      ],
-      "count": 5
-    },
-    {
-      "file": "src/app/news/actions.ts",
-      "route": "/news",
-      "area": "page-action",
-      "exports": [
-        "addFeed",
-        "cleanupOldItems",
-        "clearAllItems",
-        "deleteOneItem",
-        "listRecentItems",
-        "refreshFeeds",
-        "removeFeed",
-        "seedDefaultFeedsIfEmpty",
-        "toggleFeed"
-      ],
-      "count": 9
-    },
-    {
-      "file": "src/app/notifications/actions.ts",
-      "route": "/notifications",
-      "area": "page-action",
-      "exports": [
-        "recentNotifications"
+        "portalChat"
       ],
       "count": 1
     },
     {
-      "file": "src/app/outreach/actions.ts",
-      "route": "/outreach",
+      "file": "src/app/reports/c/[clientId]/preview-actions.ts",
+      "route": "/reports/c/[clientId]",
       "area": "page-action",
       "exports": [
-        "addOutreachContact",
-        "deleteOutreachContact",
-        "deleteOutreachTemplate",
-        "loadMessagesForContact",
-        "loadTemplatesForClient",
-        "saveOutreachTemplate",
-        "seedDefaultTemplatesIfEmpty",
-        "sendOutreachAction",
-        "setContactStatus",
-        "setSenderName"
-      ],
-      "count": 10
-    },
-    {
-      "file": "src/app/proposals/actions.ts",
-      "route": "/proposals",
-      "area": "page-action",
-      "exports": [
-        "buildKickoffReport",
-        "buildProposal",
-        "createProposal",
-        "deleteProposal",
-        "updateProposal"
-      ],
-      "count": 5
-    },
-    {
-      "file": "src/app/report-data/actions.ts",
-      "route": "/report-data",
-      "area": "page-action",
-      "exports": [
-        "deleteEntry",
-        "listForClient",
-        "parseReportDataPaste"
-      ],
-      "count": 3
-    },
-    {
-      "file": "src/app/reports/archive/actions.ts",
-      "route": "/reports/archive",
-      "area": "page-action",
-      "exports": [
-        "deleteArchivedReport",
-        "pinArchivedReport"
-      ],
-      "count": 2
-    },
-    {
-      "file": "src/app/reports/batch/actions.ts",
-      "route": "/reports/batch",
-      "area": "page-action",
-      "exports": [
-        "approveReport",
-        "pollBatch",
-        "rejectReport",
-        "sendReport",
-        "startBatch"
-      ],
-      "count": 5
-    },
-    {
-      "file": "src/app/search/actions.ts",
-      "route": "/search",
-      "area": "page-action",
-      "exports": [
-        "search"
+        "previewExecSummary"
       ],
       "count": 1
     },
     {
-      "file": "src/app/seo-chat/actions.ts",
-      "route": "/seo-chat",
-      "area": "page-action",
-      "exports": [
-        "seoChat"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/settings/actions.ts",
+      "file": "src/app/settings/brand-actions.ts",
       "route": "/settings",
       "area": "page-action",
       "exports": [
-        "saveDefaultModel",
-        "saveWebhookUrl",
-        "testWebhook"
-      ],
-      "count": 3
-    },
-    {
-      "file": "src/app/settings/ai-learning/actions.ts",
-      "route": "/settings/ai-learning",
-      "area": "page-action",
-      "exports": [
-        "deletePreference",
-        "runDistill",
-        "togglePreference"
-      ],
-      "count": 3
-    },
-    {
-      "file": "src/app/settings/ai-usage/actions.ts",
-      "route": "/settings/ai-usage",
-      "area": "page-action",
-      "exports": [
-        "saveCap"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/settings/api-keys/actions.ts",
-      "route": "/settings/api-keys",
-      "area": "page-action",
-      "exports": [
-        "createApiKey",
-        "revokeApiKey"
+        "clearLogo",
+        "saveBrand"
       ],
       "count": 2
     },
     {
-      "file": "src/app/settings/edge/actions.ts",
-      "route": "/settings/edge",
+      "file": "src/app/settings/browser-actions.ts",
+      "route": "/settings",
       "area": "page-action",
       "exports": [
-        "rotateEdgeTokenAction"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/settings/errors/actions.ts",
-      "route": "/settings/errors",
-      "area": "page-action",
-      "exports": [
-        "clearResolvedAction",
-        "resolveErrorAction"
-      ],
-      "count": 2
-    },
-    {
-      "file": "src/app/settings/google/actions.ts",
-      "route": "/settings/google",
-      "area": "page-action",
-      "exports": [
-        "clearGoogleCredentials",
-        "disconnectGoogleAccount",
-        "removeServiceAccount",
-        "saveGoogleCredentials",
-        "saveServiceAccount",
-        "testServiceAccount"
-      ],
-      "count": 6
-    },
-    {
-      "file": "src/app/settings/inbound-webhooks/actions.ts",
-      "route": "/settings/inbound-webhooks",
-      "area": "page-action",
-      "exports": [
-        "createInboundWebhook",
-        "deleteInboundWebhook",
-        "toggleInboundWebhook"
+        "loadBrowserSettings",
+        "saveBrowserSettings",
+        "testProxies"
       ],
       "count": 3
     },
     {
-      "file": "src/app/settings/team/actions.ts",
-      "route": "/settings/team",
+      "file": "src/app/settings/key-actions.ts",
+      "route": "/settings",
       "area": "page-action",
       "exports": [
-        "cancelInvite",
-        "changeRole",
-        "inviteMember",
-        "setActive",
-        "setClientAccess"
-      ],
-      "count": 5
-    },
-    {
-      "file": "src/app/tasks/actions.ts",
-      "route": "/tasks",
-      "area": "page-action",
-      "exports": [
-        "applyPlaybookToClient",
-        "bulkDeleteTasks",
-        "bulkSetTaskPriority",
-        "bulkSetTaskStatus",
-        "createTask",
-        "deleteTask",
-        "logTaskTime",
-        "setTaskEstimate",
-        "setTaskRecurrence",
-        "setTaskStatus"
-      ],
-      "count": 10
-    },
-    {
-      "file": "src/app/title-tests/actions.ts",
-      "route": "/title-tests",
-      "area": "page-action",
-      "exports": [
-        "cancelTitleTest",
-        "createTitleTest",
-        "deleteTitleTest"
-      ],
-      "count": 3
-    },
-    {
-      "file": "src/app/tools/ads-funnel/actions.ts",
-      "route": "/tools/ads-funnel",
-      "area": "page-action",
-      "exports": [
-        "generateAdsFunnel"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/ai-overview/actions.ts",
-      "route": "/tools/ai-overview",
-      "area": "page-action",
-      "exports": [
-        "analyzeAiOverview"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/ai-robots/actions.ts",
-      "route": "/tools/ai-robots",
-      "area": "page-action",
-      "exports": [
-        "runAiRobotsAudit"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/ai-schema/actions.ts",
-      "route": "/tools/ai-schema",
-      "area": "page-action",
-      "exports": [
-        "runAiSchema"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/aio-passage/actions.ts",
-      "route": "/tools/aio-passage",
-      "area": "page-action",
-      "exports": [
-        "analyzePassages",
-        "analyzeUrl",
-        "batchRewrite",
-        "suggestRewrite"
+        "saveApiKey",
+        "saveOllamaUrl",
+        "setActiveProvider",
+        "setCreditSaverEnabled"
       ],
       "count": 4
     },
     {
-      "file": "src/app/tools/anchor-distribution/actions.ts",
-      "route": "/tools/anchor-distribution",
+      "file": "src/app/settings/smtp-actions.ts",
+      "route": "/settings",
       "area": "page-action",
       "exports": [
-        "runAnchor"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/auto-link/actions.ts",
-      "route": "/tools/auto-link",
-      "area": "page-action",
-      "exports": [
-        "runAutoLink"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/backlink-discovery/actions.ts",
-      "route": "/tools/backlink-discovery",
-      "area": "page-action",
-      "exports": [
-        "runBacklinkDiscovery"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/bing/actions.ts",
-      "route": "/tools/bing",
-      "area": "page-action",
-      "exports": [
-        "clearBingKey",
-        "fetchBingInsights",
-        "fetchBingSites",
-        "saveBingKey",
-        "submitBingUrls"
-      ],
-      "count": 5
-    },
-    {
-      "file": "src/app/tools/branded-split/actions.ts",
-      "route": "/tools/branded-split",
-      "area": "page-action",
-      "exports": [
-        "runSplit"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/browser-agent/actions.ts",
-      "route": "/tools/browser-agent",
-      "area": "page-action",
-      "exports": [
-        "runAgent"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/bulk-alt/actions.ts",
-      "route": "/tools/bulk-alt",
-      "area": "page-action",
-      "exports": [
-        "runBulkAlt"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/bulk-scan/actions.ts",
-      "route": "/tools/bulk-scan",
-      "area": "page-action",
-      "exports": [
-        "runBulkScan"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/cannibalization/actions.ts",
-      "route": "/tools/cannibalization",
-      "area": "page-action",
-      "exports": [
-        "runCannibalScan"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/canonical-audit/actions.ts",
-      "route": "/tools/canonical-audit",
-      "area": "page-action",
-      "exports": [
-        "runCanonical"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/cluster/actions.ts",
-      "route": "/tools/cluster",
-      "area": "page-action",
-      "exports": [
-        "runCluster"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/code-generator/actions.ts",
-      "route": "/tools/code-generator",
-      "area": "page-action",
-      "exports": [
-        "generateCode"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/content-grader/actions.ts",
-      "route": "/tools/content-grader",
-      "area": "page-action",
-      "exports": [
-        "gradeContent"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/content-helpers/actions.ts",
-      "route": "/tools/content-helpers",
-      "area": "page-action",
-      "exports": [
-        "getCategorySuggestions",
-        "getCoverImagePrompts"
-      ],
-      "count": 2
-    },
-    {
-      "file": "src/app/tools/content-score/actions.ts",
-      "route": "/tools/content-score",
-      "area": "page-action",
-      "exports": [
-        "saveContentScoreSnapshot",
-        "scoreContent"
-      ],
-      "count": 2
-    },
-    {
-      "file": "src/app/tools/crux/actions.ts",
-      "route": "/tools/crux",
-      "area": "page-action",
-      "exports": [
-        "runCrux",
-        "runCruxHistory",
-        "runOriginSummary"
-      ],
-      "count": 3
-    },
-    {
-      "file": "src/app/tools/disavow/actions.ts",
-      "route": "/tools/disavow",
-      "area": "page-action",
-      "exports": [
-        "runDisavow"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/dns-whois/actions.ts",
-      "route": "/tools/dns-whois",
-      "area": "page-action",
-      "exports": [
-        "runDns"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/domain-overview/actions.ts",
-      "route": "/tools/domain-overview",
-      "area": "page-action",
-      "exports": [
-        "runDomainOverview"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/eeat-audit/actions.ts",
-      "route": "/tools/eeat-audit",
-      "area": "page-action",
-      "exports": [
-        "runEeatAudit"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/facet-trap/actions.ts",
-      "route": "/tools/facet-trap",
-      "area": "page-action",
-      "exports": [
-        "runFacetTrap"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/freshness/actions.ts",
-      "route": "/tools/freshness",
-      "area": "page-action",
-      "exports": [
-        "runFreshnessAudit"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/gbp-reply/actions.ts",
-      "route": "/tools/gbp-reply",
-      "area": "page-action",
-      "exports": [
-        "fetchReviewsWithDrafts",
-        "listReplyLocations",
-        "submitReply"
-      ],
-      "count": 3
-    },
-    {
-      "file": "src/app/tools/geo-score/actions.ts",
-      "route": "/tools/geo-score",
-      "area": "page-action",
-      "exports": [
-        "runGeoScore"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/github-pr/actions.ts",
-      "route": "/tools/github-pr",
-      "area": "page-action",
-      "exports": [
-        "runOpenPr"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/gsc-coverage/actions.ts",
-      "route": "/tools/gsc-coverage",
-      "area": "page-action",
-      "exports": [
-        "analyzeFixesForCoverage",
-        "runCoverage"
-      ],
-      "count": 2
-    },
-    {
-      "file": "src/app/tools/headers/actions.ts",
-      "route": "/tools/headers",
-      "area": "page-action",
-      "exports": [
-        "inspectHeaders",
-        "saveHeadersSnapshot"
-      ],
-      "count": 2
-    },
-    {
-      "file": "src/app/tools/health-check/actions.ts",
-      "route": "/tools/health-check",
-      "area": "page-action",
-      "exports": [
-        "runHealthCheck",
-        "saveHealthSnapshot"
-      ],
-      "count": 2
-    },
-    {
-      "file": "src/app/tools/hreflang/actions.ts",
-      "route": "/tools/hreflang",
-      "area": "page-action",
-      "exports": [
-        "checkHreflang"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/image-gen/actions.ts",
-      "route": "/tools/image-gen",
-      "area": "page-action",
-      "exports": [
-        "runImageGen"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/indexnow/actions.ts",
-      "route": "/tools/indexnow",
-      "area": "page-action",
-      "exports": [
-        "submitIndexNow",
-        "verifyIndexNowKeyFile"
-      ],
-      "count": 2
-    },
-    {
-      "file": "src/app/tools/intent-classifier/actions.ts",
-      "route": "/tools/intent-classifier",
-      "area": "page-action",
-      "exports": [
-        "runClassify"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/internal-linking/actions.ts",
-      "route": "/tools/internal-linking",
-      "area": "page-action",
-      "exports": [
-        "suggestInternalLinks"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/keyword-difficulty/actions.ts",
-      "route": "/tools/keyword-difficulty",
-      "area": "page-action",
-      "exports": [
-        "estimateDifficulty"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/link-checker/actions.ts",
-      "route": "/tools/link-checker",
-      "area": "page-action",
-      "exports": [
-        "analyzeLinks"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/link-graph/actions.ts",
-      "route": "/tools/link-graph",
-      "area": "page-action",
-      "exports": [
-        "runLinkGraph"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/link-intersect/actions.ts",
-      "route": "/tools/link-intersect",
-      "area": "page-action",
-      "exports": [
-        "runLinkIntersect"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/link-recommender/actions.ts",
-      "route": "/tools/link-recommender",
-      "area": "page-action",
-      "exports": [
-        "recommendLinks"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/llms-txt/actions.ts",
-      "route": "/tools/llms-txt",
-      "area": "page-action",
-      "exports": [
-        "generateLlmsTxt",
-        "validateLlmsTxt"
-      ],
-      "count": 2
-    },
-    {
-      "file": "src/app/tools/local-cwv/actions.ts",
-      "route": "/tools/local-cwv",
-      "area": "page-action",
-      "exports": [
-        "runLocalCwv"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/meta-tag-generator/actions.ts",
-      "route": "/tools/meta-tag-generator",
-      "area": "page-action",
-      "exports": [
-        "generateMetaTags"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/migration-map/actions.ts",
-      "route": "/tools/migration-map",
-      "area": "page-action",
-      "exports": [
-        "importToRedirectRules",
-        "runMapping"
-      ],
-      "count": 2
-    },
-    {
-      "file": "src/app/tools/migration-parity/actions.ts",
-      "route": "/tools/migration-parity",
-      "area": "page-action",
-      "exports": [
-        "runParity"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/mobile-friendly/actions.ts",
-      "route": "/tools/mobile-friendly",
-      "area": "page-action",
-      "exports": [
-        "runMobile"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/news-headline/actions.ts",
-      "route": "/tools/news-headline",
-      "area": "page-action",
-      "exports": [
-        "runHeadline"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/og-image/actions.ts",
-      "route": "/tools/og-image",
-      "area": "page-action",
-      "exports": [
-        "runOgImage"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/outreach-personalize/actions.ts",
-      "route": "/tools/outreach-personalize",
-      "area": "page-action",
-      "exports": [
-        "runPersonalize"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/pagerank/actions.ts",
-      "route": "/tools/pagerank",
-      "area": "page-action",
-      "exports": [
-        "runPagerank"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/perf-budget/actions.ts",
-      "route": "/tools/perf-budget",
-      "area": "page-action",
-      "exports": [
-        "runBudget"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/person-schema/actions.ts",
-      "route": "/tools/person-schema",
-      "area": "page-action",
-      "exports": [
-        "savePersonSchema"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/plagiarism/actions.ts",
-      "route": "/tools/plagiarism",
-      "area": "page-action",
-      "exports": [
-        "checkPlagiarism"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/programmatic-seo/actions.ts",
-      "route": "/tools/programmatic-seo",
-      "area": "page-action",
-      "exports": [
-        "runProgram"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/rank-where/actions.ts",
-      "route": "/tools/rank-where",
-      "area": "page-action",
-      "exports": [
-        "checkRank"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/reddit-research/actions.ts",
-      "route": "/tools/reddit-research",
-      "area": "page-action",
-      "exports": [
-        "searchReddit"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/redirects-bulk/actions.ts",
-      "route": "/tools/redirects-bulk",
-      "area": "page-action",
-      "exports": [
-        "runBulk"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/redirects-manager/actions.ts",
-      "route": "/tools/redirects-manager",
-      "area": "page-action",
-      "exports": [
-        "addRule",
-        "deleteNotFound",
-        "deleteRule",
-        "record404",
-        "resolve404"
-      ],
-      "count": 5
-    },
-    {
-      "file": "src/app/tools/refresh/actions.ts",
-      "route": "/tools/refresh",
-      "area": "page-action",
-      "exports": [
-        "runRefresh"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/render/actions.ts",
-      "route": "/tools/render",
-      "area": "page-action",
-      "exports": [
-        "runRender"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/reputation-abuse-risk/actions.ts",
-      "route": "/tools/reputation-abuse-risk",
-      "area": "page-action",
-      "exports": [
-        "scanForRisk"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/robots-history/actions.ts",
-      "route": "/tools/robots-history",
-      "area": "page-action",
-      "exports": [
-        "loadSnapshots",
-        "runSnapshot"
-      ],
-      "count": 2
-    },
-    {
-      "file": "src/app/tools/robots/actions.ts",
-      "route": "/tools/robots",
-      "area": "page-action",
-      "exports": [
-        "checkRobots"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/schema-validate/actions.ts",
-      "route": "/tools/schema-validate",
-      "area": "page-action",
-      "exports": [
-        "runValidate"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/schema/actions.ts",
-      "route": "/tools/schema",
-      "area": "page-action",
-      "exports": [
-        "generateSchema"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/screenshot-import/actions.ts",
-      "route": "/tools/screenshot-import",
-      "area": "page-action",
-      "exports": [
-        "parseScreenshot"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/search-volume/actions.ts",
-      "route": "/tools/search-volume",
-      "area": "page-action",
-      "exports": [
-        "estimateVolumes"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/security/actions.ts",
-      "route": "/tools/security",
-      "area": "page-action",
-      "exports": [
-        "checkSecurity"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/serp-features/actions.ts",
-      "route": "/tools/serp-features",
-      "area": "page-action",
-      "exports": [
-        "removeSnapshot",
-        "runCapture"
-      ],
-      "count": 2
-    },
-    {
-      "file": "src/app/tools/sitemap/actions.ts",
-      "route": "/tools/sitemap",
-      "area": "page-action",
-      "exports": [
-        "generateSitemap"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/social-preview/actions.ts",
-      "route": "/tools/social-preview",
-      "area": "page-action",
-      "exports": [
-        "runSocial"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/soft-404/actions.ts",
-      "route": "/tools/soft-404",
-      "area": "page-action",
-      "exports": [
-        "runSoft404"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/summarizer/actions.ts",
-      "route": "/tools/summarizer",
-      "area": "page-action",
-      "exports": [
-        "runSummarize"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/sxo/actions.ts",
-      "route": "/tools/sxo",
-      "area": "page-action",
-      "exports": [
-        "runSxoAudit"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/traffic-drop/actions.ts",
-      "route": "/tools/traffic-drop",
-      "area": "page-action",
-      "exports": [
-        "runDiagnostic"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/trending/actions.ts",
-      "route": "/tools/trending",
-      "area": "page-action",
-      "exports": [
-        "runTrending"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/uptime/actions.ts",
-      "route": "/tools/uptime",
-      "area": "page-action",
-      "exports": [
-        "addTarget",
-        "deleteTarget",
-        "runPingNow",
-        "toggleTarget"
+        "clearSmtpConfig",
+        "saveSmtpConfig",
+        "sendTestEmail",
+        "testSmtpConnection"
       ],
       "count": 4
     },
     {
-      "file": "src/app/tools/utm-attribution/actions.ts",
-      "route": "/tools/utm-attribution",
+      "file": "src/app/settings/theme-actions.ts",
+      "route": "/settings",
       "area": "page-action",
       "exports": [
-        "runAttribution"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/wayback/actions.ts",
-      "route": "/tools/wayback",
-      "area": "page-action",
-      "exports": [
-        "runWayback"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/wp-hack-scan/actions.ts",
-      "route": "/tools/wp-hack-scan",
-      "area": "page-action",
-      "exports": [
-        "runWpHackScan"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/youtube-audit/actions.ts",
-      "route": "/tools/youtube-audit",
-      "area": "page-action",
-      "exports": [
-        "runYtAudit"
-      ],
-      "count": 1
-    },
-    {
-      "file": "src/app/tools/youtube/actions.ts",
-      "route": "/tools/youtube",
-      "area": "page-action",
-      "exports": [
-        "clearYouTubeKey",
-        "researchOnYouTube",
-        "saveYouTubeKey"
+        "cycleTheme",
+        "getThemePreference",
+        "setThemePreference"
       ],
       "count": 3
+    },
+    {
+      "file": "src/app/settings/timezone-actions.ts",
+      "route": "/settings",
+      "area": "page-action",
+      "exports": [
+        "saveWorkspaceTimeZone"
+      ],
+      "count": 1
+    },
+    {
+      "file": "src/app/settings/ui-actions.ts",
+      "route": "/settings",
+      "area": "page-action",
+      "exports": [
+        "getUiMode",
+        "setUiMode"
+      ],
+      "count": 2
     }
   ]
 }

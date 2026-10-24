@@ -15,17 +15,27 @@
 //! 14.4 scope: the auth web domain (login/logout/mode/register/status)
 //! and the error sink (/api/errors, /api/errors/by-digest) — sessions,
 //! scrypt passwords, invite acceptance, rate limiting.
+//!
+//! 14.5a scope: the internal action API (/api/internal/*) behind the
+//! X-Internal-Token middleware — the DB effects of the ported Next server
+//! actions (tasks, notifications, keywords, backlinks, audit issues).
 
+mod audits;
 mod auth;
 mod authweb;
+mod backlinks;
 mod config;
 mod db;
 mod errlog;
 mod error;
+mod internal;
+mod keywords;
 mod misc;
+mod notifications;
 mod password;
 mod ratelimit;
 mod session;
+mod tasks;
 mod util;
 mod v1;
 
@@ -67,6 +77,45 @@ async fn main() {
         rl: Arc::new(Limiter::default()),
     };
 
+    // ---- 14.5a: internal action API — X-Internal-Token guarded ----
+    // Built as a separate router so route_layer scopes the token check to
+    // exactly these routes; the existing public routes are untouched.
+    let internal = Router::new()
+        .route("/api/internal/tasks/:id/status", post(tasks::task_status))
+        .route("/api/internal/tasks/:id/delete", post(tasks::task_delete))
+        .route("/api/internal/tasks/create", post(tasks::task_create))
+        .route("/api/internal/tasks/:id/time", post(tasks::task_time))
+        .route("/api/internal/tasks/bulk-status", post(tasks::bulk_status))
+        .route("/api/internal/tasks/bulk-priority", post(tasks::bulk_priority))
+        .route("/api/internal/tasks/bulk-delete", post(tasks::bulk_delete))
+        .route(
+            "/api/internal/notifications/recent",
+            get(notifications::recent),
+        )
+        .route("/api/internal/keywords/track", post(keywords::track))
+        .route("/api/internal/keywords/:id/untrack", post(keywords::untrack))
+        .route("/api/internal/keywords/import", post(keywords::import))
+        .route("/api/internal/backlinks/add", post(backlinks::add))
+        .route("/api/internal/backlinks/:id/status", post(backlinks::status))
+        .route("/api/internal/backlinks/:id/delete", post(backlinks::delete))
+        .route("/api/internal/backlinks/log-built", post(backlinks::log_built))
+        .route(
+            "/api/internal/backlinks/import-ahrefs",
+            post(backlinks::import_ahrefs),
+        )
+        .route(
+            "/api/internal/audits/issues/:id/status",
+            post(audits::issue_status),
+        )
+        .route(
+            "/api/internal/audits/:id/issues-type",
+            post(audits::issues_type),
+        )
+        .route_layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            internal::require_token,
+        ));
+
     let app = Router::new()
         .route("/", get(root))
         .route("/health", get(health))
@@ -101,6 +150,7 @@ async fn main() {
         .route("/__dev/bearer", get(dev_bearer))
         .route("/__dev/session", get(authweb::dev_session))
         .route("/__dev/scrypt", get(authweb::dev_scrypt))
+        .merge(internal)
         .with_state(state)
         .layer(tower_http::trace::TraceLayer::new_for_http());
 

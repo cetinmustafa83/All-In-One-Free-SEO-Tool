@@ -1,103 +1,22 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, eq, inArray, ne } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { clients, tasks } from "@/db/schema";
-import { logActivity } from "@/lib/activity";
 import { currentUserId } from "@/lib/auth";
+import { callBackend } from "@/lib/backend";
+import { guardAction } from "@/lib/action-guard";
 
-type Recur = "daily" | "weekly" | "monthly" | "quarterly";
-
-function nextDueDate(prev: Date | null, interval: Recur): Date {
-  const base = prev ?? new Date();
-  const next = new Date(base.getTime());
-  if (interval === "daily") next.setDate(next.getDate() + 1);
-  else if (interval === "weekly") next.setDate(next.getDate() + 7);
-  else if (interval === "monthly") next.setMonth(next.getMonth() + 1);
-  else if (interval === "quarterly") next.setMonth(next.getMonth() + 3);
-  return next;
-}
-
-type TaskRow = typeof tasks.$inferSelect;
-
-/**
- * Change one task's status, with everything that goes with it: who
- * completed it, the activity entry, and the next instance of a recurring
- * task. Shared by the single and bulk paths — bulk "mark done" used to
- * skip both the activity log and recurrence.
- */
-async function applyTaskStatus(
-  existing: TaskRow,
-  status: "todo" | "in_progress" | "done" | "skipped",
-  completedByUserId: number | null,
-): Promise<void> {
-  // Record who finished it. Cleared when a task is reopened, so the
-  // column always means "who completed the state it's in now" rather
-  // than "who touched it once" — /capacity and the monthly report both
-  // read it as the former.
-  await db
-    .update(tasks)
-    .set({
-      status,
-      completedByUserId: status === "done" ? completedByUserId : null,
-      updatedAt: new Date(),
-    })
-    .where(eq(tasks.id, existing.id));
-
-  if (status !== "done" || existing.status === "done") return;
-
-  await logActivity({
-    kind: "task.completed",
-    message: `Completed task: ${existing.title}`,
-    level: "success",
-    clientId: existing.clientId,
-    entityType: "task",
-    entityId: existing.id,
-  });
-
-  if (!existing.recurringInterval) return;
-
-  // Done → reopened → done again used to clone a second next instance
-  // each time (easy on the Kanban board). If an open instance of this
-  // recurring task already exists, that is the next one.
-  const [openInstance] = await db
-    .select({ id: tasks.id })
-    .from(tasks)
-    .where(
-      and(
-        eq(tasks.clientId, existing.clientId),
-        eq(tasks.title, existing.title),
-        eq(tasks.recurringInterval, existing.recurringInterval),
-        inArray(tasks.status, ["todo", "in_progress"]),
-        ne(tasks.id, existing.id),
-      ),
-    )
-    .limit(1);
-  if (openInstance) return;
-
-  await db.insert(tasks).values({
-    clientId: existing.clientId,
-    title: existing.title,
-    description: existing.description,
-    whyItMatters: existing.whyItMatters,
-    // These were dropped, so recurring work lost its owner, its estimate
-    // and its link to the tool that does it.
-    toolPath: existing.toolPath,
-    priority: existing.priority,
-    status: "todo",
-    dueDate: nextDueDate(
-      existing.dueDate,
-      existing.recurringInterval as Recur,
-    ),
-    recurringInterval: existing.recurringInterval,
-    estimatedMinutes: existing.estimatedMinutes,
-    assignedUserId: existing.assignedUserId,
-    source: existing.source,
-    sourceRef: existing.sourceRef,
-  });
-}
+// ---------------------------------------------------------------------------
+// Task 14.5a: setTaskStatus, deleteTask, createTask, logTaskTime and the
+// three bulk actions are now thin proxies over /api/internal/tasks/* —
+// the DB effects (completion attribution, activity-log entries, recurrence
+// spawning) live in backend/src/tasks.rs. guardAction stays FIRST and
+// revalidation stays here. applyPlaybookToClient, setTaskRecurrence and
+// setTaskEstimate are NOT in the 14.5a scope and keep their direct DB code.
+// ---------------------------------------------------------------------------
 
 export async function setTaskStatus(
   taskId: number,
@@ -106,16 +25,13 @@ export async function setTaskStatus(
   await guardAction("edit");
   if (!Number.isFinite(taskId) || taskId <= 0) return;
 
-  const [existing] = await db
-    .select()
-    .from(tasks)
-    .where(eq(tasks.id, taskId))
-    .limit(1);
-  if (!existing) return;
-
-  const completedByUserId =
-    status === "done" ? await currentUserId() : null;
-  await applyTaskStatus(existing, status, completedByUserId);
+  await callBackend(`/api/internal/tasks/${taskId}/status`, {
+    body: {
+      status,
+      // Who completed it — resolved here, where the session lives.
+      userId: status === "done" ? await currentUserId() : null,
+    },
+  });
 
   revalidatePath("/tasks");
   revalidatePath("/");
@@ -124,7 +40,7 @@ export async function setTaskStatus(
 export async function deleteTask(taskId: number) {
   await guardAction("edit");
   if (!Number.isFinite(taskId) || taskId <= 0) return;
-  await db.delete(tasks).where(eq(tasks.id, taskId));
+  await callBackend(`/api/internal/tasks/${taskId}/delete`, { body: {} });
   revalidatePath("/tasks");
   revalidatePath("/");
 }
@@ -166,6 +82,8 @@ export async function createTask(
         ? undefined
         : (formData.get("recurringInterval") ?? undefined),
   };
+  // zod stays Next-side so the UI error strings are byte-identical; the
+  // Rust endpoint re-validates the same rules for direct callers.
   const parsed = newTaskSchema.safeParse(raw);
   if (!parsed.success) {
     return {
@@ -174,42 +92,18 @@ export async function createTask(
     };
   }
 
-  const [client] = await db
-    .select({ id: clients.id })
-    .from(clients)
-    .where(eq(clients.id, parsed.data.clientId))
-    .limit(1);
-  if (!client) return { ok: false, error: "Client not found." };
+  const result = await callBackend<CreateTaskResult>(
+    "/api/internal/tasks/create",
+    {
+      body: { ...parsed.data, userId: await currentUserId() },
+    },
+  );
 
-  const dueDate =
-    typeof parsed.data.dueInDays === "number"
-      ? new Date(Date.now() + parsed.data.dueInDays * 86_400_000)
-      : null;
-
-  const [row] = await db
-    .insert(tasks)
-    .values({
-      clientId: parsed.data.clientId,
-      title: parsed.data.title,
-      whyItMatters: parsed.data.whyItMatters,
-      priority: parsed.data.priority,
-      status: "todo",
-      dueDate,
-      recurringInterval: parsed.data.recurringInterval,
-    })
-    .returning({ id: tasks.id });
-
-  await logActivity({
-    kind: "task.created",
-    message: `New task: ${parsed.data.title}`,
-    clientId: parsed.data.clientId,
-    entityType: "task",
-    entityId: row.id,
-  });
-
-  revalidatePath("/tasks");
-  revalidatePath("/");
-  return { ok: true, id: row.id };
+  if (result.ok) {
+    revalidatePath("/tasks");
+    revalidatePath("/");
+  }
+  return result;
 }
 
 export async function setTaskRecurrence(
@@ -242,20 +136,15 @@ export async function logTaskTime(input: {
   if (!Number.isFinite(input.minutes) || input.minutes === 0) {
     return { ok: false, error: "Enter minutes" };
   }
-  const [t] = await db
-    .select({ id: tasks.id, actualMinutes: tasks.actualMinutes })
-    .from(tasks)
-    .where(eq(tasks.id, input.taskId))
-    .limit(1);
-  if (!t) return { ok: false, error: "Task not found" };
-  const newTotal = Math.max(0, (t.actualMinutes ?? 0) + Math.round(input.minutes));
-  await db
-    .update(tasks)
-    .set({ actualMinutes: newTotal, updatedAt: new Date() })
-    .where(eq(tasks.id, input.taskId));
+  const result = await callBackend<
+    { ok: true; total: number } | { ok: false; error: string }
+  >(`/api/internal/tasks/${input.taskId}/time`, {
+    body: { minutes: input.minutes },
+  });
+  if (!result.ok) return result;
   revalidatePath("/tasks");
   revalidatePath("/capacity");
-  return { ok: true, total: newTotal };
+  return result;
 }
 
 export async function setTaskEstimate(
@@ -289,12 +178,13 @@ export async function bulkSetTaskStatus(
   await guardAction("edit");
   const valid = validIds(ids);
   if (valid.length === 0) return;
-  const completedByUserId =
-    status === "done" ? await currentUserId() : null;
-  const rows = await db.select().from(tasks).where(inArray(tasks.id, valid));
-  for (const row of rows) {
-    await applyTaskStatus(row, status, completedByUserId);
-  }
+  await callBackend("/api/internal/tasks/bulk-status", {
+    body: {
+      ids,
+      status,
+      userId: status === "done" ? await currentUserId() : null,
+    },
+  });
   revalidatePath("/tasks");
   revalidatePath("/");
 }
@@ -306,10 +196,9 @@ export async function bulkSetTaskPriority(
   await guardAction("edit");
   const valid = validIds(ids);
   if (valid.length === 0) return;
-  await db
-    .update(tasks)
-    .set({ priority, updatedAt: new Date() })
-    .where(inArray(tasks.id, valid));
+  await callBackend("/api/internal/tasks/bulk-priority", {
+    body: { ids, priority },
+  });
   revalidatePath("/tasks");
   revalidatePath("/");
 }
@@ -318,13 +207,12 @@ export async function bulkDeleteTasks(ids: number[]) {
   await guardAction("edit");
   const valid = validIds(ids);
   if (valid.length === 0) return;
-  await db.delete(tasks).where(inArray(tasks.id, valid));
+  await callBackend("/api/internal/tasks/bulk-delete", { body: { ids } });
   revalidatePath("/tasks");
   revalidatePath("/");
 }
 
 import { getPlaybook } from "@/lib/niche-templates";
-import { guardAction } from "@/lib/action-guard";
 
 export async function applyPlaybookToClient(input: {
   playbookId: string;

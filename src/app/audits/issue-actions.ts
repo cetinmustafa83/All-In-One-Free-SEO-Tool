@@ -1,10 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, eq, inArray } from "drizzle-orm";
-import { db } from "@/db/client";
-import { auditIssues } from "@/db/schema";
+import { callBackend } from "@/lib/backend";
 import { guardAction } from "@/lib/action-guard";
+
+// Task 14.5a: the status updates now live in backend/src/audits.rs; these
+// proxies keep the guard, the id validation and the revalidation halves.
 
 type IssueStatus = "new" | "resolved" | "ignored" | "false_positive";
 
@@ -15,10 +16,9 @@ export async function setIssueStatus(
 ) {
   await guardAction("edit");
   if (!Number.isFinite(issueId) || issueId <= 0) return;
-  await db
-    .update(auditIssues)
-    .set({ status, updatedAt: new Date() })
-    .where(eq(auditIssues.id, issueId));
+  await callBackend(`/api/internal/audits/issues/${issueId}/status`, {
+    body: { status, auditId },
+  });
   revalidatePath(`/audits/${auditId}`);
 }
 
@@ -29,15 +29,8 @@ export async function setStatusForType(
 ) {
   await guardAction("edit");
   if (!Number.isFinite(auditId) || auditId <= 0) return;
-  const rows = await db
-    .select({ id: auditIssues.id })
-    .from(auditIssues)
-    .where(and(eq(auditIssues.auditId, auditId), eq(auditIssues.type, type)));
-  const ids = rows.map((r) => r.id);
-  if (ids.length === 0) return;
-  await db
-    .update(auditIssues)
-    .set({ status, updatedAt: new Date() })
-    .where(inArray(auditIssues.id, ids));
+  await callBackend(`/api/internal/audits/${auditId}/issues-type`, {
+    body: { type, status },
+  });
   revalidatePath(`/audits/${auditId}`);
 }

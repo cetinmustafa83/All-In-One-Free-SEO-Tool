@@ -1,12 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, eq } from "drizzle-orm";
-import { db } from "@/db/client";
-import { keywords } from "@/db/schema";
+import { callBackend } from "@/lib/backend";
 import { researchKeywords } from "@/lib/keyword-research";
 import { normaliseCountry } from "@/lib/countries";
 import { guardAction } from "@/lib/action-guard";
+
+// Task 14.5a: trackKeyword and untrackKeyword are thin proxies over
+// /api/internal/keywords/* (dedup + insert live in backend/src/keywords.rs).
+// researchAction is NOT in the 14.5a scope and stays as-is.
 
 export type ResearchActionResult =
   | {
@@ -82,33 +84,22 @@ export async function trackKeyword(formData: FormData) {
   if (!Number.isFinite(clientId) || clientId <= 0) return;
   if (!query) return;
 
-  // Skip if same client+query already tracked
-  const existing = await db
-    .select({ id: keywords.id })
-    .from(keywords)
-    .where(and(eq(keywords.clientId, clientId), eq(keywords.query, query)))
-    .limit(1);
-  if (existing.length > 0) {
-    revalidatePath("/keywords");
-    return;
-  }
-
-  await db.insert(keywords).values({
-    clientId,
-    query,
-    country,
-    device,
+  // Same client+query dedup happens in the backend; it reports whether
+  // this call actually inserted so revalidation matches the original.
+  const r = await callBackend<{ deduped?: boolean }>("/api/internal/keywords/track", {
+    body: { clientId, query, country, device },
   });
-
   revalidatePath("/keywords");
-  revalidatePath(`/clients/${clientId}`);
-  revalidatePath("/");
+  if (!r.deduped) {
+    revalidatePath(`/clients/${clientId}`);
+    revalidatePath("/");
+  }
 }
 
 export async function untrackKeyword(keywordId: number) {
   await guardAction("edit");
   if (!Number.isFinite(keywordId) || keywordId <= 0) return;
-  await db.delete(keywords).where(eq(keywords.id, keywordId));
+  await callBackend(`/api/internal/keywords/${keywordId}/untrack`, { body: {} });
   revalidatePath("/keywords");
   revalidatePath("/");
 }

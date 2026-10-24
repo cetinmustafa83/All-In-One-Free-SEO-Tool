@@ -155,3 +155,7 @@ docs/audits/
 # already local-only; publishing a generated stub while hiding the real
 # thing was the inconsistency.
 docs/AGENTS.md
+
+# internal proxy token (auto-generated, never commit)
+.seo-internal-token
+data/

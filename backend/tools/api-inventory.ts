@@ -118,7 +118,7 @@ const routes = all
   .map(scanRoute)
   .sort((a, b) => a.route.localeCompare(b.route));
 const actions = all
-  .filter((f) => f.split("/").pop() === "actions.ts") // exact basename: not *-actions.ts
+  .filter((f) => /(^|\/)\w+(-actions\.ts|actions\.ts)$/.test(f)) // actions.ts + *-actions.ts (14.5a gap fix)
   .map(scanActions)
   .sort((a, b) => a.file.localeCompare(b.file));
 

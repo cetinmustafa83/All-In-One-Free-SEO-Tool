@@ -1,0 +1,732 @@
+     1→//! /api/v1/* — public Bearer-key API. Task 14.3.
+     2→//! Ports src/app/api/v1/**/route.ts + src/lib/api-auth.ts semantics.
+     3→//! NOTE: /api/v1/clients uses the LONG 401 message; every other v1 route
+     4→//! uses plain "Unauthorized" — byte-for-byte, as in the Next sources.
+     5→
+     6→use crate::auth;
+     7→use crate::error;
+     8→use crate::util::*;
+     9→use crate::AppState;
+    10→use axum::extract::{Path, State};
+    11→use axum::http::{HeaderMap, StatusCode, Uri};
+    12→use axum::response::{IntoResponse, Response};
+    13→use axum::Json;
+    14→use rusqlite::{params, OptionalExtension};
+    15→use serde_json::{json, Value};
+    16→
+    17→const MSG_401_SHORT: &str = "Unauthorized";
+    18→const MSG_READ_SCOPE: &str = "Read scope required.";
+    19→const MSG_WRITE_SCOPE: &str = "Write scope required.";
+    20→
+    21→struct V1Key {
+    22→    #[allow(dead_code)]
+    23→    id: i64,
+    24→    scopes: Vec<String>,
+    25→}
+    26→
+    27→/// api-auth.ts authenticateRequest + requireScope + last_used_at update.
+    28→fn require_key(
+    29→    state: &AppState,
+    30→    headers: &HeaderMap,
+    31→    unauthorized_msg: &str,
+    32→    scope: &str,
+    33→    scope_denied_msg: &str,
+    34→) -> Result<V1Key, Response> {
+    35→    let Some(raw) = auth::bearer_token(headers) else {
+    36→        return Err(error::api_error(StatusCode::UNAUTHORIZED, unauthorized_msg));
+    37→    };
+    38→    if !raw.starts_with(auth::KEY_PREFIX) {
+    39→        return Err(error::api_error(StatusCode::UNAUTHORIZED, unauthorized_msg));
+    40→    }
+    41→    let hash = auth::sha256_hex(&raw);
+    42→    let now = now_secs();
+    43→    let row = state
+    44→        .db
+    45→        .with_conn(|c| {
+    46→            use rusqlite::OptionalExtension;
+    47→            c.query_row(
+    48→                "SELECT id, scopes FROM api_keys \
+    49→                 WHERE key_hash = ?1 AND revoked_at IS NULL \
+    50→                 AND (expires_at IS NULL OR expires_at > ?2) LIMIT 1",
+    51→                params![hash, now],
+    52→                |r| Ok((r.get::<_, i64>(0)?, r.get::<_, Option<String>>(1)?)),
+    53→            )
+    54→            .optional()
+    55→        })
+    56→        .ok()
+    57→        .flatten();
+    58→    let Some((id, scopes_raw)) = row else {
+    59→        return Err(error::api_error(StatusCode::UNAUTHORIZED, unauthorized_msg));
+    60→    };
+    61→    // non-blocking last_used_at update
+    62→    let _ = state.db.with_conn(|c| {
+    63→        c.execute("UPDATE api_keys SET last_used_at = ?1 WHERE id = ?2", params![now, id])
+    64→    });
+    65→    // Drizzle text mode json: parsed array, NULL → ["read"] default
+    66→    let scopes: Vec<String> = scopes_raw
+    67→        .and_then(|s| serde_json::from_str(&s).ok())
+    68→        .unwrap_or_else(|| vec!["read".into()]);
+    69→    if !auth::scope_allows(&scopes, scope) {
+    70→        return Err(error::api_error(StatusCode::FORBIDDEN, scope_denied_msg));
+    71→    }
+    72→    Ok(V1Key { id, scopes })
+    73→}
+    74→
+    75→fn ok_json(body: Value) -> Response {
+    76→    Json(body).into_response()
+    77→}
+    78→
+    79→// ---------- GET /api/v1/health (+ OPTIONS) ----------
+    80→fn cors_json(body: Value) -> Response {
+    81→    let mut resp = (StatusCode::OK, Json(body)).into_response();
+    82→    let h = resp.headers_mut();
+    83→    h.insert("access-control-allow-origin", "*".parse().unwrap());
+    84→    h.insert("access-control-allow-methods", "GET, OPTIONS".parse().unwrap());
+    85→    h.insert("cache-control", "no-store".parse().unwrap());
+    86→    resp
+    87→}
+    88→
+    89→/// installRoot + pid only for same-machine callers: an absolute filesystem
+    90→/// path is reconnaissance, not health.
+    91→fn v1_health_host_is_local(headers: &HeaderMap) -> bool {
+    92→    let host = headers
+    93→        .get("host")
+    94→        .and_then(|v| v.to_str().ok())
+    95→        .unwrap_or("")
+    96→        .to_string();
+    97→    let hostname = host
+    98→        .rsplit_once(':')
+    99→        .map(|(h, _)| h) // strip :port
+   100→        .unwrap_or(&host)
+   101→        .to_lowercase();
+   102→    matches!(hostname.as_str(), "localhost" | "127.0.0.1" | "[::1]")
+   103→}
+   104→
+   105→pub async fn v1_health_get(headers: HeaderMap) -> Response {
+   106→    let base = json!({
+   107→        "ok": true,
+   108→        "service": "seo-tool",
+   109→        "version": "v1",
+   110→        "time": now_iso(),
+   111→    });
+   112→    if !v1_health_host_is_local(&headers) {
+   113→        return cors_json(base);
+   114→    }
+   115→    // cwd is backend/ — the install root is the repo root above it
+   116→    let install_root = std::env::current_dir()
+   117→        .ok()
+   118→        .and_then(|p| p.join("..").canonicalize().ok())
+   119→        .map(|p| p.display().to_string())
+   120→        .unwrap_or_default();
+   121→    cors_json(json!({ "ok": true, "service": "seo-tool", "version": "v1", "time": now_iso(),
+   122→                      "installRoot": install_root, "pid": std::process::id() }))
+   123→}
+   124→
+   125→pub async fn v1_health_options() -> Response {
+   126→    axum::response::Response::builder()
+   127→        .status(StatusCode::NO_CONTENT)
+   128→        .header("access-control-allow-origin", "*")
+   129→        .header("access-control-allow-methods", "GET, OPTIONS")
+   130→        .header("access-control-allow-headers", "*")
+   131→        .header("access-control-max-age", "86400")
+   132→        .body(axum::body::Body::empty())
+   133→        .unwrap()
+   134→}
+   135→
+   136→// ---------- GET /api/v1/clients ----------
+   137→pub async fn clients_list(State(state): State<AppState>, headers: HeaderMap, uri: Uri) -> Response {
+   138→    if let Err(resp) = require_key(&state, &headers, error::MSG_BEARER_REQUIRED, "read", MSG_READ_SCOPE) {
+   139→        return resp;
+   140→    }
+   141→    let limit = auth::parse_limit(qparam(uri.query(), "limit"), 50, 200);
+   142→    let rows = state.db.with_conn(|c| {
+   143→        let mut stmt = c.prepare(
+   144→            "SELECT id, name, url, niche, city, country, tech_stack, created_at \
+   145→             FROM clients ORDER BY created_at DESC LIMIT ?1",
+   146→        )?;
+   147→        let list = stmt
+   148→            .query_map([limit], |r| {
+   149→                Ok(row_json(r, &[
+   150→                    ("id", "id", Col::Raw),
+   151→                    ("name", "name", Col::Raw),
+   152→                    ("url", "url", Col::Raw),
+   153→                    ("niche", "niche", Col::Raw),
+   154→                    ("city", "city", Col::Raw),
+   155→                    ("country", "country", Col::Raw),
+   156→                    ("tech_stack", "techStack", Col::Raw),
+   157→                    ("created_at", "createdAt", Col::Iso),
+   158→                ]))
+   159→            })?
+   160→            .collect::<Result<Vec<_>, _>>()?;
+   161→        Ok(list)
+   162→    });
+   163→    match rows {
+   164→        Ok(list) => ok_json(json!({ "clients": list, "count": list.len() })),
+   165→        Err(e) => ok_json(json!({ "clients": [], "count": 0, "_err": e.to_string() })),
+   166→    }
+   167→}
+   168→
+   169→// ---------- GET /api/v1/clients/:id ----------
+   170→pub async fn client_get(
+   171→    State(state): State<AppState>,
+   172→    headers: HeaderMap,
+   173→    Path(id): Path<String>,
+   174→) -> Response {
+   175→    if let Err(resp) = require_key(&state, &headers, MSG_401_SHORT, "read", MSG_READ_SCOPE) {
+   176→        return resp;
+   177→    }
+   178→    let Some(cid) = js_number(Some(&id)) else {
+   179→        return error::api_error(StatusCode::BAD_REQUEST, "Invalid client id");
+   180→    };
+   181→    // credential blobs stripped before returning — read scope must not see
+   182→    // them even encrypted (defensive pattern in the Next source).
+   183→    let row = state.db.with_conn(|c| {
+   184→        c.query_row(
+   185→            "SELECT id, name, url, niche, tech_stack, share_token, logo_url, description, \
+   186→             address, phone, email, social_links, gbp_url, gsc_property, ga4_property_id, \
+   187→             google_connected_email, country, language, city, geo_target, business_type, \
+   188→             service_radius_km, onboarding_step, plan_generated_at, wp_endpoint, \
+   189→             branding_skipped, gbp_location_name, created_at, updated_at \
+   190→             FROM clients WHERE id = ?1 LIMIT 1",
+   191→            params![cid],
+   192→            |r| {
+   193→                Ok(row_json(r, &[
+   194→                    ("id", "id", Col::Raw),
+   195→                    ("name", "name", Col::Raw),
+   196→                    ("url", "url", Col::Raw),
+   197→                    ("niche", "niche", Col::Raw),
+   198→                    ("tech_stack", "techStack", Col::Raw),
+   199→                    ("share_token", "shareToken", Col::Raw),
+   200→                    ("logo_url", "logoUrl", Col::Raw),
+   201→                    ("description", "description", Col::Raw),
+   202→                    ("address", "address", Col::Raw),
+   203→                    ("phone", "phone", Col::Raw),
+   204→                    ("email", "email", Col::Raw),
+   205→                    ("social_links", "socialLinks", Col::Raw),
+   206→                    ("gbp_url", "gbpUrl", Col::Raw),
+   207→                    ("gsc_property", "gscProperty", Col::Raw),
+   208→                    ("ga4_property_id", "ga4PropertyId", Col::Raw),
+   209→                    ("google_connected_email", "googleConnectedEmail", Col::Raw),
+   210→                    ("country", "country", Col::Raw),
+   211→                    ("language", "language", Col::Raw),
+   212→                    ("city", "city", Col::Raw),
+   213→                    ("geo_target", "geoTarget", Col::Raw),
+   214→                    ("business_type", "businessType", Col::Raw),
+   215→                    ("service_radius_km", "serviceRadiusKm", Col::Raw),
+   216→                    ("onboarding_step", "onboardingStep", Col::Raw),
+   217→                    ("plan_generated_at", "planGeneratedAt", Col::Iso),
+   218→                    ("wp_endpoint", "wpEndpoint", Col::Raw),
+   219→                    ("branding_skipped", "brandingSkipped", Col::Raw),
+   220→                    ("gbp_location_name", "gbpLocationName", Col::Raw),
+   221→                    ("created_at", "createdAt", Col::Iso),
+   222→                    ("updated_at", "updatedAt", Col::Iso),
+   223→                ]))
+   224→            },
+   225→        )
+   226→        .optional()
+   227→    });
+   228→    match row {
+   229→        Ok(Some(client)) => ok_json(json!({ "client": client })),
+   230→        Ok(None) => error::api_error(StatusCode::NOT_FOUND, "Client not found"),
+   231→        Err(_) => error::api_error(StatusCode::NOT_FOUND, "Client not found"),
+   232→    }
+   233→}
+   234→
+   235→// ---------- GET /api/v1/keywords ----------
+   236→pub async fn keywords_list(State(state): State<AppState>, headers: HeaderMap, uri: Uri) -> Response {
+   237→    if let Err(resp) = require_key(&state, &headers, MSG_401_SHORT, "read", MSG_READ_SCOPE) {
+   238→        return resp;
+   239→    }
+   240→    let limit = auth::parse_limit(qparam(uri.query(), "limit"), 100, 500);
+   241→    // Node: clientId ? Number(clientId) : null — junk binds NaN → NULL match
+   242→    // → no rows. Impossible-filter (id = -1) keeps that observable behavior.
+   243→    let cid = qparam(uri.query(), "clientId").and_then(|s| js_number(Some(s)).map(|f| f as i64));
+   244→    let where_clause = if cid.is_some() {
+   245→        format!("WHERE k.client_id = {}", cid.unwrap())
+   246→    } else {
+   247→        String::new()
+   248→    };
+   249→    let rows = state.db.with_conn(|c| {
+   250→        let sql = format!(
+   251→            "SELECT k.id, k.query, k.country, k.client_id, cl.name \
+   252→             FROM keywords k LEFT JOIN clients cl ON k.client_id = cl.id \
+   253→             {where_clause} LIMIT {limit}",
+   254→        );
+   255→        let mut stmt = c.prepare(&sql)?;
+   256→        let map_row = |r: &rusqlite::Row<'_>| {
+   257→            Ok(row_json(r, &[
+   258→                ("id", "id", Col::Raw),
+   259→                ("query", "query", Col::Raw),
+   260→                ("country", "country", Col::Raw),
+   261→                ("client_id", "clientId", Col::Raw),
+   262→                ("name", "clientName", Col::Raw),
+   263→            ]))
+   264→        };
+   265→        let list: Vec<Value> = stmt.query_map([], map_row)?.collect::<Result<Vec<_>, _>>()?;
+   266→        Ok(list)
+   267→    });
+   268→    let kw_rows = match rows {
+   269→        Ok(v) => v,
+   270→        Err(_) => Vec::new(),
+   271→    };
+   272→    // latest rank per keyword — 10 most-recent rows per keyword is plenty
+   273→    let mut latest: std::collections::HashMap<i64, (Value, Value)> = std::collections::HashMap::new();
+   274→    if !kw_rows.is_empty() {
+   275→        let ids: Vec<i64> = kw_rows
+   276→            .iter()
+   277→            .filter_map(|v| v.get("id").and_then(|x| x.as_i64()))
+   278→            .collect();
+   279→        if !ids.is_empty() {
+   280→            let marks = vec!["?"; ids.len()].join(",");
+   281→            let sql = format!(
+   282→                "SELECT keyword_id, position, checked_at FROM keyword_rankings \
+   283→                 WHERE keyword_id IN ({marks}) ORDER BY checked_at DESC LIMIT {}",
+   284→                ids.len() * 10
+   285→            );
+   286→            let _ = state.db.with_conn(|c| {
+   287→                let mut stmt = c.prepare(&sql)?;
+   288→                let mut rows = stmt.query(rusqlite::params_from_iter(ids.iter()))?;
+   289→                while let Some(r) = rows.next()? {
+   290→                    let kid: i64 = r.get(0)?;
+   291→                    if !latest.contains_key(&kid) {
+   292→                        latest.insert(kid, (sqv_to_json(r.get(1)?), sqv_to_iso(r.get(2)?)));
+   293→                    }
+   294→                }
+   295→                Ok(())
+   296→            });
+   297→        }
+   298→    }
+   299→    let enriched: Vec<Value> = kw_rows
+   300→        .into_iter()
+   301→        .map(|mut v| {
+   302→            if let Value::Object(obj) = &mut v {
+   303→                let kid = obj.get("id").and_then(|x| x.as_i64());
+   304→                let latest_entry = kid.and_then(|k| latest.get(&k));
+   305→                obj.insert("latestPosition".into(), latest_entry.map(|(p, _)| p.clone()).unwrap_or(Value::Null));
+   306→                obj.insert("lastCheckedAt".into(), latest_entry.map(|(_, c)| c.clone()).unwrap_or(Value::Null));
+   307→            }
+   308→            v
+   309→        })
+   310→        .collect();
+   311→    let count = enriched.len();
+   312→    ok_json(json!({ "keywords": enriched, "count": count }))
+   313→}
+   314→
+   315→// ---------- GET /api/v1/rankings ----------
+   316→pub async fn rankings_list(State(state): State<AppState>, headers: HeaderMap, uri: Uri) -> Response {
+   317→    if let Err(resp) = require_key(&state, &headers, MSG_401_SHORT, "read", MSG_READ_SCOPE) {
+   318→        return resp;
+   319→    }
+   320→    let keyword_id = qparam(uri.query(), "keywordId");
+   321→    let client_id = qparam(uri.query(), "clientId");
+   322→    if keyword_id.is_none() && client_id.is_none() {
+   323→        return error::api_error(StatusCode::BAD_REQUEST, "Specify keywordId or clientId");
+   324→    }
+   325→    // Node: days = Math.min(Number(days ?? 90), 365); Number("") = 0
+   326→    let days = js_number(qparam(uri.query(), "days")).map(|d| d.min(365.0)).unwrap_or(90.0);
+   327→    let limit = auth::parse_limit(qparam(uri.query(), "limit"), 500, 2000);
+   328→    // Invalid Date (NaN days) matches nothing in SQLite — mirror with empty.
+   329→    if !days.is_finite() {
+   330→        return ok_json(json!({ "rankings": [], "count": 0 }));
+   331→    }
+   332→    let since = now_secs() - (days * 86400.0) as i64;
+   333→    let kid = keyword_id.and_then(|s| js_number(Some(s)).map(|f| f as i64));
+   334→    let cid = client_id.and_then(|s| js_number(Some(s)).map(|f| f as i64));
+   335→    // since/kid/cid are validated i64s — inline is safe (no injection)
+   336→    let rows = state.db.with_conn(|c| {
+   337→        let mut sql = format!(
+   338→            "SELECT kr.keyword_id, k.query, k.country, kr.position, kr.url, kr.checked_at, \
+   339→             kr.has_ai_overview, kr.has_featured_snippet, kr.has_local_pack \
+   340→             FROM keyword_rankings kr LEFT JOIN keywords k ON kr.keyword_id = k.id \
+   341→             WHERE kr.checked_at >= {since}"
+   342→        );
+   343→        if let Some(kid) = kid {
+   344→            sql.push_str(&format!(" AND kr.keyword_id = {kid}"));
+   345→        }
+   346→        if let Some(cid) = cid {
+   347→            sql.push_str(&format!(" AND k.client_id = {cid}"));
+   348→        }
+   349→        sql.push_str(&format!(" ORDER BY kr.checked_at DESC LIMIT {limit}"));
+   350→        let mut stmt = c.prepare(&sql)?;
+   351→        let map_row = |r: &rusqlite::Row<'_>| {
+   352→            Ok(row_json(r, &[
+   353→                ("keyword_id", "keywordId", Col::Raw),
+   354→                ("query", "query", Col::Raw),
+   355→                ("country", "country", Col::Raw),
+   356→                ("position", "position", Col::Raw),
+   357→                ("url", "url", Col::Raw),
+   358→                ("checked_at", "checkedAt", Col::Iso),
+   359→                ("has_ai_overview", "hasAiOverview", Col::Raw),
+   360→                ("has_featured_snippet", "hasFeaturedSnippet", Col::Raw),
+   361→                ("has_local_pack", "hasLocalPack", Col::Raw),
+   362→            ]))
+   363→        };
+   364→        let list: Vec<Value> = stmt.query_map([], map_row)?.collect::<Result<Vec<_>, _>>()?;
+   365→        Ok(list)
+   366→    });
+   367→    match rows {
+   368→        Ok(list) => {
+   369→            let count = list.len();
+   370→            ok_json(json!({ "rankings": list, "count": count }))
+   371→        }
+   372→        Err(_) => ok_json(json!({ "rankings": [], "count": 0 })),
+   373→    }
+   374→}
+   375→
+   376→// ---------- GET /api/v1/reports ----------
+   377→pub async fn reports_list(State(state): State<AppState>, headers: HeaderMap, uri: Uri) -> Response {
+   378→    if let Err(resp) = require_key(&state, &headers, MSG_401_SHORT, "read", MSG_READ_SCOPE) {
+   379→        return resp;
+   380→    }
+   381→    let limit = auth::parse_limit(qparam(uri.query(), "limit"), 50, 200);
+   382→    let cid = qparam(uri.query(), "clientId").and_then(|s| js_number(Some(s)).map(|f| f as i64));
+   383→    let cols = &[
+   384→        ("id", "id", Col::Raw),
+   385→        ("client_id", "clientId", Col::Raw),
+   386→        ("name", "clientName", Col::Raw),
+   387→        ("title", "title", Col::Raw),
+   388→        ("period_start", "periodStart", Col::Iso),
+   389→        ("period_end", "periodEnd", Col::Iso),
+   390→        ("template", "template", Col::Raw),
+   391→        ("exec_summary", "execSummary", Col::Raw),
+   392→        ("pdf_bytes", "pdfBytes", Col::Raw),
+   393→        ("pinned", "pinned", Col::Raw),
+   394→        ("created_at", "createdAt", Col::Iso),
+   395→    ];
+   396→    let sql_base = "SELECT r.id, r.client_id, cl.name, r.title, r.period_start, r.period_end, \
+   397→         r.template, r.exec_summary, r.pdf_bytes, r.pinned, r.created_at \
+   398→         FROM report_archives r LEFT JOIN clients cl ON r.client_id = cl.id";
+   399→    let rows = state.db.with_conn(|c| {
+   400→        let list: Vec<Value> = if let Some(cid) = cid {
+   401→            let mut stmt = c.prepare(&format!("{sql_base} WHERE r.client_id = ?1 ORDER BY r.created_at DESC LIMIT ?2"))?;
+   402→            let v = stmt
+   403→                .query_map(params![cid, limit], |r| Ok(row_json(r, cols)))?
+   404→                .collect::<Result<Vec<_>, _>>()?;
+   405→            v
+   406→        } else {
+   407→            let mut stmt = c.prepare(&format!("{sql_base} ORDER BY r.created_at DESC LIMIT ?1"))?;
+   408→            let v = stmt
+   409→                .query_map([limit], |r| Ok(row_json(r, cols)))?
+   410→                .collect::<Result<Vec<_>, _>>()?;
+   411→            v
+   412→        };
+   413→        Ok(list)
+   414→    });
+   415→    match rows {
+   416→        Ok(list) => {
+   417→            let count = list.len();
+   418→            ok_json(json!({ "reports": list, "count": count }))
+   419→        }
+   420→        Err(_) => ok_json(json!({ "reports": [], "count": 0 })),
+   421→    }
+   422→}
+   423→
+   424→// ---------- GET /api/v1/snapshots ----------
+   425→pub async fn snapshots_list(State(state): State<AppState>, headers: HeaderMap, uri: Uri) -> Response {
+   426→    if let Err(resp) = require_key(&state, &headers, MSG_401_SHORT, "read", MSG_READ_SCOPE) {
+   427→        return resp;
+   428→    }
+   429→    let limit = auth::parse_limit(qparam(uri.query(), "limit"), 90, 365);
+   430→    let cid = qparam(uri.query(), "clientId").and_then(|s| js_number(Some(s)).map(|f| f as i64));
+   431→    let cols = &[
+   432→        ("client_id", "clientId", Col::Raw),
+   433→        ("name", "clientName", Col::Raw),
+   434→        ("kind", "kind", Col::Raw),
+   435→        ("health_score", "healthScore", Col::Raw),
+   436→        ("organic_clicks", "organicClicks", Col::Raw),
+   437→        ("organic_impressions", "organicImpressions", Col::Raw),
+   438→        ("organic_avg_position_x100", "organicAvgPositionX100", Col::Raw),
+   439→        ("ga4_sessions", "ga4Sessions", Col::Raw),
+   440→        ("ga4_conversions", "ga4Conversions", Col::Raw),
+   441→        ("ga4_revenue_x100", "ga4RevenueX100", Col::Raw),
+   442→        ("keyword_count", "keywordCount", Col::Raw),
+   443→        ("avg_rank_x100", "avgRankX100", Col::Raw),
+   444→        ("top10_count", "top10Count", Col::Raw),
+   445→        ("critical_issues", "criticalIssues", Col::Raw),
+   446→        ("high_issues", "highIssues", Col::Raw),
+   447→        ("backlink_count", "backlinkCount", Col::Raw),
+   448→        ("gbp_score", "gbpScore", Col::Raw),
+   449→        ("mention_count", "mentionCount", Col::Raw),
+   450→        ("captured_at", "capturedAt", Col::Iso),
+   451→    ];
+   452→    let sql_base = "SELECT s.client_id, cl.name, s.kind, s.health_score, s.organic_clicks, \
+   453→         s.organic_impressions, s.organic_avg_position_x100, s.ga4_sessions, s.ga4_conversions, \
+   454→         s.ga4_revenue_x100, s.keyword_count, s.avg_rank_x100, s.top10_count, s.critical_issues, \
+   455→         s.high_issues, s.backlink_count, s.gbp_score, s.mention_count, s.captured_at \
+   456→         FROM client_metric_snapshots s LEFT JOIN clients cl ON s.client_id = cl.id";
+   457→    let rows = state.db.with_conn(|c| {
+   458→        let list: Vec<Value> = if let Some(cid) = cid {
+   459→            let mut stmt = c.prepare(&format!("{sql_base} WHERE s.client_id = ?1 ORDER BY s.captured_at DESC LIMIT ?2"))?;
+   460→            let v = stmt
+   461→                .query_map(params![cid, limit], |r| Ok(row_json(r, cols)))?
+   462→                .collect::<Result<Vec<_>, _>>()?;
+   463→            v
+   464→        } else {
+   465→            let mut stmt = c.prepare(&format!("{sql_base} ORDER BY s.captured_at DESC LIMIT ?1"))?;
+   466→            let v = stmt
+   467→                .query_map([limit], |r| Ok(row_json(r, cols)))?
+   468→                .collect::<Result<Vec<_>, _>>()?;
+   469→            v
+   470→        };
+   471→        Ok(list)
+   472→    });
+   473→    match rows {
+   474→        Ok(list) => {
+   475→            let count = list.len();
+   476→            ok_json(json!({ "snapshots": list, "count": count }))
+   477→        }
+   478→        Err(_) => ok_json(json!({ "snapshots": [], "count": 0 })),
+   479→    }
+   480→}
+   481→
+   482→// ---------- GET /api/v1/audits ----------
+   483→pub async fn audits_list(State(state): State<AppState>, headers: HeaderMap, uri: Uri) -> Response {
+   484→    if let Err(resp) = require_key(&state, &headers, MSG_401_SHORT, "read", MSG_READ_SCOPE) {
+   485→        return resp;
+   486→    }
+   487→    let limit = auth::parse_limit(qparam(uri.query(), "limit"), 50, 200);
+   488→    let cid = qparam(uri.query(), "clientId").and_then(|s| js_number(Some(s)).map(|f| f as i64));
+   489→    let cols = &[
+   490→        ("id", "id", Col::Raw),
+   491→        ("client_id", "clientId", Col::Raw),
+   492→        ("name", "clientName", Col::Raw),
+   493→        ("score", "score", Col::Raw),
+   494→        ("issues_count", "issuesCount", Col::Raw),
+   495→        ("status", "status", Col::Raw),
+   496→        ("started_at", "startedAt", Col::Iso),
+   497→        ("completed_at", "completedAt", Col::Iso),
+   498→    ];
+   499→    let sql_base = "SELECT a.id, a.client_id, cl.name, a.score, a.issues_count, a.status, \
+   500→         a.started_at, a.completed_at \
+   501→         FROM audits a LEFT JOIN clients cl ON a.client_id = cl.id";
+   502→    let rows = state.db.with_conn(|c| {
+   503→        let list: Vec<Value> = if let Some(cid) = cid {
+   504→            let mut stmt = c.prepare(&format!("{sql_base} WHERE a.client_id = ?1 ORDER BY a.created_at DESC LIMIT ?2"))?;
+   505→            let v = stmt
+   506→                .query_map(params![cid, limit], |r| Ok(row_json(r, cols)))?
+   507→                .collect::<Result<Vec<_>, _>>()?;
+   508→            v
+   509→        } else {
+   510→            let mut stmt = c.prepare(&format!("{sql_base} ORDER BY a.created_at DESC LIMIT ?1"))?;
+   511→            let v = stmt
+   512→                .query_map([limit], |r| Ok(row_json(r, cols)))?
+   513→                .collect::<Result<Vec<_>, _>>()?;
+   514→            v
+   515→        };
+   516→        Ok(list)
+   517→    });
+   518→    match rows {
+   519→        Ok(list) => {
+   520→            let count = list.len();
+   521→            ok_json(json!({ "audits": list, "count": count }))
+   522→        }
+   523→        Err(_) => ok_json(json!({ "audits": [], "count": 0 })),
+   524→    }
+   525→}
+   526→
+   527→// ---------- GET /api/v1/audits/:id ----------
+   528→pub async fn audit_get(
+   529→    State(state): State<AppState>,
+   530→    headers: HeaderMap,
+   531→    Path(id): Path<String>,
+   532→) -> Response {
+   533→    if let Err(resp) = require_key(&state, &headers, MSG_401_SHORT, "read", MSG_READ_SCOPE) {
+   534→        return resp;
+   535→    }
+   536→    let Some(aid) = js_number(Some(&id)) else {
+   537→        return error::api_error(StatusCode::BAD_REQUEST, "Invalid audit id");
+   538→    };
+   539→    let audit = state.db.with_conn(|c| {
+   540→        use rusqlite::OptionalExtension;
+   541→        c.query_row(
+   542→            "SELECT id, client_id, status, score, issues_count, started_at, completed_at, \
+   543→             created_at, updated_at, kind, target_url, summary, pages_crawled \
+   544→             FROM audits WHERE id = ?1 LIMIT 1",
+   545→            params![aid],
+   546→            |r| {
+   547→                Ok(row_json(r, &[
+   548→                    ("id", "id", Col::Raw),
+   549→                    ("client_id", "clientId", Col::Raw),
+   550→                    ("status", "status", Col::Raw),
+   551→                    ("score", "score", Col::Raw),
+   552→                    ("issues_count", "issuesCount", Col::Raw),
+   553→                    ("started_at", "startedAt", Col::Iso),
+   554→                    ("completed_at", "completedAt", Col::Iso),
+   555→                    ("created_at", "createdAt", Col::Iso),
+   556→                    ("updated_at", "updatedAt", Col::Iso),
+   557→                    ("kind", "kind", Col::Raw),
+   558→                    ("target_url", "targetUrl", Col::Raw),
+   559→                    ("summary", "summary", Col::Raw),
+   560→                    ("pages_crawled", "pagesCrawled", Col::Raw),
+   561→                ]))
+   562→            },
+   563→        )
+   564→        .optional()
+   565→    });
+   566→    let audit = match audit {
+   567→        Ok(Some(a)) => a,
+   568→        Ok(None) => return error::api_error(StatusCode::NOT_FOUND, "Audit not found"),
+   569→        Err(_) => return error::api_error(StatusCode::NOT_FOUND, "Audit not found"),
+   570→    };
+   571→    let issues = state.db.with_conn(|c| {
+   572→        let mut stmt = c.prepare(
+   573→            "SELECT id, severity, type, url, message, status, category, ai_generated \
+   574→             FROM audit_issues WHERE audit_id = ?1 ORDER BY severity ASC",
+   575→        )?;
+   576→        let list = stmt
+   577→            .query_map([aid], |r| {
+   578→                Ok(row_json(r, &[
+   579→                    ("id", "id", Col::Raw),
+   580→                    ("severity", "severity", Col::Raw),
+   581→                    ("type", "type", Col::Raw),
+   582→                    ("url", "url", Col::Raw),
+   583→                    ("message", "message", Col::Raw),
+   584→                    ("status", "status", Col::Raw),
+   585→                    ("category", "category", Col::Raw),
+   586→                    ("ai_generated", "aiGenerated", Col::Raw),
+   587→                ]))
+   588→            })?
+   589→            .collect::<Result<Vec<_>, _>>()?;
+   590→        Ok(list)
+   591→    });
+   592→    let mut issues = issues.unwrap_or_default();
+   593→    // SEVERITY_RANK { critical:0, high:1, medium:2, low:3, default 9 } —
+   594→    // stable sort over the SQL's alphabetical order, exactly like the JS.
+   595→    issues.sort_by_key(|v| match v.get("severity").and_then(|s| s.as_str()) {
+   596→        Some("critical") => 0,
+   597→        Some("high") => 1,
+   598→        Some("medium") => 2,
+   599→        Some("low") => 3,
+   600→        _ => 9,
+   601→    });
+   602→    let issue_count = issues.len();
+   603→    ok_json(json!({ "audit": audit, "issues": issues, "issueCount": issue_count }))
+   604→}
+   605→
+   606→// ---------- POST /api/v1/track-404 ----------
+   607→pub async fn track_404_post(
+   608→    State(state): State<AppState>,
+   609→    headers: HeaderMap,
+   610→    body: axum::body::Bytes,
+   611→) -> Response {
+   612→    if let Err(resp) = require_key(&state, &headers, MSG_401_SHORT, "write", MSG_WRITE_SCOPE) {
+   613→        return resp;
+   614→    }
+   615→    let parsed: Result<Value, _> = serde_json::from_slice(&body);
+   616→    let Ok(body) = parsed else {
+   617→        return error::api_error(StatusCode::BAD_REQUEST, "Body must be JSON.");
+   618→    };
+   619→    let obj = body.as_object();
+   620→    let source_path = js_string(obj.and_then(|o| o.get("sourcePath"))).trim().to_string();
+   621→    if source_path.is_empty() || !source_path.starts_with('/') {
+   622→        return error::api_error(StatusCode::BAD_REQUEST, "sourcePath required (must start with /).");
+   623→    }
+   624→    let client_id = obj
+   625→        .and_then(|o| o.get("clientId"))
+   626→        .and_then(|v| v.as_i64());
+   627→    let existing = state.db.with_conn(|c| {
+   628→        use rusqlite::OptionalExtension;
+   629→        c.query_row(
+   630→            "SELECT id, hits FROM not_found_log WHERE source_path = ?1 LIMIT 1",
+   631→            params![source_path],
+   632→            |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?)),
+   633→        )
+   634→        .optional()
+   635→    });
+   636→    match existing {
+   637→        Ok(Some((id, hits))) => {
+   638→            let _ = state.db.with_conn(|c| {
+   639→                c.execute(
+   640→                    "UPDATE not_found_log SET hits = hits + 1, last_seen = ?1 WHERE id = ?2",
+   641→                    params![now_secs(), id],
+   642→                )
+   643→            });
+   644→            ok_json(json!({ "ok": true, "id": id, "hits": hits + 1 }))
+   645→        }
+   646→        _ => {
+   647→            let inserted = state.db.with_conn(|c| {
+   648→                c.query_row(
+   649→                    "INSERT INTO not_found_log (source_path, client_id) VALUES (?1, ?2) RETURNING id",
+   650→                    params![source_path, client_id],
+   651→                    |r| r.get::<_, i64>(0),
+   652→                )
+   653→            });
+   654→            match inserted {
+   655→                Ok(id) => ok_json(json!({ "ok": true, "id": id, "hits": 1 })),
+   656→                Err(_) => ok_json(json!({ "ok": true, "id": Value::Null, "hits": 1 })),
+   657→            }
+   658→        }
+   659→    }
+   660→}
+   661→
+   662→// ---------- GET + POST /api/v1/capture ----------
+   663→pub async fn capture_get(State(state): State<AppState>, headers: HeaderMap) -> Response {
+   664→    if let Err(resp) = require_key(&state, &headers, MSG_401_SHORT, "read", MSG_READ_SCOPE) {
+   665→        return resp;
+   666→    }
+   667→    ok_json(json!({
+   668→        "ok": true,
+   669→        "note": "POST JSON to this endpoint with { type, url, title, payload }",
+   670→    }))
+   671→}
+   672→
+   673→pub async fn capture_post(
+   674→    State(state): State<AppState>,
+   675→    headers: HeaderMap,
+   676→    body: axum::body::Bytes,
+   677→) -> Response {
+   678→    if let Err(resp) = require_key(&state, &headers, MSG_401_SHORT, "write", MSG_WRITE_SCOPE) {
+   679→        return resp;
+   680→    }
+   681→    let parsed: Result<Value, _> = serde_json::from_slice(&body);
+   682→    let Ok(body) = parsed else {
+   683→        return error::api_error(StatusCode::BAD_REQUEST, "Body must be JSON.");
+   684→    };
+   685→    let obj = body.as_object();
+   686→    let type_ = {
+   687→        let t = js_string(obj.and_then(|o| o.get("type")));
+   688→        if t.is_empty() { "generic".to_string() } else { t }
+   689→    };
+   690→    let url = js_string(obj.and_then(|o| o.get("url")));
+   691→    let title = js_string(obj.and_then(|o| o.get("title")));
+   692→    if url.is_empty() {
+   693→        return error::api_error(StatusCode::BAD_REQUEST, "url is required.");
+   694→    }
+   695→    // logActivity FIRST (order matters in the Next source), with the 24h
+   696→    // (kind, message) dedupe window.
+   697→    let title80: String = title.chars().take(80).collect();
+   698→    let message = format!("Browser-ext capture: {type_} from {url} — {title80}");
+   699→    let kind = "outreach.contacted";
+   700→    let cutoff = now_secs() - 24 * 60 * 60;
+   701→    let _ = state.db.with_conn(|c| {
+   702→        use rusqlite::OptionalExtension;
+   703→        let dupe: Option<i64> = c
+   704→            .query_row(
+   705→                "SELECT id FROM activity_log WHERE kind = ?1 AND message = ?2 AND created_at >= ?3 LIMIT 1",
+   706→                params![kind, message, cutoff],
+   707→                |r| r.get(0),
+   708→            )
+   709→            .optional()?;
+   710→        if dupe.is_none() {
+   711→            c.execute(
+   712→                "INSERT INTO activity_log (kind, message, level, entity_type, created_at) \
+   713→                 VALUES (?1, ?2, 'info', 'capture', ?3)",
+   714→                params![kind, message, now_secs()],
+   715→            )?;
+   716→        }
+   717→        Ok(())
+   718→    });
+   719→    let payload = obj.and_then(|o| o.get("payload")).cloned().unwrap_or(Value::Null);
+   720→    let size = serde_json::to_string(&payload).map(|s| s.len()).unwrap_or(2); // "null" = 4; JS {} = 2
+   721→    if size > 1_000_000 {
+   722→        return error::api_error(StatusCode::PAYLOAD_TOO_LARGE, "Payload >1MB — strip the HTML before sending.");
+   723→    }
+   724→    ok_json(json!({
+   725→        "ok": true,
+   726→        "type": type_,
+   727→        "url": url,
+   728→        "storedAt": now_iso(),
+   729→        "payloadSize": size,
+   730→    }))
+   731→}
+   732→

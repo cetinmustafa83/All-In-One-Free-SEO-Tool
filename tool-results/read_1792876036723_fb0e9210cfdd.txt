@@ -1,0 +1,270 @@
+     1→# Worklog
+     2→
+     3→---
+     4→Task ID: 1
+     5→Agent: Z.ai Code (main)
+     6→Task: Clone https://github.com/IamRamgarhia/All-In-One-Free-SEO-Tool.git, install and run it
+     7→
+     8→Work Log:
+     9→- Cloned repo (shallow) to /tmp/seo-tool-repo, inspected structure: Next.js 16.2.4 + React 19 + Drizzle ORM + better-sqlite3, pnpm@10.34.5 pinned, 71 SQL migrations.
+    10→- Verified auth model: no login wall until first user registers (single-user mode by default).
+    11→- Stopped old dev server (port 3000 freed).
+    12→- Cleaned old project files in /home/z/my-project (kept Caddyfile, dev.log, download/, upload/, skills/, examples/, mini-services/, .git from repo copied over).
+    13→- Copied full repo contents (incl. .git for future `git pull`) into /home/z/my-project.
+    14→- Installed pnpm 10.34.5 via npm -g (corepack failed on permissions); `pnpm install` OK (better-sqlite3 native build verified with in-memory smoke test).
+    15→- Ran `node scripts/migrate.cjs`: 71 migrations applied to ./data.db (WAL mode).
+    16→- Started dev server: `pnpm dev` (predev re-runs migrations idempotently) → Next.js 16.2.4 Turbopack ready on port 3000, logs to /home/z/my-project/dev.log.
+    17→- Agent Browser E2E verification:
+    18→  - / redirects to /welcome onboarding, renders correctly.
+    19→  - Dashboard renders (setup checklist, health widgets).
+    20→  - Golden path: created client "Test Site" via /clients/new form → row persisted in SQLite (clients.id=1) → redirect to /clients/1/onboarding → auto site audit ran (13 findings, health 54/100) → 20 tasks auto-generated.
+    21→  - /tools catalog renders (92 tools, categories, filters).
+    22→  - Mobile viewport (390x844) responsive with hamburger nav; health score gauge shows persisted data.
+    23→  - No browser console/page errors; dev.log clean except benign recharts width/height dev warning.
+    24→
+    25→Stage Summary:
+    26→- The All-In-One Free SEO Tool (v0.7.0) is fully installed and running on port 3000 from /home/z/my-project.
+    27→- Stack in use: Next.js 16.2.4 (Turbopack dev), Drizzle ORM + better-sqlite3 at ./data.db, pnpm 10.34.5.
+    28→- No login wall (single-user mode); optional APP_PASSWORD / Google OAuth via .env (see .env.example).
+    29→- Future updates: `git pull` inside /home/z/my-project, then `pnpm install && node scripts/migrate.cjs`, restart dev server.
+    30→
+    31→---
+    32→Task ID: 2
+    33→Agent: Z.ai Code (main)
+    34→Task: v0.7.0 doğrulama + "Invalid Server Actions request" ve script-tag hatalarını düzeltme + AdCrewOS-web özelliklerinin entegrasyonunu tamamlama/doğrulama
+    35→
+    36→Work Log:
+    37→- Git ile doğrulandı: yerel HEAD = origin/main 0a0e982 (Merge PR #46: v0.7.0 security and reliability release). package.json version: 0.7.0. → En son sürüm kurulu.
+    38→- Çalışma ağacında paralel oturumdan kalan yarım AdCrewOS entegrasyonu bulundu (commit'lenmemiş): /ads sayfaları, ads-engine.ts, 0071_ads_autopilot.sql, schema/nav güncellemeleri, layout.tsx next/script düzeltmesi, proxy.ts normaliseForwardedHost fix'i. pnpm typecheck temiz geçti.
+    39→- "Invalid Server Actions request" kök nedeni: Next.js 16 server-action handler'ı (E80) POST'ta origin header'ını x-forwarded-host ?? host ile karşılaştırıyor; öni gateway zinciri host'u ezerken origin korunduğu için eşleşmezlik 500 veriyor.
+    40→- proxy.ts normaliseForwardedHost güçlendirildi: x-forwarded-host HİÇ gelmediğinde de origin host'u ile set ediliyor (ilk düzeltme sadece header var-ken çalışıyordu).
+    41→- A/B kanıt (curl, Caddy :81 üzerinden mismatch'li Host/Origin): fix'siz 500 + digest E80 "Invalid Server Actions request." / fix'li 200. Gerçek tarayıcı akışında da /clients/new üzerinden client oluşturma (createClient → redirect /clients/2/onboarding) çalışıyor.
+    42→- Script-tag console hatası: layout.tsx raw <script> → next/script (beforeInteractive) değişikliği doğrulandı; tarayıcı konsolunda "Encountered a script tag" 0 kez.
+    43→- AdCrewOS entegrasyonu uçtan uca browser testi: /ads kokpit (KPI: 3 hesap, $393/24s, 1 auto-pause), demo hesaplar + sparkline'lar, "Run engine now" → SCALE_PROPOSAL üretimi, Approve → bütçe $259.20→$311.04 (+20%) + SCALE_APPLIED denetim kaydı, /ads/accounts/3 detay, /ads/reports (hesap/dönem seçici + Print/Save PDF), sidebar "Paid ads > Ads Autopilot ⭐".
+    44→- Yeni sorun: dev server tekrar tekrar OOM-killed (dmesg: next-server 2.76GB/3.22GB anon-rss; 4GB sandbox + tarayıcı). Çözümler: next.config.ts'e experimental.turbopackMemoryLimit: 1536; .zscripts/dev-supervisor.sh (OOM'da otomatik restart, kalıcı .next/dev cache sayesinde her restart ilerleme); ana rotalar kademeli ısıtıldı (her ağır rota taze server ömründe): /, /clients/new, /clients, /clients/1, /ads, /ads/reports, /ads/accounts/3, /tools, /audits, /keywords, /tasks, /reports, /seo-chat, /backlinks → hepsi 200.
+    45→- eslint (proxy.ts, next.config.ts, ads-engine.ts, ads/actions.ts): temiz.
+    46→
+    47→Stage Summary:
+    48→- v0.7.0 doğrulandı; iki kullanıcı hatası kökten çözüldü ve kanıtlandı.
+    49→- AdCrewOS özellikleri (Ads Autopilot: guardrail motoru, auto-pause, onaylı scale, alert feed, demo veri, hesap detayı, PDF rapor) projede ÇALIŞIR durumda; sidebar'dan erişilir.
+    50→- Dev server artık .zscripts/dev-supervisor.sh ile yönetiliyor (OOM kendini iyileştirir); turbopackMemoryLimit devrede.
+    51→- Değişen dosyalar (commit'lenmedi, kullanıcıya ait): src/proxy.ts, next.config.ts, .zscripts/dev-supervisor.sh (yeni), + paralel oturumun ads/ layout / nav / schema / migration dosyaları.
+    52→
+    53→---
+    54→Task ID: 3
+    55→Agent: Z.ai Code (main)
+    56→Task: "Keep going" — confirm v0.7.0 state, re-verify integration end-to-end after OOM restarts, harden /ads action flows, stabilize sandbox memory
+    57→
+    58→Work Log:
+    59→- Git: HEAD = origin/main 0a0e982 (v0.7.0, PR #46) confirmed latest; 2 env-generated commits on top, work tree clean. Previous session's fixes (proxy.ts origin fix, next/script theme-init, Ads Autopilot port) all present in commit 52dff95.
+    60→- AdCrewOS-web feature cross-check against /tmp/adcrew README: cockpit KPIs, account cards + sparklines, alert feed (Approve/Dismiss), auto-pause engine, approval-gated scaling, demo data, guardrails editor, PDF report w/ agency letterhead, add/remove accounts → ALL ported. Billing/Stripe/SMS intentionally out of scope for a free self-hosted tool.
+    61→- Browser E2E (fresh, after supervisor OOM-restarts): dashboard OK; /ads cockpit OK (3 accounts, $393/24h); "Run engine now" → SCALE_PROPOSAL (toast "Checked 3 account(s) — the engine acted on 1"); Approve → budget $373.25→$447.90/day (+20%), audit trail persisted across 3 separate server lifetimes; /ads/reports renders KPIs + guardrails + autopilot history; ROAS trend chart confirmed RENDERING once hydration completes (screenshot verify-reports-fixed.png).
+    62→- Root-caused NEW finding: first page load right after a dev-server restart can render full SSR HTML but never hydrate (0 React fibers, zero interactivity, charts blank). Reload fixes it. Clicking a server-action button on such a page native-POSTs and Next 16 rejects it → the exact "Invalid Server Actions request" class the user reported. Dev-only artifact of Turbopack module-graph rebuild; not reproducible in production builds.
+    63→- Root-caused the "stuck Approving… toast": a failed action POST (stale action ID after restart) left useFormStatus/useActionState pending forever with no feedback.
+    64→- Hardening shipped: new src/app/ads/safe-action.ts (useSafeCall + useWrappedActionState) wired into ALL 5 /ads action surfaces (alert-feed Approve/Dismiss, resume-button, ads-toolbar Run engine/Sync, add-account-form, guardrails-form). A dead action POST now toasts "Couldn't reach the server" + auto router.refresh() (fresh action IDs) instead of hanging. Verified live: stale-page engine click recovered and succeeded.
+    65→- Memory stabilization on the 4GB sandbox: turbopackMemoryLimit 1536→1024 in next.config.ts (peak anon-rss OOM kills observed at 3.1-3.3GB); documented in config comments. dev-supervisor.sh continues to auto-restart; persistent .next/dev cache keeps restarts cheap. Routes re-warmed after restarts: /, /ads, /ads/reports all 200.
+    66→- eslint + tsc --noEmit clean for all changed files (remaining lint noise is pre-existing skills/ scripts only).
+    67→- Known limitation (honest): /ads/reports compile + Chrome cannot coexist in 4GB — visual mobile-viewport check of /ads not re-run this session; previous session verified mobile 390x844 for the app shell, and /ads pages use standard responsive Tailwind (flex-wrap/grid stacking) seen working at narrow desktop widths.
+    68→
+    69→Stage Summary:
+    70→- v0.7.0 confirmed current; both user-reported bugs remain fixed and re-verified; AdCrewOS feature set fully ported and functioning (engine, approvals, compounding budgets $259.20→$311.04→$373.25→$447.90, audit trail, reports).
+    71→- New resilience layer: /ads actions can no longer hang the UI — stale-action failures recover with a toast + auto-refresh (src/app/ads/safe-action.ts).
+    72→- First-load-no-hydration (dev restart artifact) root-caused and documented; workaround = one reload; mitigated by memory caps + supervisor.
+    73→- Changed files this task: next.config.ts, src/app/ads/{safe-action.ts,new}, alert-feed.tsx, resume-button.tsx, ads-toolbar.tsx, add-account-form.tsx, accounts/[id]/guardrails-form.tsx.
+    74→
+    75→---
+    76→Task ID: 12
+    77→Agent: Z.ai Code (main)
+    78→Task: "keep going" — discovered the sandbox had RESET and rolled the tree back to the task-3 state; recovered the lost hardening work (tasks 4–11 artifacts) from the session record, re-verified end-to-end in the browser, commit 7bc6823
+    79→
+    80→Work Log:
+    81→- LOSS DISCOVERY: git log showed only 4 commits (0a0e982 upstream + 3 env auto-commits); named commits c80296a/b935d07 gone, reflog + fsck found nothing recoverable. Confirmed lost on disk: useInstallOrigin fix (settings/edge/setup.tsx), ChartFrame, supervisor cache guard, first-run a11y, edge-worker API, CodeGPT provider, /ads/settings page (a live preview panel still requests it → 404 in dev.log — user-visible symptom of the reset).
+    82→- SURVIVED (in env commit 52dff95): full /ads module + safe-action, dev-supervisor.sh base, turbopackMemoryLimit 1024, layout next/script theme-init.
+    83→- ENVIRONMENT RECOVERY: sandbox reset also wiped global pnpm (reinstalled pnpm@10.34.5 via npm -g) and data.db (untracked; migrations recreated it on boot via predev). DB now fresh: client id=1 "Recovery Test Site" + ad_accounts ids 1–3 (demo seed), NOT the old ids 2/5–7 — all future automation must re-query ids.
+    84→- Recovered task 11: setup.tsx useInstallOrigin (useSyncExternalStore, server snapshot = placeholder) replacing render-time `typeof window` ternary; removed dead appUrl prop from EdgeSetup + its caller; first-run-prompt role=dialog/aria-modal/aria-labelledby; layout.tsx theme-script comment rewritten to the verified source facts (beforeInteractive returns a REAL script element on client mount — only afterInteractive renders null; warning is dev-only/inherent; all alternatives regress).
+    85→- Recovered task 8: new src/components/charts/chart-frame.tsx — ResponsiveContainer's own default initialDimension is literally {width:-1,height:-1} (verified in recharts 3.8.1 .d.ts), which is the width(-1) crash class; ChartFrame always passes real initial dims. Wired into ui/area-chart.tsx (feeds /ads accounts + reports), settings/ai-usage/usage-charts.tsx (bar + donut), keywords rank-sparkline.tsx. Verified live: /ads/accounts/1 chart measures 545×240.
+    86→- Recovered supervisor cache guard: pre-boot .next/dev prune at CACHE_LIMIT_MB=900 (cache/server/static/build subdirs) before each (re)start.
+    87→- NEW FINDING + FIX (was the lost task 4 "mobile overflow fix"): EVERY page overflowed 111px horizontally at 390px. Offender was NOT page content — (a) top-bar right cluster (AI usage pill + guided/pro ModeToggle, 323px) overflowed the header; (b) sidebar rendered expanded (260px) at phone widths with no auto-collapse. Fixes: top-bar.tsx hides pill+toggle below md; sidebar.tsx useIsNarrowViewport() via useSyncExternalStore (server snapshot false = desktop default, corrected post-hydration; same sanctioned pattern as the edge fix), effective collapsed = stored || narrow, toggle writes the stored pref only. NOTE: sidebar now imports useSyncExternalStore — the file already used the pattern via use-stored-state.
+    88→- Browser E2E re-verification (fresh contexts per the trusted-read rule): /welcome renders + Skip persists (seo:first-run-done=done); /settings/edge 0 console errors/0 warnings + snippet shows real origin http://localhost:3000 (hydration fix live); golden path client create → auto audit (13 findings, health 54/100) → 20 tasks; /ads demo seed (3 accounts, $434–473/24h) → run engine → Approve (1→0 suggestions) — all clean; /ads/reports + /settings/ai-usage charts render.
+    89→- GOTCHA (cost real time): the /clients/new submit appeared dead — button.click()/requestSubmit() fired the submit event but no POST, no pending. Fresh reload + retry worked; consistent with the known dev-only stale-action/HMR artifact class (task 3). If a form action ever looks dead again: reload FIRST, then debug.
+    90→- Verification matrix: 13 routes × 390px overflow=0; 7 routes × 1440px overflow=0; fresh-context console clean on /settings/edge + /ads. tsc: no src errors (only .next/dev generated-file noise); eslint: src/ clean (78 pre-existing errors all in skills/ + upload/ scaffolding).
+    91→
+    92→Stage Summary:
+    93→- Sandbox reset detected and documented; all recoverable hardening restored and browser-verified (commit 7bc6823, worktree clean except env files).
+    94→- Permanently lost (needs rediscovery, was tasks 5–6): edge-worker alert delivery API, setup wizard page, SubmitButton hardening, CodeGPT AI provider integration, /ads/settings page. Flagged as task 12-g follow-up.
+    95→- New durable lesson recorded: sidebar auto-collapse + header responsive trimming are the canonical mobile pattern for this app; any new wide header widget must be wrapped in the hidden md:flex cluster.
+    96→
+    97→---
+    98→Task ID: 12-g (partial)
+    99→Agent: Z.ai Code (main)
+   100→Task: Rediscover lost task-5/6 features — recovered CodeGPT provider; scoped the rest
+   101→
+   102→Work Log:
+   103→- Scoped the gap: README line 76 says "No setup wizard" (so task 5's "setup wizard" was an internal detail, not README-promised); the edge delivery chain GET /api/edge/fixes (token auth + cache headers + graceful-empty) SURVIVED and is complete — worker edge-worker/seo-tool-worker.js only GETs that endpoint, nothing missing server-side. No in-app reference to /ads/settings exists; the 404 in dev.log is only a user browser tab from before the reset — left as-is rather than inventing an unspecified page.
+   104→- Recovered task 6 (CodeGPT) across every exhaustive registry: api-providers.ts (union + catalog card, free-tier, steps for JWT-style API key), api-keys.ts (ENV_VAR CODEGPT_API_KEY + SETTING_KEY api.codegpt), settings-store.ts SettingKey union, provider-dispatch.ts (openai-compat → https://api.codegpt.co/v1/chat/completions), ai-model-presets.ts (11 presets, default gpt-4o-mini, rates mirror underlying vendors + PROVIDER_LABEL), api/test-provider (VALID set + probe branch), db/schema.ts ai-visibility provider enum, llm-citation.ts PROVIDER_GROUNDING codegpt:"memory", settings/key-actions ALLOWED_KEYS, README provider list (also added Mistral/Cerebras/Together/GitHub — stale before the reset).
+   105→- TypeScript exhaustiveness did the discovery work for me: adding "codegpt" to the Provider union made tsc enumerate every incomplete map (8 errors → 0 fixes). Verified live: /settings renders the CodeGPT card with FREE TIER badge + key link; tsc + eslint clean; commit 8a70250.
+   106→- Honest limits: model list/prices are CodeGPT's catalog as known at integration time, not a live /v1/models probe (no key in this sandbox to fetch with); real-call test requires the user's key via the existing Test button.
+   107→
+   108→Stage Summary:
+   109→- CodeGPT is back as provider #13 (12 + Ollama), fully wired and UI-verified; commit 8a70250, src lint/tsc clean.
+   110→- Still missing from the lost sessions (unknown spec, low confidence to reconstruct): /ads/settings page (if it ever held more than the per-account guardrails editor) and whatever SubmitButton hardening was — grep shows form submits here use plain useActionState; no SubmitButton component exists to fix.
+   111→
+   112→---
+   113→Task ID: 13
+   114→Agent: Z.ai Code (main)
+   115→Task: "geliştirmeye devam edelim" — API routes smoke audit (the last untested surface) + follow the ai-call failure symptom to an env-var collision fix
+   116→
+   117→Work Log:
+   118→- Enumerated all 36 API route files (47 HTTP handlers); classified GET/POST + side effects. DANGEROUS ones (restart, shutdown, restore POST, update POST, desktop-shortcut POST) identified and NOT called — code review only.
+   119→- Guard architecture verified by reading src/lib/admin-auth.ts: 3-layer protection (Sec-Fetch-Site CSRF check first in every mode; accounts mode = owner role; password mode = proxy cookie; open mode = local-socket only). Destructive POSTs all behind guardAdminRequest.
+   120→- Live smoke suite (/home/z/.audit/api-smoke.sh): 26 probes, ALL as designed —
+   121→  - open endpoints (auth/mode, auth/status, health-ping, v1/health, errors/env) → 200 sane JSON
+   122→  - v1 Bearer API: 9/9 endpoints return 401 without token (clients, clients/1, audits, audits/1, keywords, rankings, reports, snapshots, capture)
+   123→  - edge/fixes contract exact: 400 (no client / client=0), 401 (no token); cache headers + graceful-empty catch in code
+   124→  - errors/by-digest: 400 on non-numeric digest (format validation is correct — Next digests are numeric), 200 {found:false} on valid-format miss
+   125→  - google/auth + callback → 307 to /settings/google?error=no-credentials|missing-code (graceful, not configured here)
+   126→  - report-archives/999999/pdf → 404; restore GET → db size+SQLite header check; update GET → local SHA vs remote (null remote degrades gracefully); desktop-shortcut GET → Windows-only message
+   127→  - team/invite has 401/403 guards; errors POST truncates context/digest fields
+   128→- SYMPTOM FOLLOW-UP (dev.log: recurring "[ai-call] gpt-4o-mini call failed: fetch failed" on every GET /): root-caused to an env-var collision — the `github` AI provider's env fallback is GITHUB_TOKEN; this session stored the user's repo-push PAT in .env as GITHUB_TOKEN → Next reloaded env → configuredProviders() counted github as configured → scheduler agents fired doomed AI calls (sandbox has no egress to models endpoint). ai-call.ts's no_provider short-circuit was correct all along; the input was wrong.
+   129→- FIX (2 files): api-keys.ts — ENV_VAR map → ENV_VAR_CANDIDATES (priority list per provider) + envApiKey() helper; github = ["GITHUB_MODELS_TOKEN", "GITHUB_TOKEN"] with full collision rationale in comments (CI/git tooling set GITHUB_TOKEN universally). api-providers.ts — GitHub Models card envVar hint → GITHUB_MODELS_TOKEN, notes explain the stray-GITHUB_TOKEN hazard. GITHUB_TOKEN kept as fallback so explicit Actions/Codespaces setups still work.
+   130→- Sandbox-side: renamed the push token in .env + ~/.bashrc from GITHUB_TOKEN to GITHUB_PAT (name the app never reads) — collision removed at the source.
+   131→- Verified live: after Next's "Reload env: .env", two consecutive GET / produced ZERO new ai-call failures (previously every load logged one). tsc + eslint clean.
+   132→
+   133→Stage Summary:
+   134→- API surface (36 route files) audited end-to-end: auth guards, contracts, and degradation paths all correct — no endpoint fixes needed. Combined with tasks 10–11 (28 page routes browser-verified), every user-facing surface has now been exercised.
+   135→- Real bug found and fixed: GitHub Models AI provider silently activated by any environment GITHUB_TOKEN (CI collision class). New preferred env var GITHUB_MODELS_TOKEN; UI hint updated; sandbox token renamed to GITHUB_PAT.
+   136→- Durable lesson: .env is app-env — never store generic-name secrets (GITHUB_TOKEN, OPENAI_API_KEY...) in it that collide with the app's provider env fallbacks; use suffixed names (GITHUB_PAT).
+   137→
+   138→---
+   139→Task ID: 14
+   140→Agent: Z.ai Code (main)
+   141→Task: "keep going" — Tier-3 route audit (settings subpages + tools + dashboard neighbors) + root-cause a restart storm that blocked it
+   142→
+   143→Work Log:
+   144→- Enumerated ALL page routes: 229 total, 28 covered by tasks 10-11 → ~200 never browser-verified. Built Tier-3 sample of 18 representative routes (all 7 uncovered /settings/* subpages, 8 tools form pages, /activity, /automations, /digest, /news, /history, /monitor).
+   145→- AUDIT STORM (blocked the first 3 attempts): dev server died every ~60s. Root-caused in three steps: (1) dmesg showed kernel OOM-kill of next-server at 3.24GB anon-rss; (2) live watch showed baseline RSS 2.47GB with ONLY / warm — .next/dev cache had grown to 2,134MB unchecked; (3) WHY the 900MB cache guard never fired: supervisor PID started 08:22:04, guard added to the script 08:24:49 — bash reads scripts lazily, the running `while true` loop kept executing the OLD guard-less body forever. Classic edit-a-running-bash-script hazard masquerading as a turbopack bug.
+   146→- FIX: killed stale supervisor, pruned .next/dev (2,134MB → 2MB), restarted supervisor fully detached `( setsid ... < /dev/null > dev.log 2>&1 & )`. Guard now live. Documented the hazard in the script header so the next editor restarts the process.
+   147→- Measured clean baseline: 2.0-2.1GB RSS with empty cache + / warm (intrinsic dev footprint; OOM ceiling ~3.2GB → ~1.1GB headroom, and Chrome + one new-route compile consumes exactly that). Consequence: audit in batches of 2-3 routes per server lifetime; the supervisor recovers between batches. Harness v3 hardened: curl pre-warm per route (server-side compile, tolerant of graceful exits), FRESH browser context per route (close→open — kills stale-chunk ChunkLoadError cascade AND gives trusted console reads), server health-check between steps.
+   148→- RESULTS: 18/18 routes CLEAN — 0 console errors, 0 page errors, 0 horizontal overflow at 1440×900 AND 390×844 (sw==cw everywhere): /settings/{backup,errors,health,install,team,google,ai-learning} /tools/{robots,sitemap,headers,meta-tag-generator,llms-txt,serp-features,health-check,keyword-difficulty} /{activity,automations,digest,news,history,monitor}.
+   149→- /digest PAGEERR=1 during batch: errors dump was an empty "✗" line; fresh-context repro = 0 errors, page renders ("Weekly digest"). Non-reproducible dev transient (HMR/chunk hiccup), not a defect.
+   150→- Harness lives at /home/z/.audit/route-audit.sh (agent-browser gotcha: its eval output escapes quotes as \" — strip backslashes before parsing JSON).
+   151→
+   152→Stage Summary:
+   153→- Tier-3 audit: 18 more routes verified clean; combined with tasks 10-13, 46 of 229 routes exercised end-to-end with zero product defects found beyond task 13's env-collision fix. The app's route surface is remarkably solid; remaining ~180 routes are mostly /tools/* variants sharing the same shell + form patterns as the audited sample.
+   154→- Operational root cause banked: stale-running-bash-script supervisor. Sandbox baseline math documented (2.05GB intrinsic + ~0.4GB per GB of .next/dev cache; OOM at 3.2GB; audit batch size = 2-3 routes).
+   155→- Commit includes: supervisor script warning + usage fix, worklog task 14.
+   156→
+   157→---
+   158→Task ID: 14.0
+   159→Agent: Z.ai Code (main)
+   160→Task: Proje 3 parçaya bölme planı (devops tarzı): frontend Next.js (olduğu gibi, importlar yenilenecek) / backend Rust (yeni) / db SQLite (olduğu gibi). Plan dokümanı + todo listesi + Rust toolchain kurulumu + backend scaffold.
+   161→
+   162→Work Log:
+   163→- Recon: envanter ölçümü — 36 API route dosyası + 19 dış route handler (CSV×11, PDF×4, r/[slug], screenshots) + 158 server actions dosyası (~90'ı tools/*) + 150 dosya @/lib/db veya @/db direkt import ediyor. data.db 733KB, 80 tablo, zaten WAL modda.
+   164→- Strateji kararı: big-bang yerine strangler-fig — Rust backend domain-domain büyür, frontend kontratı sabit kalır.
+   165→- docs/architecture-split-plan.md yazıldı: ölçümler, hedef mimari (R1-R5 kuralları), 11 fazlı plan (14.0-14.10), kararlar, risk tablosu.
+   166→- Rust toolchain kuruldu: rustup 1.99.1 minimal profile (background nohup sandbox'ta öldüğü için foreground'da), PATH ~/.bashrc'ye kalıcı eklendi.
+   167→- backend/ scaffold: Cargo.toml (axum 0.7, tokio, rusqlite bundled, tower-http trace/cors), src/main.rs (/health canlı DB smoke: tablo sayısı + journal mode, /api/health alias), run-dev.sh + up.sh (up|stop|status pidfile supervisor), README, .gitignore (target/log/pid).
+   168→- İlk derleme hatası: json! makrosu DbHealth struct'ını serileştiremedi → #[derive(Serialize)] eklendi. İkinci sorun: up.sh içinde cargo PATH'te yoktu (taze shell) → scriptlere export PATH="$HOME/.cargo/bin:$PATH" eklendi.
+   169→- Doğrulama: :3100/health direkt ✓, :81 gateway XTransformPort=3100 ✓ (aynı JSON), /api/health alias ✓, Next :3000 etkilenmedi ✓ (200, actions çalışıyor).
+   170→
+   171→Stage Summary:
+   172→- backend/ canlı: Rust 1.99.1 + axum, port 3100, /health → {"status":"ok","db":{"ok":true,"tables":80,"journal_mode":"wal"}}
+   173→- Plan dokümanı commit'lendi: docs/architecture-split-plan.md (R1: frontend DB'ye asla dokunmaz, R2: Rust tek DB client, R3: DB olduğu gibi/Drizzle schema sahibi, R4: kontrat parity, R5: server actions → REST + client wrapper)
+   174→- Sonraki faz 14.1: api-contract.md envanteri + parity harness.
+   175→
+   176→---
+   177→Task ID: 14.1
+   178→Agent: Z.ai Code (main)
+   179→Task: API contract envanteri + parity harness — 36 API route + 19 handler + 158 actions → docs/api-contract.md; Next vs Rust curl-diff probe seti.
+   180→
+   181→Work Log:
+   182→- Sandbox restore tespit edildi (HEAD restore-marker 9775819, c8f2c2a'nın üstünde; tarihçe tam, worktree temiz, process'ler hayatta — Next 200, backend health 200).
+   183→- Next endpoint gerçek durumları ölçüldü probe seeding için: /health 404, /api/health 404, /api/health-ping 200, /api/auth/status 200, /api/v1/health 200 (açık), /api/edge/fixes 400, /api/errors/env 200.
+   184→- backend/tools/api-inventory.ts yazıldı: src/app'i gezip route.ts + actions.ts dosyalarından method/auth marker (adminGuard, bearer, csrf, localSocket, apiKey, oauth) / native dep (pdfkit, playwright, tesseract, resvg, satori, qrcode) / usesDb sinyalleri çıkarır; docs/api-contract.md + docs/api-actions-inventory.md + docs/api-inventory.json üretir; faz önerisi (14.3-14.8+BFF) heuristic.
+   185→- Düzeltme 1: endsWith("actions.ts") preview-actions.ts gibi dosyaları da yakalıyordu (185→158) → basename kontrolüne geçildi.
+   186→- Düzeltme 2: rg sayımıyla eşleşti — kesin envanter: 36 API route dosyası + 19 dış handler (65 HTTP method) + 158 action dosyası (376 export edilen fonksiyon).
+   187→- backend/tools/parity.ts + backend/parity-probes.json: 7 probe, her ikisini stack'i (Next :3000, Rust :3100) curl'leyip status diff; compareKeys seçeneği top-level JSON key set karşılaştırması (14.3+ port edilen domainler için).
+   188→- Sonuç: parity 7/7 PASS (exit 0). rust:404 probe'ları port backlog'unu belgeliyor — 14.3+'da "mirror"a dönecek.
+   189→- backend/README.md'ye Tools bölümü eklendi.
+   190→
+   191→Stage Summary:
+   192→- Kontrat dokümanları commit'lendi: api-contract.md (88 satır, normatif auth semantik tablosu + 55 route satırı) + api-actions-inventory.md (173 satır, 158 dosya/376 fonksiyon) + api-inventory.json (makine-okunur, 2364 satır).
+   193→- Üretici script commit'te: API değişince `bun backend/tools/api-inventory.ts` ile yeniden üret → diff = kontrat değişikliği (review'da görünür).
+   194→- Sonraki faz 14.2: Rust core infra (config, SQLite katmanı, error envelope, auth middleware).
+   195→
+   196→---
+   197→Task ID: 14.2
+   198→Agent: Z.ai Code (main)
+   199→Task: Rust core infra — config/env, SQLite katmanı (WAL + busy_timeout), error envelope parity, auth middleware port'u (CSRF Sec-Fetch-Site, admin modları, Bearer v1).
+   200→
+   201→Work Log:
+   202→- Next kaynaklarından kontrat okundu: src/lib/admin-auth.ts (isCrossSiteRequest, isLocalRequest, guardAdminRequest üç mod), src/lib/api-auth.ts (authenticateRequest sha256+api_keys, jsonError/jsonOk, requireScope, parseLimit), src/lib/edge-token.ts (sabit-zamanlı karşılaştırma), src/lib/auth.ts accountsEnabled (users tablosu > 0, sticky cache).
+   203→- Rust modülleri: config.rs (PORT/DATABASE_PATH/TRUSTED_PROXY/APP_PASSWORD-presence — value hiç okunmaz), db.rs (Arc<Mutex<Connection>>, WAL, busy_timeout 5s, accounts_enabled sticky port'u, smoke()), error.rs (İKİ zarf: {"error"} v1+edge / {"ok":false,"error"} admin — mesajlar byte-for-byte Next kaynaklarından), auth.rs (is_cross_site, is_local_request TRUSTED_PROXY mantığıyla, guard_admin üç mod, bearer_token/KEY_PREFIX/sha256_hex/scope_allows/parse_limit/ct_eq).
+   204→- main.rs güncellendi: AppState cfg+db, /health ortak Db üzerinden, /__dev/admin-guard + /__dev/bearer probe route'ları (açıkça scaffold, kontrat değil).
+   205→- Derleme düzeltmeleri: IntoResponse import scope; serde_json preserve_order feature (varsayılan BTreeMap alfabetik sıralıyordu, Next insertion-order — CSRF/local zarflarında {"ok"} önce gelmeli).
+   206→- BYTE-FOR-BYTE PARITY DOĞRULANDI (diff ile): ① CSRF 403 gövdesi = Next POST /api/restore + Sec-Fetch-Site:cross-site (güvenli: katman-1'de reddedilir, action çalışmaz) ② local-only 403 gövdesi = Host: evil.com ③ Bearer 401 gövdesi = GET /api/v1/clients. Üçü de IDENTICAL.
+   207→- Open-mode geçiş: POST /__dev/admin-guard → {"ok":true,"mode":"open"} ✓.
+   208→- Parity probe seti 7→11: admin-open-pass 200, admin-csrf-blocked 403, bearer-required 401, bearer-invalid-key 401 (__dev path'lerinde Next 404 beklenir). Harness: 11/11 PASS.
+   209→
+   210→Stage Summary:
+   211→- Rust tarafında auth çekirdeği tamam: CSRF → mod → local-socket zinciri ve Bearer anahtar doğrulama (sha256+api_keys+scope) Next ile birebir.
+   212→- 14.3 için hazır: health-ping, errors/env, edge/fixes (ct_eq + cache-control + graceful-empty hazır), v1 9 endpoint (scope_allows + parse_limit hazır).
+   213→- Kullanıcı-vurabilir karar: accounts modunda Rust proxy'nin cookie doğrulamasına güvenir (middleware rewrite'tan önce koşar), in-route owner re-check Next'te kalır — fail-closed owner'ı admin aksiyonlarından kilitleyecekti. R4 dokümanına not düşüldü.
+   214→
+   215→---
+   216→Task ID: 14.3
+   217→Agent: Z.ai Code (main)
+   218→Task: Read-only + hafif-write domainlerin Rust'a port'u — health-ping, errors/env, edge/fixes (lib/edge-fixes + edge-token), /api/v1'in tamamı (health GET/OPTIONS, clients, clients/:id, keywords, rankings, reports, snapshots, audits, audits/:id, track-404 POST, capture GET/POST).
+   219→
+   220→Work Log:
+   221→- DB introspection: kolonlar snake_case, 129 timestamp kolonu epoch-saniye (mode:"timestamp", timestamp_ms: 0) → API'de ISO string. activity_log kolonları + api_keys.scopes (text mode json) doğrulandı.
+   222→- Rust modülleri: util.rs (iso_from_secs chrono, js_number/js_string JS semantiği, row_json explicit kolon listesi — JSON key order = Drizzle select order), misc.rs (health-ping t:ms, errors/env version/commit/node/platform/arch/mode, edge token ct_eq + JSON-unquote, buildFixSet: newest-first, path\0field dedupe, og_title→twitter_title +2 count, pathOf URL parse + leading-slash passthrough), v1.rs (require_key: sha256+api_keys+revoked/expired+last_used_at+scope, clients LONG 401 mesajı vs diğerleri kısa — route bazlı korundu).
+   223→- İnce parity noktaları: /^Bearer\s+/i replace anchored (boşluksuz BearerXYZ değişmez), Number("")=0 (days), NaN days → boş sonuç (SQLite NULL compare davranışı), keywords clientId junk → impossible-filter, audit severity stable sort (SQL asc + JS rank map), credential blob'ların clients/:id'den strip'i, capture logActivity ÖNCE → sonra 413 size check, 24h dedupe window.
+   224→- Derleme düzeltmeleri: parse_limit auth modülünden, OptionalExtension import, if/else branch temporaries borrow hatası (let v = ...; v deseni, 6 nokta), i64 validate sonrası güvenli inline SQL.
+   225→- installRoot düzeltmesi: cwd backend/ → repo kökü canonicalize("..").
+   226→- BYTE-FOR-BYTE IDENTICAL: v1/clients 401, keywords 401, edge/fixes 400, edge/fixes 401 (junk token). 
+   227→- Parity probe seti 11→23: 4 probe mirror + compareKeys'e döndü (health-ping, v1/health, errors-env key set eş), edge/fixes 400/401 mirror, 10 v1 401 mirror probe. 23/23 PASS.
+   228→- Next eşzamanlı erişimde etkilenmedi (WAL, 200).
+   229→
+   230→Stage Summary:
+   231→- /api/v1'in 12 handler'ı + 3 misc endpoint Rust'ta canlı — her ikisi de aynı data.db'ye yazıp okuyor.
+   232→- Port edilen handler sayısı: 15 (12 v1 + 3 misc). Cutover'da emekliye ayrılacak Next route'ları bu kadar.
+   233→- Sonraki faz 14.4: settings/auth/workspace domainleri (admin auth endpoint'leri, api-keys CRUD, settings CRUD).
+   234→---
+   235→Task ID: 14.4
+   236→Agent: Z.ai Code (main)
+   237→Task: Settings/auth domain — auth web routes (login/logout/mode/register/status) + error sink (/api/errors, /api/errors/by-digest) Rust'a port edildi; sessions, scrypt, invites, rate-limit dahil.
+   238→
+   239→Work Log:
+   240→- Ayrıca bu oturum başında Task 14.3'ün önceki oturumdan kalma commit'i (0ab3000) yeniden doğrulandı: parity 23/23 + 4 byte-for-byte diff IDENTICAL. Remote kafa karışıklığı çözüldü: origin = IamRamgarhia fork kaynağı; gerçek repo push hedefi explicit URL (cetinmustafa83) ve 14.3 zaten oradaydı.
+   241→- Yeni Rust modülleri: password.rs (scrypt N=16384,r=8,p=1,len=64 — Node defaults; KRİTİK: salt hex TEXT olarak KDF'e girer, decode edilmez — Node crypto.scrypt string davranışı), session.rs (v1.{uid}.{expMs}.{fp}.{hmac-b64url} token; secret çözümleme SEO_SESSION_SECRET → data/.seo-session-secret(≥32) → generate+persist 0600 → APP_PASSWORD fallback → ephemeral; current_user = imza+active+fingerprint), ratelimit.rs (login fail-bucket'ları; XFF SON giriş = clientKey — admin-auth'un ILK girişinden farklı, kaynak öyle), errlog.rs (logError dedupe: (source,context,message) → occurrences++/unresolve/stack COALESCE; >1000 satır trim; by-digest regex ^[0-9]{4,32}$ + LIKE '%digest X%' + 12 satır stack), authweb.rs (5 handler + acceptInvite/findInvite + register_user/isFirst→owner).
+   242→- Config'e app_password DEĞERI eklendi (sadece in-memory; password-mode login + secret fallback), cookie_secure_env (SEO_COOKIE_SECURE), data_dir() (SEO_DATA_DIR → SEO_DB_PATH dirname → canonicalize("..")).
+   243→- Set-Cookie formatı cookie@1 serializer sırası: `name=value; Max-Age; Path=/; HttpOnly; [Secure;] SameSite=Lax`. Login: stb_auth=sha256(pw+".v1") 30d; accounts: stb_session 14d (TTL_MS=1209600000, maxAge=1209600). Logout her iki cookie'yi Max-Age=0 temizler; secure=protocol-only (kaynağa sadık).
+   244→- /__dev/session (imza→doğrula→tamper-red; secret_source raporu) ve /__dev/scrypt (SABIT input) scaffold probe'ları eklendi.
+   245→- parity.ts genişletildi: body? + exactBody? (raw text equality — deterministik endpoint'ler için compareKeys'ten sıkı).
+   246→- 11 yeni probe (auth×6, errors×5) exactBody'li; harness 23→34.
+   247→- Kanıtlar: 34/34 PASS; 11/11 byte-for-byte curl diff IDENTICAL; scrypt interop Node↔Rust IDENTICAL (node -e crypto.scrypt vs /__dev/scrypt, aynı salt+pw); secret_source:"file" → Next ile AYNI secret dosyası; Next eşzamanlı erişimde etkilenmedi (WAL, 200).
+   248→
+   249→Stage Summary:
+   250→- Port edilen handler: +7 (auth×5, errors×2) → toplam 22 Next handler Rust'ta canlı (15 v1/misc + 7 auth/errors).
+   251→- Accounts-mode login/register HTTP üzerinden bu kurulumda (open mode) probe edilemez — kullanıcı satırı oluşturmak kalıcı mod değişimi olur; bunun yerine kripto katmanı kanıtlandı: scrypt interop + secret dosya paylaşımı + imza roundtrip. Cutover E2E (14.9) gerçek hesapla login/logout yapacak.
+   252→- Bilinen sapma (kabul edilen, dökümante): POST /api/errors'ta body.stack yoksa V8 auto-stack yerine "Error: {msg}\n    at <anonymous>" saklanır (HTTP kontratı değil DB içeriği); non-string email/name gibi malformed girişlerde Next 500 verirken Rust zarifçe coerce eder (probe edilemez yüzey).
+   253→- Sonraki faz 14.5: Domain CRUD wave 1 (clients, keywords, audits, backlinks, tasks, notifications) → REST + R5 client wrapper'lar; settings/* server actions da bu dalgada.
+   254→
+   255→---
+   256→Task ID: 15
+   257→Agent: Z.ai Code (main)
+   258→Task: "push yap" — GitHub'a push (kullanıcı PAT sağladı, env'de saklanacak)
+   259→
+   260→Work Log:
+   261→- Kullanıcı PAT (ghp_Xo7b…) verdi; ~/.bashrc, ~/.profile (GITHUB_PAT/GH_TOKEN) + ~/.git-credentials (credential.helper store) kalıcı olarak yazıldı. Proje .env'sine bilerek YAZILMADI (Task 13 dersi: app-env genel-adlı secret taşımaz).
+   262→- İlk push IamRamgarhia/All-In-One-Free-SEO-Tool'a 403 verdi: token sahibi cetinmustafa83 fork'ta collaborator değil. Remote origin → cetinmustafa83/All-In-One-Free-SEO-Tool olarak değiştirildi (kullanıcının kendi repo'su, oradaki 14.x Rust işi zaten oradaydı).
+   263→- Push "fetch first" reddi: remote'da 14.1–14.4 commit'leri (Rust auth/v1 port) vardı, lokalde 2 UUID snapshot commit. Rebase: worklog.md conflict → HEAD (remote) tarafı korundu (remote zengin/Yetkili versiyon; lokal snapshot task-11'de kesilmiş eskimiş kopya). .zscripts/dev.pid conflict → theirs (güncel PID). 
+   264→- Push b7d372d..a6803b0 OK. GITHUB_TOKEN adı GITHUB_PAT'a çevrildi (GitHub Models provider env-fallback çarpışması — Task 13 düzeltmesiyle uyumlu).
+   265→
+   266→Stage Summary:
+   267→- origin artık cetinmustafa83/All-In-One-Free-SEO-Tool; main = Rust backend işi (14.x) + sandbox snapshot'ları, linear tarih.
+   268→- Kalıcı config: GITHUB_PAT + GH_TOKEN (bashrc/profile), credential store ~/.git-credentials. Push/pull artık token gerekmez.
+   269→- Not: IamRamgarhia repo'suna push için ya collaborator daveti ya o hesabın PAT'i gerekli.
+   270→

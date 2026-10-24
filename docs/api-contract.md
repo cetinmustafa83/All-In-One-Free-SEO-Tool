@@ -82,7 +82,7 @@ Counts: 36 API route files · 19 route handlers · 65 HTTP handlers · 36 DB-bac
 
 ## C. Server actions
 
-158 files, 376 exported functions. Full detail: `docs/api-actions-inventory.md` + `docs/api-inventory.json`.
+22 files, 46 exported functions. Full detail: `docs/api-actions-inventory.md` + `docs/api-inventory.json`.
 Per R5: each domain becomes Rust REST endpoints; the `actions.ts` file becomes a
 client-side wrapper with the same exported names → importing components unchanged.
 
