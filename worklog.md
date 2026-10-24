@@ -71,3 +71,40 @@ Stage Summary:
 - New resilience layer: /ads actions can no longer hang the UI — stale-action failures recover with a toast + auto-refresh (src/app/ads/safe-action.ts).
 - First-load-no-hydration (dev restart artifact) root-caused and documented; workaround = one reload; mitigated by memory caps + supervisor.
 - Changed files this task: next.config.ts, src/app/ads/{safe-action.ts,new}, alert-feed.tsx, resume-button.tsx, ads-toolbar.tsx, add-account-form.tsx, accounts/[id]/guardrails-form.tsx.
+
+---
+Task ID: 12
+Agent: Z.ai Code (main)
+Task: "keep going" — discovered the sandbox had RESET and rolled the tree back to the task-3 state; recovered the lost hardening work (tasks 4–11 artifacts) from the session record, re-verified end-to-end in the browser, commit 7bc6823
+
+Work Log:
+- LOSS DISCOVERY: git log showed only 4 commits (0a0e982 upstream + 3 env auto-commits); named commits c80296a/b935d07 gone, reflog + fsck found nothing recoverable. Confirmed lost on disk: useInstallOrigin fix (settings/edge/setup.tsx), ChartFrame, supervisor cache guard, first-run a11y, edge-worker API, CodeGPT provider, /ads/settings page (a live preview panel still requests it → 404 in dev.log — user-visible symptom of the reset).
+- SURVIVED (in env commit 52dff95): full /ads module + safe-action, dev-supervisor.sh base, turbopackMemoryLimit 1024, layout next/script theme-init.
+- ENVIRONMENT RECOVERY: sandbox reset also wiped global pnpm (reinstalled pnpm@10.34.5 via npm -g) and data.db (untracked; migrations recreated it on boot via predev). DB now fresh: client id=1 "Recovery Test Site" + ad_accounts ids 1–3 (demo seed), NOT the old ids 2/5–7 — all future automation must re-query ids.
+- Recovered task 11: setup.tsx useInstallOrigin (useSyncExternalStore, server snapshot = placeholder) replacing render-time `typeof window` ternary; removed dead appUrl prop from EdgeSetup + its caller; first-run-prompt role=dialog/aria-modal/aria-labelledby; layout.tsx theme-script comment rewritten to the verified source facts (beforeInteractive returns a REAL script element on client mount — only afterInteractive renders null; warning is dev-only/inherent; all alternatives regress).
+- Recovered task 8: new src/components/charts/chart-frame.tsx — ResponsiveContainer's own default initialDimension is literally {width:-1,height:-1} (verified in recharts 3.8.1 .d.ts), which is the width(-1) crash class; ChartFrame always passes real initial dims. Wired into ui/area-chart.tsx (feeds /ads accounts + reports), settings/ai-usage/usage-charts.tsx (bar + donut), keywords rank-sparkline.tsx. Verified live: /ads/accounts/1 chart measures 545×240.
+- Recovered supervisor cache guard: pre-boot .next/dev prune at CACHE_LIMIT_MB=900 (cache/server/static/build subdirs) before each (re)start.
+- NEW FINDING + FIX (was the lost task 4 "mobile overflow fix"): EVERY page overflowed 111px horizontally at 390px. Offender was NOT page content — (a) top-bar right cluster (AI usage pill + guided/pro ModeToggle, 323px) overflowed the header; (b) sidebar rendered expanded (260px) at phone widths with no auto-collapse. Fixes: top-bar.tsx hides pill+toggle below md; sidebar.tsx useIsNarrowViewport() via useSyncExternalStore (server snapshot false = desktop default, corrected post-hydration; same sanctioned pattern as the edge fix), effective collapsed = stored || narrow, toggle writes the stored pref only. NOTE: sidebar now imports useSyncExternalStore — the file already used the pattern via use-stored-state.
+- Browser E2E re-verification (fresh contexts per the trusted-read rule): /welcome renders + Skip persists (seo:first-run-done=done); /settings/edge 0 console errors/0 warnings + snippet shows real origin http://localhost:3000 (hydration fix live); golden path client create → auto audit (13 findings, health 54/100) → 20 tasks; /ads demo seed (3 accounts, $434–473/24h) → run engine → Approve (1→0 suggestions) — all clean; /ads/reports + /settings/ai-usage charts render.
+- GOTCHA (cost real time): the /clients/new submit appeared dead — button.click()/requestSubmit() fired the submit event but no POST, no pending. Fresh reload + retry worked; consistent with the known dev-only stale-action/HMR artifact class (task 3). If a form action ever looks dead again: reload FIRST, then debug.
+- Verification matrix: 13 routes × 390px overflow=0; 7 routes × 1440px overflow=0; fresh-context console clean on /settings/edge + /ads. tsc: no src errors (only .next/dev generated-file noise); eslint: src/ clean (78 pre-existing errors all in skills/ + upload/ scaffolding).
+
+Stage Summary:
+- Sandbox reset detected and documented; all recoverable hardening restored and browser-verified (commit 7bc6823, worktree clean except env files).
+- Permanently lost (needs rediscovery, was tasks 5–6): edge-worker alert delivery API, setup wizard page, SubmitButton hardening, CodeGPT AI provider integration, /ads/settings page. Flagged as task 12-g follow-up.
+- New durable lesson recorded: sidebar auto-collapse + header responsive trimming are the canonical mobile pattern for this app; any new wide header widget must be wrapped in the hidden md:flex cluster.
+
+---
+Task ID: 12-g (partial)
+Agent: Z.ai Code (main)
+Task: Rediscover lost task-5/6 features — recovered CodeGPT provider; scoped the rest
+
+Work Log:
+- Scoped the gap: README line 76 says "No setup wizard" (so task 5's "setup wizard" was an internal detail, not README-promised); the edge delivery chain GET /api/edge/fixes (token auth + cache headers + graceful-empty) SURVIVED and is complete — worker edge-worker/seo-tool-worker.js only GETs that endpoint, nothing missing server-side. No in-app reference to /ads/settings exists; the 404 in dev.log is only a user browser tab from before the reset — left as-is rather than inventing an unspecified page.
+- Recovered task 6 (CodeGPT) across every exhaustive registry: api-providers.ts (union + catalog card, free-tier, steps for JWT-style API key), api-keys.ts (ENV_VAR CODEGPT_API_KEY + SETTING_KEY api.codegpt), settings-store.ts SettingKey union, provider-dispatch.ts (openai-compat → https://api.codegpt.co/v1/chat/completions), ai-model-presets.ts (11 presets, default gpt-4o-mini, rates mirror underlying vendors + PROVIDER_LABEL), api/test-provider (VALID set + probe branch), db/schema.ts ai-visibility provider enum, llm-citation.ts PROVIDER_GROUNDING codegpt:"memory", settings/key-actions ALLOWED_KEYS, README provider list (also added Mistral/Cerebras/Together/GitHub — stale before the reset).
+- TypeScript exhaustiveness did the discovery work for me: adding "codegpt" to the Provider union made tsc enumerate every incomplete map (8 errors → 0 fixes). Verified live: /settings renders the CodeGPT card with FREE TIER badge + key link; tsc + eslint clean; commit 8a70250.
+- Honest limits: model list/prices are CodeGPT's catalog as known at integration time, not a live /v1/models probe (no key in this sandbox to fetch with); real-call test requires the user's key via the existing Test button.
+
+Stage Summary:
+- CodeGPT is back as provider #13 (12 + Ollama), fully wired and UI-verified; commit 8a70250, src lint/tsc clean.
+- Still missing from the lost sessions (unknown spec, low confidence to reconstruct): /ads/settings page (if it ever held more than the per-account guardrails editor) and whatever SubmitButton hardening was — grep shows form submits here use plain useActionState; no SubmitButton component exists to fix.
