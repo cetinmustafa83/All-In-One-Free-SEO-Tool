@@ -1,4 +1,16 @@
 id,client,client_url,title,why_it_matters,priority,status,due_date,recurring,estimated_minutes,actual_minutes,created_at,updated_at
+9999,Seed Client,https://seed.test,FIX148C December year end,why,medium,done,2025-12-31T00:00:00.000Z,,35,,2023-11-14T22:46:50.000Z,2023-11-14T22:46:50.000Z
+9998,Seed Client,https://seed.test,FIX148C September (en-GB short month is Sept),why,medium,todo,2025-09-15T00:00:00.000Z,,25,,2023-11-14T22:46:49.000Z,2023-11-14T22:46:49.000Z
+9997,Seed Client,https://seed.test,FIX148C March,why,medium,todo,2025-03-10T00:00:00.000Z,,20,,2023-11-14T22:46:48.000Z,2023-11-14T22:46:48.000Z
+9996,Seed Client,https://seed.test,"FIX148C multi
+line ""q"", end 😀",why,medium,skipped,2025-02-17T00:00:00.000Z,,,,2023-11-14T22:46:47.000Z,2023-11-14T22:46:47.000Z
+9995,Seed Client,https://seed.test,FIX148C week 2,why,medium,todo,2025-02-10T00:00:00.000Z,,15,,2023-11-14T22:46:46.000Z,2023-11-14T22:46:46.000Z
+9994,Seed Client,https://seed.test,FIX148C month boundary Jan to Feb same week,,medium,done,2025-02-03T00:00:00.000Z,,45,,2023-11-14T22:46:45.000Z,2023-11-14T22:46:45.000Z
+9993,Seed Client,https://seed.test,@at leading title,why	tab,medium,todo,2025-01-28T00:00:00.000Z,,,,2023-11-14T22:46:44.000Z,2023-11-14T22:46:44.000Z
+9992,Seed Client,https://seed.test,+plus leading title,-dash leading why,medium,in_progress,2025-01-29T00:00:00.000Z,,0,,2023-11-14T22:46:43.000Z,2023-11-14T22:46:43.000Z
+9991,Seed Client,https://seed.test,"FIX148C =HYPERLINK(""https://x.test/a,1"", ""click, me"")","=important, ""why"" not",medium,todo,2025-01-28T00:00:00.000Z,,30,,2023-11-14T22:46:42.000Z,2023-11-14T22:46:42.000Z
+9990,Seed Client,https://seed.test,"FIX148C undated two, ""no date"" 😀","why ""q"", comma",medium,todo,,,5,,2023-11-14T22:46:41.000Z,2023-11-14T22:46:41.000Z
+9989,Seed Client,https://seed.test,FIX148C undated one,,medium,todo,,,,,2023-11-14T22:46:40.000Z,2023-11-14T22:46:40.000Z
 9915,"FIX148 ""Quote, Comma"" & Ünïcode 😀 Client","https://fix148-a.test/páth?q=1,2",FIX148 all nulls,,high,todo,,,,,2023-11-14T22:20:04.000Z,2023-11-14T22:20:04.000Z
 9914,Seed Client,https://seed.test,FIX148 Ünïcode 😀 görev,@handle leading at,medium,skipped,2100-01-01T00:00:00.000Z,quarterly,,,2023-11-14T22:20:03.000Z,2023-11-14T22:20:03.000Z
 9913,FIX148 =Hyperlink +Plus -Minus @At,https://fix148-b.test,FIX148 =cmd @at +plus,why	does it matter (tab),low,done,1969-12-31T00:00:00.000Z,monthly,0,0,2023-11-14T22:20:02.000Z,2023-11-14T22:20:02.000Z

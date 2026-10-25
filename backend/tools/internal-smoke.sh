@@ -7,6 +7,7 @@ set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 TOKEN="${SEO_INTERNAL_TOKEN:-$(cat "$ROOT/.seo-internal-token" 2>/dev/null || cat "$ROOT/data/.seo-internal-token" 2>/dev/null)}"
 B="http://127.0.0.1:3100"
+N="http://127.0.0.1:3000"  # Next app (14.8c: plan-export proxy byte-compare + 404 semantics)
 AUTH=(-H "X-Internal-Token: $TOKEN" -H "Content-Type: application/json")
 CID=$(node -e "const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');const r=db.prepare('SELECT id FROM clients ORDER BY id LIMIT 1').get();console.log(r?r.id:'')" 2>/dev/null)
 pass=0; fail=0
@@ -571,6 +572,154 @@ S1=$(grep -cF '# 1 entries across 1 domains' /tmp/14.8b-disavow-9901.txt 2>/dev/
 S2=$(grep -cF 'domain:spam-b.test' /tmp/14.8b-disavow-9901.txt 2>/dev/null || true)
 [ "$S1" = "1" ] && [ "$S2" = "1" ] && chk "disavow-scope-client-slice" y y || chk "disavow-scope-client-slice" y n
 rm -f /tmp/14.8b-disavow*.json /tmp/14.8b-disavow*.txt /tmp/14.8b-*.norm /tmp/14.8b-*.fixture.norm
+
+# ---- 14.8c: plan export (groupPlanByWeek port + canAccess 404 semantics) ----
+# Third serializer variant: EVERY cell quote-wrapped, leading = + - @ defused
+# with ', lines joined "\r\n". Auth is canAccessClient (NOT exportScope): an
+# inaccessible/missing client is the original route's 404 "Not found", which
+# the backend reports as {"ok":false,"notFound":true} and the Next proxy maps
+# to that exact Response. The route is PATH-param based (/clients/<id>/plan/
+# export.csv) — there is no ?clientId variant; direct internal callers pass
+# {"userId":?, "clientId":?}. FIX148C seed wave (tasks 9989..9999, seed
+# client, source='auto_calendar') drives every branch: earliest-due week
+# start (Tue 2025-01-28), same-week cluster + exact due_date tie, Jan→Feb
+# month boundary inside week 1, weeks 2/3, sparse far weeks (Mar/Sept/Dec —
+# "15 Sept" pins the en-GB four-letter short month), 2 undated rows.
+
+# 58. token middleware covers the plan export
+chk "exports-401-plan" 401 "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"clientId":1}' $B/api/internal/exports/plan)"
+
+# 59. re-seed (idempotent; also clears this run's wall-clock "smoke task"
+# rows so client 1's auto_calendar set is exactly the FIX148C wave)
+(cd "$ROOT" && bun run backend/tools/seed-14.8.ts) > /dev/null 2>&1
+
+# 60. envelope contract + byte-compare vs golden fixture (Rust-direct)
+curl -s -X POST "${AUTH[@]}" -d '{"clientId":1}' "$B/api/internal/exports/plan" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+assert d['ok'] is True, d
+assert d['filename']=='seed-client-30-day-plan.csv', d['filename']
+assert d['contentType']=='text/csv; charset=utf-8', d['contentType']
+assert d['disposition']=='attachment; filename=\"seed-client-30-day-plan.csv\"', d['disposition']
+open('/tmp/14.8c-plan.csv','w').write(d['csv'])
+" 2>/dev/null
+if [ -f /tmp/14.8c-plan.csv ] && cmp -s /tmp/14.8c-plan.csv "$ROOT/backend/fixtures/14.8/plan.csv"; then
+  chk "export-fixture-plan" y y
+else
+  chk "export-fixture-plan" y n
+fi
+
+# 61. absent clientId → the per-client route's notFound signal (direct
+# callers must pass it; the TS route never had a clientless branch)
+PNF=$(curl -s -X POST "${AUTH[@]}" -d '{}' "$B/api/internal/exports/plan")
+echo "$PNF" | grep -q '"ok":false,"notFound":true' && chk "plan-missing-clientid-notfound" y y || chk "plan-missing-clientid-notfound" y n
+NF2=$(curl -s -X POST "${AUTH[@]}" -d '{"clientId":424242}' "$B/api/internal/exports/plan")
+echo "$NF2" | grep -q '"ok":false,"notFound":true' && chk "plan-nonexistent-client-notfound" y y || chk "plan-nonexistent-client-notfound" y n
+
+# 62. Excel-formula defuse: a leading = + - @ cell comes out as '=
+# (9991's WHY starts with '='; 9992's title/why with '+'/'-'; 9993's title
+# with '@' — 9991's TITLE only CONTAINS '='HYPERLINK mid-string, which must
+# NOT be defused, proving the ^-anchored regex)
+D1=$(grep -cF "\"'=important" /tmp/14.8c-plan.csv 2>/dev/null || true)
+D2=$(grep -cF "\"'+plus leading title" /tmp/14.8c-plan.csv 2>/dev/null || true)
+D3=$(grep -cF "\"'-dash leading why" /tmp/14.8c-plan.csv 2>/dev/null || true)
+D4=$(grep -cF "\"'@at leading title" /tmp/14.8c-plan.csv 2>/dev/null || true)
+[ "$D1" = "1" ] && [ "$D2" = "1" ] && [ "$D3" = "1" ] && [ "$D4" = "1" ] \
+  && chk "plan-formula-defuse" y y || chk "plan-formula-defuse" y n
+
+# 63. CRLF structure: 12 lines (header + 11 rows) joined "\r\n" — 11 CRLF
+# separators OUTSIDE quoted cells, no lone \n or \r anywhere outside them
+# (the 9996 title carries a raw \r\n INSIDE its quotes, which the quoted-
+# span strip removes), and the csv module parses 12 rows × 6 fields.
+python3 - "$ROOT/backend/fixtures/14.8/plan.csv" <<'PYEOF' 2>/dev/null
+import csv, re, sys
+raw = open(sys.argv[1], 'rb').read().decode('utf-8')
+stripped = re.sub(r'"(?:[^"]|"")*"', '\x00', raw)
+assert stripped.count('\r\n') == 11, stripped.count('\r\n')
+assert re.findall(r'(?<!\r)\n', stripped) == [], 'lone LF outside quotes'
+assert re.findall(r'\r(?!\n)', stripped) == [], 'lone CR outside quotes'
+rows = list(csv.reader(raw.splitlines(True)))
+assert len(rows) == 12, len(rows)
+assert all(len(r) == 6 for r in rows), [len(r) for r in rows]
+assert raw.split('\r\n')[0] == '"Week","Due","Task","Why it matters","Minutes","Status"'
+assert not raw.endswith('\r\n'), 'trailing terminator must not exist'
+PYEOF
+[ $? -eq 0 ] 2>/dev/null && chk "plan-crlf-structure" y y || chk "plan-crlf-structure" y n
+
+# 64. week buckets vs DB: the DB's auto_calendar due dates bucket into
+# exactly 6 distinct weeks (floor((t - min)/7d)) and the CSV labels match —
+# Week 1 ×4 (cluster + tie + month boundary), Weeks 2/3/6/33/49 ×1 each,
+# "No date" ×2 (undated trailing bucket).
+WK=$(node -e "
+const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');
+const due=db.prepare(\"SELECT due_date FROM tasks WHERE client_id=1 AND source='auto_calendar' AND due_date IS NOT NULL\").all().map(r=>r.due_date*1000);
+const mn=Math.min(...due);
+console.log(new Set(due.map(t=>Math.floor((t-mn)/(7*86400000)))).size);
+" 2>/dev/null)
+C1=$(grep -cF '"Week 1"' /tmp/14.8c-plan.csv 2>/dev/null || true)
+C2=$(grep -cF '"Week 2"' /tmp/14.8c-plan.csv 2>/dev/null || true)
+C3=$(grep -cF '"Week 3"' /tmp/14.8c-plan.csv 2>/dev/null || true)
+C6=$(grep -cF '"Week 6"' /tmp/14.8c-plan.csv 2>/dev/null || true)
+C33=$(grep -cF '"Week 33"' /tmp/14.8c-plan.csv 2>/dev/null || true)
+C49=$(grep -cF '"Week 49"' /tmp/14.8c-plan.csv 2>/dev/null || true)
+ND=$(grep -cF '"No date"' /tmp/14.8c-plan.csv 2>/dev/null || true)
+SEP=$(grep -cF '"15 Sept"' /tmp/14.8c-plan.csv 2>/dev/null || true)
+[ "$WK" = "6" ] && [ "$C1" = "4" ] && [ "$C2" = "1" ] && [ "$C3" = "1" ] \
+  && [ "$C6" = "1" ] && [ "$C33" = "1" ] && [ "$C49" = "1" ] && [ "$ND" = "2" ] \
+  && [ "$SEP" = "1" ] && chk "plan-week-buckets-vs-db" y y || chk "plan-week-buckets-vs-db" y n
+rm -f /tmp/14.8c-plan.csv
+
+# 65. Next proxy: byte-compare vs fixture + transport headers + status 200
+PCODE=$(curl -s -o /tmp/14.8c-plan-proxy.csv -D /tmp/14.8c-plan-proxy.h -w '%{http_code}' "$N/clients/1/plan/export.csv")
+[ "$PCODE" = "200" ] && chk "plan-proxy-200" y y || chk "plan-proxy-200" y n
+grep -qi '^content-type: text/csv; charset=utf-8' /tmp/14.8c-plan-proxy.h && chk "plan-proxy-content-type" y y || chk "plan-proxy-content-type" y n
+grep -qi '^content-disposition: attachment; filename="seed-client-30-day-plan.csv"' /tmp/14.8c-plan-proxy.h && chk "plan-proxy-disposition" y y || chk "plan-proxy-disposition" y n
+cmp -s /tmp/14.8c-plan-proxy.csv "$ROOT/backend/fixtures/14.8/plan.csv" && chk "export-fixture-plan-next-proxy" y y || chk "export-fixture-plan-next-proxy" y n
+
+# 66. Next proxy 404 semantics — byte-identical to the original route's
+# `new Response("Not found", { status: 404 })`: nonexistent client (backend
+# notFound signal), non-integer id (proxy-local parseInt NaN, no backend
+# call), negative integer (backend client-missing branch). "1.5" parses to 1
+# (parseInt semantics) → the full CSV.
+P404=$(curl -s -o /tmp/14.8c-404.txt -w '%{http_code}|%{content_type}' "$N/clients/424242/plan/export.csv")
+[ "$P404" = "404|text/plain;charset=UTF-8" ] && [ "$(cat /tmp/14.8c-404.txt)" = "Not found" ] && chk "plan-proxy-404-notfound" y y || chk "plan-proxy-404-notfound" y n
+chk "plan-proxy-404-noninteger" 404 "$(curl -s -o /dev/null -w '%{http_code}' "$N/clients/abc/plan/export.csv")"
+chk "plan-proxy-404-negative" 404 "$(curl -s -o /dev/null -w '%{http_code}' "$N/clients/-5/plan/export.csv")"
+chk "plan-proxy-parseint-truncates" 200 "$(curl -s -o /dev/null -w '%{http_code}' "$N/clients/1.5/plan/export.csv")"
+rm -f /tmp/14.8c-plan-proxy.csv /tmp/14.8c-plan-proxy.h /tmp/14.8c-404.txt
+
+# 67. canAccessClient semantics (temp users, direct Rust calls only — while
+# they exist the Next process must NOT be asked anything: its
+# accountsEnabled() cache would flip for the process lifetime). Member with
+# NO assignments → 404 signal; member assigned 9901 → client 1 is 404 but
+# client 9901 exports; owner → unrestricted.
+node -e "
+const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');
+db.pragma('journal_mode = WAL');
+db.prepare('DELETE FROM client_members WHERE user_id BETWEEN 9801 AND 9803').run();
+db.prepare('DELETE FROM users WHERE id BETWEEN 9801 AND 9803').run();
+const u=db.prepare('INSERT INTO users (id, email, password_hash, role, active, created_at) VALUES (?,?,?,?,1,1700000300)');
+u.run(9801,'fix148c-smoke-empty@test.local','scrypt:1:aa:bb','member');
+u.run(9802,'fix148c-smoke-assigned@test.local','scrypt:1:aa:bb','member');
+u.run(9803,'fix148c-smoke-owner@test.local','scrypt:1:aa:bb','owner');
+db.prepare('INSERT INTO client_members (user_id, client_id, created_at) VALUES (9802, 9901, 1700000300)').run();
+" 2>/dev/null
+M1=$(curl -s -X POST "${AUTH[@]}" -d '{"userId":9801,"clientId":1}' "$B/api/internal/exports/plan")
+echo "$M1" | grep -q '"ok":false,"notFound":true' && chk "plan-canaccess-empty-assignment-404" y y || chk "plan-canaccess-empty-assignment-404" y n
+M2=$(curl -s -X POST "${AUTH[@]}" -d '{"userId":9802,"clientId":1}' "$B/api/internal/exports/plan")
+echo "$M2" | grep -q '"ok":false,"notFound":true' && chk "plan-canaccess-unassigned-404" y y || chk "plan-canaccess-unassigned-404" y n
+M3=$(curl -s -X POST "${AUTH[@]}" -d '{"userId":9802,"clientId":9901}' "$B/api/internal/exports/plan")
+echo "$M3" | grep -q '"ok":true' && echo "$M3" | grep -q '30-day-plan.csv' && chk "plan-canaccess-assigned-200" y y || chk "plan-canaccess-assigned-200" y n
+M4=$(curl -s -X POST "${AUTH[@]}" -d '{"userId":9803,"clientId":1}' "$B/api/internal/exports/plan")
+echo "$M4" | grep -q '"ok":true' && chk "plan-canaccess-owner-unrestricted" y y || chk "plan-canaccess-owner-unrestricted" y n
+node -e "
+const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');
+db.prepare('DELETE FROM client_members WHERE user_id BETWEEN 9801 AND 9803').run();
+db.prepare('DELETE FROM users WHERE id BETWEEN 9801 AND 9803').run();
+console.log(db.prepare('SELECT COUNT(*) n FROM users').get().n);
+" > /tmp/14.8c-users-left.txt 2>/dev/null
+[ "$(cat /tmp/14.8c-users-left.txt 2>/dev/null)" = "0" ] && chk "plan-scope-users-cleaned" y y || chk "plan-scope-users-cleaned" y n
+rm -f /tmp/14.8c-users-left.txt
 
 echo "----"
 echo "PASS=$pass FAIL=$fail"

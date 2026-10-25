@@ -248,6 +248,8 @@ async fn main() {
             "/api/internal/exports/disavow",
             post(exports::disavow),
         )
+        // ---- 14.8c: plan export (groupPlanByWeek port, canAccess 404 semantics) ----
+        .route("/api/internal/exports/plan", post(exports::plan))
         .route(
             "/api/internal/tools/migration-map/run",
             post(tools_compute::migration_run),

@@ -55,6 +55,23 @@
  *                           newlines collapsed to one space; one ACTIVE row
  *                           that must be filtered out; empty-string notes)
  *
+ * Task 14.8c adds the FIX148C wave (ids 9989..9999 — tasks table only, so no
+ * other 14.8a/b fixture changes except tasks.csv, which sees the new rows and
+ * is re-captured from the ORIGINAL Next implementation):
+ *   tasks        9989..9999 for the seed client (id 1), ALL source
+ *                'auto_calendar' — the plan-export filter. Earliest-due edge
+ *                (2025-01-28, a Tuesday: week 1 starts at the earliest due
+ *                date, not the calendar week), a same-week cluster incl. an
+ *                exact due_date TIE pair (sorter-stability canary), a
+ *                month-boundary pair in one week (Jan 28 → Feb 3), weeks 2
+ *                and 3, sparse far weeks (March/September/December — the
+ *                September row pins the en-GB short month "Sept", four
+ *                letters), 2 undated (NULL due_date → "No date" bucket,
+ *                dueLabel "—"), titles/whys with leading = + - @ (the plan
+ *                serializer's Excel-formula defuse), embedded quotes, a
+ *                tab, CRLF, and unicode. All due dates are midnight-UTC
+ *                fixed epochs.
+ *
  * Run with Bun (bun:sqlite — better-sqlite3 does not load under Bun):
  *   bun run backend/tools/seed-14.8.ts
  */
@@ -111,6 +128,16 @@ const E = {
   blG: 1700001403,
   blH: 1700001404,
   blI: 1700001405,
+  // ---- 14.8c (FIX148C wave — plan-export auto_calendar tasks, midnight UTC) ----
+  planW1a: 1738022400, // 2025-01-28 (Tue) — earliest due; week 1 starts HERE
+  planW1b: 1738108800, // 2025-01-29 — same week, next day (cluster)
+  planW1c: 1738540800, // 2025-02-03 — month boundary, still week 1 (floor(6d/7d)=0)
+  planW2: 1739145600,  // 2025-02-10 — week 2
+  planW3: 1739750400,  // 2025-02-17 — week 3
+  planMar: 1741564800, // 2025-03-10 — sparse far week ("10 Mar")
+  planSep: 1757894400, // 2025-09-15 — pins en-GB short month "Sept"
+  planDec: 1767139200, // 2025-12-31 — year-end month boundary
+  planCreated: 1700002000, // + (id - 9989): deterministic tasks.csv ordering
 };
 
 function seed(): void {
@@ -147,6 +174,10 @@ function seed(): void {
   db.prepare("DELETE FROM outreach_contacts WHERE id >= 9921 AND id <= 9929").run();
   db.prepare("DELETE FROM tasks WHERE id >= 9911 AND id <= 9919").run();
   db.prepare("DELETE FROM backlinks WHERE id >= 9911 AND id <= 9999").run();
+  // 2c. previous FIX148C rows (14.8c wave — plan-export tasks only).
+  db.prepare("DELETE FROM tasks WHERE id >= 9989 AND id <= 9999").run();
+  // marker-based safety net for the 14.8c table.
+  db.prepare("DELETE FROM tasks WHERE source_ref = 'FIX148C'").run();
   // marker-based safety nets for the 14.8b tables (backlinks markers only —
   // the other FIX148B tables never collide with the 14.8a FIX148 prefix set).
   db.prepare(
@@ -441,6 +472,41 @@ function seed(): void {
     9986, 1, "https://aaa-first.test/w", "AAA-first.test", null, null, null,
     "disavow", "manual", null, E.blI, E.blI,
   );
+
+  // 13. plan-export tasks (14.8c) ----------------------------------------------
+  // All for the seed client (id 1) with source='auto_calendar' — exactly the
+  // set GET /clients/1/plan/export.csv groups by week. 9991+9993 are an exact
+  // due_date TIE (sorter-stability canary across the two SQLite engines);
+  // 9992's title/why carry leading + and -; 9991's title/why leading = ;
+  // 9993's title leading @; 9996 embeds CRLF+quotes in the title; 9989/9990
+  // are undated (NULL due_date → "No date" bucket, dueLabel "—").
+  const plan = db.prepare(
+    `INSERT INTO tasks (id, client_id, title, why_it_matters, priority, status, due_date, estimated_minutes, source, source_ref, created_at, updated_at)
+     VALUES (?, 1, ?, ?, 'medium', ?, ?, ?, 'auto_calendar', 'FIX148C', ?, ?)`,
+  );
+  plan.run(9989, "FIX148C undated one", null, "todo", null, null,
+    E.planCreated, E.planCreated);
+  plan.run(9990, 'FIX148C undated two, "no date" 😀', 'why "q", comma',
+    "todo", null, 5, E.planCreated + 1, E.planCreated + 1);
+  plan.run(9991, 'FIX148C =HYPERLINK("https://x.test/a,1", "click, me")',
+    '=important, "why" not', "todo", E.planW1a, 30,
+    E.planCreated + 2, E.planCreated + 2);
+  plan.run(9992, "+plus leading title", "-dash leading why", "in_progress",
+    E.planW1b, 0, E.planCreated + 3, E.planCreated + 3);
+  plan.run(9993, "@at leading title", "why\ttab", "todo", E.planW1a, null,
+    E.planCreated + 4, E.planCreated + 4);
+  plan.run(9994, "FIX148C month boundary Jan to Feb same week", null, "done",
+    E.planW1c, 45, E.planCreated + 5, E.planCreated + 5);
+  plan.run(9995, "FIX148C week 2", "why", "todo", E.planW2, 15,
+    E.planCreated + 6, E.planCreated + 6);
+  plan.run(9996, 'FIX148C multi\r\nline "q", end 😀', "why", "skipped",
+    E.planW3, null, E.planCreated + 7, E.planCreated + 7);
+  plan.run(9997, "FIX148C March", "why", "todo", E.planMar, 20,
+    E.planCreated + 8, E.planCreated + 8);
+  plan.run(9998, "FIX148C September (en-GB short month is Sept)", "why",
+    "todo", E.planSep, 25, E.planCreated + 9, E.planCreated + 9);
+  plan.run(9999, "FIX148C December year end", "why", "done", E.planDec, 35,
+    E.planCreated + 10, E.planCreated + 10);
 }
 
 db.exec("BEGIN");

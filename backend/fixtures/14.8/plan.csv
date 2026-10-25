@@ -1,0 +1,13 @@
+"Week","Due","Task","Why it matters","Minutes","Status"
+"Week 1","28 Jan","FIX148C =HYPERLINK(""https://x.test/a,1"", ""click, me"")","'=important, ""why"" not","30","todo"
+"Week 1","28 Jan","'@at leading title","why	tab","","todo"
+"Week 1","29 Jan","'+plus leading title","'-dash leading why","0","in_progress"
+"Week 1","3 Feb","FIX148C month boundary Jan to Feb same week","","45","done"
+"Week 2","10 Feb","FIX148C week 2","why","15","todo"
+"Week 3","17 Feb","FIX148C multi
+line ""q"", end 😀","why","","skipped"
+"Week 6","10 Mar","FIX148C March","why","20","todo"
+"Week 33","15 Sept","FIX148C September (en-GB short month is Sept)","why","25","todo"
+"Week 49","31 Dec","FIX148C December year end","why","35","done"
+"No date","—","FIX148C undated one","","","todo"
+"No date","—","FIX148C undated two, ""no date"" 😀","why ""q"", comma","5","todo"

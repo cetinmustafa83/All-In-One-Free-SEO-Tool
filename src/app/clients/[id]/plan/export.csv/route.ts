@@ -1,8 +1,5 @@
-import { and, asc, eq } from "drizzle-orm";
-import { db } from "@/db/client";
-import { clients, tasks } from "@/db/schema";
-import { groupPlanByWeek } from "@/lib/plan-view";
-import { canAccessClient } from "@/lib/client-scope";
+import { currentUser } from "@/lib/auth";
+import { callBackend } from "@/lib/backend";
 
 /**
  * The plan as a file, because "download it on the same page" is what
@@ -12,6 +9,26 @@ import { canAccessClient } from "@/lib/client-scope";
  * a spreadsheet, forwarded, and edited. A PDF of it would look more
  * finished and be less useful. The branded PDF report is a different
  * document with a different job.
+ *
+ * Since 14.8c the bytes come from the Rust backend
+ * (POST /api/internal/exports/plan — a byte-for-byte port incl. the
+ * groupPlanByWeek week bucketing; golden fixture
+ * backend/fixtures/14.8/plan.csv). This route stays for what needed a
+ * Next runtime:
+ *
+ *   * the route-param parsing the original did: Number.parseInt(id, 10) +
+ *     Number.isInteger() — a non-integer id 404s right here, no backend
+ *     round-trip (same short-circuit the original had);
+ *   * the user resolution canAccessClient() did internally:
+ *     scopedClientIds() → currentUser() (session cookie → users row). The
+ *     proxy passes `userId`; the Rust side re-derives the same scope
+ *     (owner/manager unrestricted, member/viewer client_members IN(ids),
+ *     empty assignment = sees nothing, null user = solo install). This is
+ *     deliberately NOT the exportScope() the other export routes use — the
+ *     plan download guards ONE client, so an inaccessible or missing client
+ *     is the original's 404 "Not found", which the backend reports as
+ *     {"ok":false,"notFound":true} and is mapped to the identical Response
+ *     here.
  */
 export async function GET(
   _req: Request,
@@ -19,67 +36,29 @@ export async function GET(
 ) {
   const { id } = await ctx.params;
   const clientId = Number.parseInt(id, 10);
-  if (!Number.isInteger(clientId) || !(await canAccessClient(clientId))) {
+  if (!Number.isInteger(clientId)) {
     return new Response("Not found", { status: 404 });
   }
 
-  const [client] = await db
-    .select({ name: clients.name })
-    .from(clients)
-    .where(eq(clients.id, clientId))
-    .limit(1);
-  if (!client) return new Response("Not found", { status: 404 });
+  const me = await currentUser();
+  const r = await callBackend<
+    | {
+        ok: true;
+        filename: string;
+        contentType: string;
+        disposition: string;
+        csv: string;
+      }
+    | { ok: false; notFound: true }
+  >("/api/internal/exports/plan", {
+    body: { userId: me?.id ?? null, clientId },
+  });
 
-  const rows = await db
-    .select({
-      id: tasks.id,
-      title: tasks.title,
-      whyItMatters: tasks.whyItMatters,
-      status: tasks.status,
-      dueDate: tasks.dueDate,
-      estimatedMinutes: tasks.estimatedMinutes,
-      sourceRef: tasks.sourceRef,
-    })
-    .from(tasks)
-    .where(and(eq(tasks.clientId, clientId), eq(tasks.source, "auto_calendar")))
-    .orderBy(asc(tasks.dueDate));
-
-  const plan = groupPlanByWeek(rows);
-
-  /** Excel treats a leading = or + as a formula, so those are defused. */
-  const cell = (v: unknown): string => {
-    let s = String(v ?? "");
-    if (/^[=+\-@]/.test(s)) s = `'${s}`;
-    return `"${s.replace(/"/g, '""')}"`;
-  };
-
-  const lines = [
-    ["Week", "Due", "Task", "Why it matters", "Minutes", "Status"]
-      .map(cell)
-      .join(","),
-  ];
-  for (const w of plan.weeks) {
-    for (const t of w.items) {
-      lines.push(
-        [
-          w.label,
-          t.dueLabel,
-          t.title,
-          t.whyItMatters ?? "",
-          t.estimatedMinutes ?? "",
-          t.status,
-        ]
-          .map(cell)
-          .join(","),
-      );
-    }
-  }
-
-  const safe = client.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
-  return new Response(lines.join("\r\n"), {
+  if (!r.ok) return new Response("Not found", { status: 404 });
+  return new Response(r.csv, {
     headers: {
-      "content-type": "text/csv; charset=utf-8",
-      "content-disposition": `attachment; filename="${safe}-30-day-plan.csv"`,
+      "content-type": r.contentType,
+      "content-disposition": r.disposition,
     },
   });
 }

@@ -41,6 +41,16 @@
 //! `IN (-1)` — the TS route turns every non-positive-integer Number(raw)
 //! into exactly that filter ("an unparseable clientId yields an empty
 //! export rather than everything").
+//!
+//! 14.8b added the wave-2 routes (tasks/outreach/reports/monitor/keywords —
+//! the keywords route has its OWN bespoke csvEscape — and disavow.txt, a
+//! text/plain body in the same envelope) and 14.8c the plan export
+//! (POST /api/internal/exports/plan): a third serializer variant — every
+//! cell quoted unconditionally, leading = + - @ defused with ', lines joined
+//! "\r\n" — a faithful port of groupPlanByWeek (src/lib/plan-view.ts), and
+//! canAccessClient() auth instead of exportScope: an inaccessible/missing
+//! client is the original route's 404 "Not found", surfaced as
+//! {"ok":false,"notFound":true} for the proxy to map.
 
 use crate::client_scope::visible_client_ids;
 use crate::internal::{db_error_response, result_json};
@@ -49,6 +59,7 @@ use axum::body::Bytes;
 use axum::extract::State;
 use axum::response::Response;
 use rusqlite::types::{Value as Sqv, ValueRef};
+use rusqlite::OptionalExtension;
 use serde_json::{json, Value};
 
 // ---------------------------------------------------------------------------
@@ -1258,4 +1269,271 @@ fn collapse_newlines(s: &str) -> String {
         }
     }
     out
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/internal/exports/plan — 14.8c
+// (src/app/clients/[id]/plan/export.csv/route.ts — third serializer variant:
+// EVERY cell quote-wrapped unconditionally, leading = + - @ defused with ',
+// lines joined "\r\n"; auth is canAccessClient() NOT exportScope — an
+// inaccessible client is the route's 404 "Not found", surfaced as an
+// {"ok":false,"notFound":true} signal the Next proxy maps to that Response)
+// ---------------------------------------------------------------------------
+
+/// The plan route's inline `cell()`:
+///   let s = String(v ?? "");
+///   if (/^[=+\-@]/.test(s)) s = `'${s}`;
+///   return `"${s.replace(/"/g, '""')}"`;
+/// i.e. quote-wrapping is UNCONDITIONAL (both earlier variants quote only on
+/// /[",\n\r]/), inner quotes double, and a leading = + - @ is defused with '
+/// because Excel would otherwise parse the cell as a formula.
+fn plan_cell(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 3);
+    out.push('"');
+    if matches!(
+        s.bytes().next(),
+        Some(b'=') | Some(b'+') | Some(b'-') | Some(b'@')
+    ) {
+        out.push('\'');
+    }
+    for c in s.chars() {
+        if c == '"' {
+            out.push_str("\"\"");
+        } else {
+            out.push(c);
+        }
+    }
+    out.push('"');
+    out
+}
+
+/// `d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })` —
+/// Node's ICU en-GB renders "d MMM" with NO day padding and the CLDR en-GB
+/// short months. September is FOUR letters ("Sept") in en-GB — verified
+/// against the runtime, not assumed. Node formats in the server-LOCAL zone;
+/// this mirror computes the UTC civil day — exact when the server runs
+/// TZ=UTC (this sandbox does; the golden fixture pins the assumption, see
+/// worklog 14.8c for the deviation note).
+fn en_gb_short(t_ms: f64) -> String {
+    const MONTHS: [&str; 12] = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sept", "Oct", "Nov", "Dec",
+    ];
+    let days = (t_ms / 86_400_000.0).floor() as i64;
+    let (_, m, d) = civil_from_days(days);
+    format!("{d} {}", MONTHS[(m - 1) as usize])
+}
+
+/// `client.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()` — every RUN of
+/// characters outside [a-z0-9] (case-insensitively: ASCII alnum; non-ASCII
+/// letters like 'Ü' do NOT match the class) collapses to ONE dash, then the
+/// surviving A-Z is lowercased.
+fn plan_slug(name: &str) -> String {
+    let mut out = String::with_capacity(name.len());
+    let mut in_run = false;
+    for c in name.chars() {
+        if c.is_ascii_alphanumeric() {
+            out.push(c);
+            in_run = false;
+        } else if !in_run {
+            out.push('-');
+            in_run = true;
+        }
+    }
+    out.to_ascii_lowercase()
+}
+
+/// One plan row as the serializer needs it (title/why/status/minutes are
+/// pre-rendered through String(v ?? "") — `cell()` semantics; they cannot
+/// fail). `due_ms` stays f64 because a REAL (fractional-second) due_date
+/// yields fractional ms.
+#[derive(Clone)]
+struct PlanItem {
+    title: String,
+    why: String,
+    minutes: String,
+    status: String,
+    due_label: String,
+}
+
+/// drizzle mode:"timestamp" (`new Date(value * 1000)`) + plan-view's asDate()
+/// + ES TimeClip, collapsed: `Some(ms)` = a valid JS Date time value,
+/// `None` = the undated bucket. NULL → null → undated; TEXT/BLOB → `value *
+/// 1000` → NaN → Invalid Date → asDate() null → UNDATED (unlike the tasks
+/// export, where a TEXT due_date throws at render — the plan route groups
+/// it); |t| > 8.64e15 → TimeClip NaN → undated.
+fn plan_due_ms(v: ValueRef<'_>) -> Option<f64> {
+    let t = match v {
+        ValueRef::Null => return None,
+        ValueRef::Integer(i) => i as f64 * 1000.0,
+        ValueRef::Real(f) => f * 1000.0,
+        ValueRef::Text(_) | ValueRef::Blob(_) => return None,
+    };
+    if !t.is_finite() || t.abs() > 8_640_000_000_000_000.0 {
+        return None;
+    }
+    Some(t)
+}
+
+/// Pure port of groupPlanByWeek (src/lib/plan-view.ts), reduced to the
+/// surface the CSV exports: weeks with `Week ${index + 1}` labels and
+/// per-item dueLabels. Weeks bucket from the EARLIEST due date
+/// (`Math.floor((t - start) / (7 * DAY))` — "the first seven days of the
+/// plan", not the calendar week), buckets iterate ascending, items keep
+/// their SQL order inside a bucket (the JS sort by getTime() is stable, as
+/// is Rust sort_by). Undated rows keep their SQL scan order in a trailing
+/// "No date" group with dueLabel "—". NOT ported (no observable effect on
+/// this route): the week `range` "12 Sep – 18 Sep" (en dash U+2013 with
+/// spaces — computed by the TS but never exported; the CSV columns are
+/// Week/Due/Task/Why/Minutes/Status) and the total/done/totalMinutes sums.
+fn group_plan_by_week(rows: Vec<(Option<f64>, PlanItem)>) -> Vec<(String, Vec<PlanItem>)> {
+    let mut dated: Vec<(f64, PlanItem)> = Vec::new();
+    let mut undated: Vec<PlanItem> = Vec::new();
+    for (due, item) in rows {
+        match due {
+            Some(t) => dated.push((t, item)),
+            None => undated.push(item),
+        }
+    }
+    dated.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+
+    let mut weeks: Vec<(String, Vec<PlanItem>)> = Vec::new();
+    if !dated.is_empty() {
+        let start = dated[0].0;
+        let mut buckets: std::collections::BTreeMap<i64, Vec<PlanItem>> =
+            std::collections::BTreeMap::new();
+        for (t, mut item) in dated {
+            let index = ((t - start) / (7.0 * 86_400_000.0)).floor() as i64;
+            item.due_label = en_gb_short(t);
+            buckets.entry(index).or_default().push(item);
+        }
+        for (index, items) in buckets {
+            weeks.push((format!("Week {}", index + 1), items));
+        }
+    }
+    if !undated.is_empty() {
+        for item in &mut undated {
+            item.due_label = "\u{2014}".to_string(); // — em dash
+        }
+        weeks.push(("No date".to_string(), undated));
+    }
+    weeks
+}
+
+pub async fn plan(State(state): State<AppState>, bytes: Bytes) -> Response {
+    let body: Value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
+    let (user_id, client_id) = body_ids(&body);
+    // TS: Number.parseInt(id, 10) + Number.isInteger() happens in the Next
+    // proxy (TypeScript where it IS the semantics); a non-integer id never
+    // reaches here, and an absent/invalid body id means the same outcome.
+    let Some(client_id) = client_id else {
+        return plan_not_found();
+    };
+    // canAccessClient(clientId): scopedClientIds() — None = unrestricted
+    // (anonymous/solo install, owner/manager), Some(ids) = member/viewer
+    // assignments (EMPTY = sees nothing). 404, not 403, on purpose (the TS
+    // doc comment: id enumeration must not confirm existence).
+    if let Some(ids) = visible_client_ids(&state.db, user_id) {
+        if !ids.contains(&client_id) {
+            return plan_not_found();
+        }
+    }
+    // `SELECT name FROM clients WHERE id = ? LIMIT 1` — the client the plan
+    // belongs to (only its name is read: filename slug; the CSV itself has
+    // no client column).
+    let name: Option<String> = state
+        .db
+        .with_conn(|c| {
+            c.query_row(
+                "SELECT name FROM clients WHERE id = ?1",
+                [client_id],
+                |r| r.get(0),
+            )
+            .optional()
+        })
+        .ok()
+        .flatten();
+    let Some(name) = name else {
+        return plan_not_found();
+    };
+
+    // tasks WHERE client_id=? AND source='auto_calendar' ORDER BY due_date ASC
+    // (drizzle asc() → "ORDER BY tasks.due_date asc"; SQLite sorts NULLs
+    // first, so undated rows arrive before the dated ones and the grouping
+    // moves them to the trailing "No date" bucket, ties in scan order).
+    let scanned: Result<Vec<(Option<f64>, PlanItem)>, String> = state
+        .db
+        .with_conn(|c| {
+            Ok((|| -> Result<Vec<(Option<f64>, PlanItem)>, String> {
+            let mut stmt = c
+                .prepare(
+                    "SELECT tasks.title, tasks.why_it_matters, tasks.status, \
+                     tasks.due_date, tasks.estimated_minutes \
+                     FROM tasks WHERE tasks.client_id = ?1 \
+                     AND tasks.source = 'auto_calendar' \
+                     ORDER BY tasks.due_date ASC",
+                )
+                .map_err(|e| e.to_string())?;
+            let mut q = stmt.query([client_id]).map_err(|e| e.to_string())?;
+            let mut out: Vec<(Option<f64>, PlanItem)> = Vec::new();
+            while let Some(r) = q.next().map_err(|e| e.to_string())? {
+                out.push((
+                    plan_due_ms(r.get_ref(3).map_err(|e| e.to_string())?),
+                    PlanItem {
+                        title: cell(r.get_ref(0).map_err(|e| e.to_string())?),
+                        why: cell(r.get_ref(1).map_err(|e| e.to_string())?), // ?? ""
+                        minutes: cell(r.get_ref(4).map_err(|e| e.to_string())?), // ?? ""
+                        status: cell(r.get_ref(2).map_err(|e| e.to_string())?),
+                        due_label: String::new(), // filled by the grouping
+                    },
+                ));
+            }
+            Ok(out)
+            })())
+        })
+        .map_err(|e| e.to_string())
+        .flatten();
+    let rows = match scanned {
+        Ok(rows) => rows,
+        Err(msg) => return db_fail(&msg),
+    };
+
+    let weeks = group_plan_by_week(rows);
+    let mut lines: Vec<String> = Vec::with_capacity(weeks.len() + 1);
+    lines.push(
+        ["Week", "Due", "Task", "Why it matters", "Minutes", "Status"]
+            .iter()
+            .map(|h| plan_cell(h))
+            .collect::<Vec<_>>()
+            .join(","),
+    );
+    for (label, items) in &weeks {
+        for it in items {
+            lines.push(
+                [
+                    label.as_str(),
+                    it.due_label.as_str(),
+                    it.title.as_str(),
+                    it.why.as_str(),
+                    it.minutes.as_str(),
+                    it.status.as_str(),
+                ]
+                .iter()
+                .map(|c| plan_cell(c))
+                .collect::<Vec<_>>()
+                .join(","),
+            );
+        }
+    }
+    // `lines.join("\r\n")` — CRLF (Excel's line ending), NO trailing
+    // terminator, no BOM.
+    let filename = format!("{}-30-day-plan.csv", plan_slug(&name));
+    envelope(&filename, "text/csv; charset=utf-8", lines.join("\r\n"))
+}
+
+/// The plan route's 404 surface as a business-level signal: the TS returned
+/// `new Response("Not found", { status: 404 })` for BOTH the canAccess and
+/// the client-missing branches (identical bytes either way); the Next proxy
+/// maps this envelope to exactly that Response.
+fn plan_not_found() -> Response {
+    result_json(json!({ "ok": false, "notFound": true }))
 }
