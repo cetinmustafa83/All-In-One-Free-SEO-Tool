@@ -138,6 +138,18 @@ const E = {
   planSep: 1757894400, // 2025-09-15 — pins en-GB short month "Sept"
   planDec: 1767139200, // 2025-12-31 — year-end month boundary
   planCreated: 1700002000, // + (id - 9989): deterministic tasks.csv ordering
+  // ---- ambient rows the 14.8 fixtures pin (fresh-DB reproducibility) ----
+  // These two rows existed in the working DB when the golden fixtures were
+  // captured (2026-10-25 morning recovery) and are baked into
+  // fixtures/14.8/audits.csv line 2 and keywords.csv line 2. The seed owns
+  // them so a fresh db:migrate + seed client + this seed reproduces the
+  // fixtures byte-for-byte. They are NOT part of the FIX148 id scheme —
+  // the audit keeps its real id 1; the keyword lives at 9950 (inside the
+  // 9901..9999 seed id band, outside the FIX148B ranges 9961..9969, so the
+  // wave-2 deletes never touch it; rankings for it are wiped by the
+  // marker-based delete below).
+  auditAmbient: 1792909589, // 2026-10-25T06:26:29.000Z (audits.csv row 2)
+  kwAmbient: 1792911976,    // 2026-10-25T07:06:16.000Z (keywords.csv row 2)
 };
 
 function seed(): void {
@@ -151,6 +163,23 @@ function seed(): void {
   // section 3 of internal-smoke.sh creates one wall-clock task per run;
   // tasks.csv has no other non-deterministic rows.
   db.prepare("DELETE FROM tasks WHERE title LIKE 'smoke task %'").run();
+
+  // 1b. ambient rows the 14.8 fixtures pin (re-create deterministically).
+  // The audit keeps its real id 1; the 'seed keyword' lives at 9950 with
+  // its ranking at 9940 (checked_at pinned, position/url NULL — the fold
+  // has nothing to fold over, so the CSV cells stay empty).
+  db.prepare("DELETE FROM audits WHERE id = 1").run();
+  db.prepare(
+    "DELETE FROM keyword_rankings WHERE keyword_id IN " +
+      "(SELECT id FROM keywords WHERE query = 'seed keyword' AND client_id = 1)",
+  ).run();
+  db.prepare(
+    "DELETE FROM keywords WHERE query = 'seed keyword' AND client_id = 1",
+  ).run();
+  db.prepare(
+    `INSERT INTO audits (id, client_id, status, score, issues_count, started_at, completed_at, created_at, updated_at, kind, target_url)
+     VALUES (1, 1, 'failed', NULL, 0, ?, ?, ?, ?, 'ai_full', 'https://seed.test')`,
+  ).run(E.auditAmbient, E.auditAmbient, E.auditAmbient, E.auditAmbient);
 
   // 2. previous FIX148 rows (children first; client delete also cascades).
   db.prepare("DELETE FROM backlinks WHERE id >= 9901 AND id <= 9999").run();
@@ -402,6 +431,17 @@ function seed(): void {
   change.run(9953, 9942, "description", "warning", "old\tdesc",
     "new, desc", E.chC);
   change.run(9954, 9942, "status", "info", "200", "404, gone", E.compC);
+
+  // 10b. ambient 'seed keyword' the keywords.csv fixture pins (row 2) -------
+  // client 1 / US / desktop, created 07:06 UTC 2026-10-25 → sorts FIRST in
+  // the created_at DESC export (FIX148B rows are 2023-era). Deliberately NO
+  // keyword_rankings row — the fixture shows empty latest_position /
+  // ranking_url AND empty last_checked (the "added" cell is the keyword's
+  // own created_at).
+  db.prepare(
+    `INSERT INTO keywords (id, client_id, query, country, device, created_at, updated_at)
+     VALUES (9950, 1, 'seed keyword', 'US', 'desktop', ?, ?)`,
+  ).run(E.kwAmbient, E.kwAmbient);
 
   // 11. keywords + rankings (14.8b) -------------------------------------------
   // 9961's query contains a LONE \r: the BESPOKE keywords csvEscape does NOT

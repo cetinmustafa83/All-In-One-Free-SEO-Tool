@@ -1,6 +1,6 @@
 [
   { "name": "rust-root-health", "path": "/health", "expect": { "next": 404, "rust": 200 } },
-  { "name": "rust-api-health-alias", "path": "/api/health", "expect": { "next": 404, "rust": 200 } },
+  { "name": "rust-api-health-alias", "path": "/api/health", "expect": { "next": 200, "rust": 200 } },
   { "name": "parity-health-ping", "path": "/api/health-ping", "expect": { "next": 200, "rust": "mirror" }, "compareKeys": true },
   { "name": "parity-v1-health", "path": "/api/v1/health", "expect": { "next": 200, "rust": "mirror" }, "compareKeys": true },
   { "name": "parity-v1-health-options", "method": "OPTIONS", "path": "/api/v1/health", "expect": { "next": 204, "rust": "mirror" } },

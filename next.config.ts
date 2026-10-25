@@ -56,6 +56,49 @@ const nextConfig: NextConfig = {
    * exposes no account data and carries no session-authenticated
    * actions: it grades a URL the caller typed and writes a lead row.
    */
+  /**
+   * Phase 14.9 cutover — serve ported /api/* from the Rust backend.
+   *
+   * Background: the backend has been progressively ported to Rust (axum,
+   * port 3100) behind the strangler-fig plan in docs/architecture-split-plan.md.
+   * Through phase 14.8 every ported endpoint kept a Next route handler that
+   * proxied to Rust (or implemented it in TS). This rewrite retires those
+   * handlers: the ported route files under src/app/api are deleted and any
+   * /api/* path that no Next handler claims is transparently proxied to the
+   * Rust process instead.
+   *
+   * Why `fallback`: Next checks rewrite classes in a fixed order —
+   * filesystem routes (static route.ts paths) → afterFiles rewrites →
+   * dynamic routes → fallback rewrites. The 15 /api handlers that are
+   * deliberately NOT ported (PDF, backup/restore, desktop ops, google
+   * oauth, mcp, webhooks/[token], …) include dynamic-segment routes, and
+   * an afterFiles rewrite would shadow those. A fallback rewrite only
+   * fires when neither the filesystem nor dynamic routes matched —
+   * exactly "the paths the deleted handlers used to own".
+   *
+   * Gated on API_BACKEND_URL: unset (or empty) = classic Next-only mode,
+   * which is the rollback switch — restore the deleted route files from
+   * git and everything runs in-process again. When set, the Rust backend
+   * must be running (backend/up.sh) or every ported /api path fails.
+   *
+   * Security note: this also exposes /api/internal/* through the Next
+   * origin for the first time. Those endpoints are guarded by the
+   * x-internal-token check backend-side (anonymous requests get 401),
+   * so the public surface is unchanged in practice.
+   */
+  async rewrites() {
+    const backend = process.env.API_BACKEND_URL;
+    if (!backend) return [];
+    return {
+      fallback: [
+        {
+          source: "/api/:path*",
+          destination: `${backend}/api/:path*`,
+        },
+      ],
+    };
+  },
+
   async headers() {
     return [
       {
