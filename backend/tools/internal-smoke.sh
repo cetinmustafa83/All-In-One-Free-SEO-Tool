@@ -721,6 +721,93 @@ console.log(db.prepare('SELECT COUNT(*) n FROM users').get().n);
 [ "$(cat /tmp/14.8c-users-left.txt 2>/dev/null)" = "0" ] && chk "plan-scope-users-cleaned" y y || chk "plan-scope-users-cleaned" y n
 rm -f /tmp/14.8c-users-left.txt
 
+# ---- 14.13: write-gateway wave 1 — short-links domain -----------------------
+# The /r/<slug> redirector reads through the 14.7 query gateway and records
+# the click via /api/internal/short-links/click; the /links create/delete
+# actions proxy the create/delete endpoints. Scratch links use the
+# smoke-sl- slug prefix (or smoke-dest.test destinations) and are removed
+# at the end — no 14.8 fixture touches short_links / short_link_clicks.
+
+SL_TS=$(date +%s)
+SL_SLUG="smoke-sl-${SL_TS}"
+
+chk "shortlinks-click-401" 401 "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' $B/api/internal/short-links/click)"
+chk "shortlinks-create-401" 401 "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' $B/api/internal/short-links/create)"
+chk "shortlinks-delete-401" 401 "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' $B/api/internal/short-links/delete)"
+
+# create (custom slug, client 1 → activity row) + collision + bad URL
+C1=$(curl -s -X POST "${AUTH[@]}" -d "{\"clientId\":1,\"destination\":\"https://smoke-dest.test/landing\",\"label\":\"Smoke link\",\"customSlug\":\"$SL_SLUG\",\"utmSource\":\"smoke\"}" $B/api/internal/short-links/create)
+echo "$C1" | grep -q '"ok":true' && echo "$C1" | grep -q "\"slug\":\"$SL_SLUG\"" && chk "shortlinks-create-ok" y y || chk "shortlinks-create-ok" y n
+C2=$(curl -s -X POST "${AUTH[@]}" -d "{\"destination\":\"https://smoke-dest.test/x\",\"customSlug\":\"$SL_SLUG\"}" $B/api/internal/short-links/create)
+echo "$C2" | grep -q 'already taken' && chk "shortlinks-create-collision" y y || chk "shortlinks-create-collision" y n
+C3=$(curl -s -X POST "${AUTH[@]}" -d '{"destination":"not a url"}' $B/api/internal/short-links/create)
+echo "$C3" | grep -q '"ok":false' && chk "shortlinks-create-badurl" y y || chk "shortlinks-create-badurl" y n
+
+node -e "
+const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/db/data.db');
+const r=db.prepare('SELECT destination,label,utm_source,click_count FROM short_links WHERE slug=?').get('$SL_SLUG');
+console.log(r && r.destination==='https://smoke-dest.test/landing' && r.label==='Smoke link' && r.utm_source==='smoke' && r.click_count===0 ? 'y' : 'n');
+" > /tmp/sl-row.txt 2>/dev/null
+chk "shortlinks-create-db-row" y "$(cat /tmp/sl-row.txt 2>/dev/null)"
+rm -f /tmp/sl-row.txt
+SL_ID=$(node -e "
+const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/db/data.db');
+console.log(db.prepare('SELECT id FROM short_links WHERE slug=?').get('$SL_SLUG').id);
+" 2>/dev/null)
+
+# the real redirector end-to-end: gateway read → 302 with UTM location →
+# fire-and-forget click write through the Rust endpoint
+REDIR=$(curl -s -o /dev/null -w '%{http_code}|%{redirect_url}' -A 'SmokeUA/1.0' -H 'Accept-Language: en-US,en;q=0.9' "$N/r/$SL_SLUG")
+[ "$REDIR" = "302|https://smoke-dest.test/landing?utm_source=smoke" ] && chk "shortlinks-redirect-302-utm" y y || chk "shortlinks-redirect-302-utm" y n
+sleep 1
+node -e "
+const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/db/data.db');
+const c=db.prepare('SELECT user_agent,country_hint FROM short_link_clicks WHERE short_link_id=? ORDER BY id DESC LIMIT 1').get($SL_ID);
+const l=db.prepare('SELECT click_count,last_click_at FROM short_links WHERE id=?').get($SL_ID);
+console.log(c && c.country_hint==='US' && c.user_agent==='SmokeUA/1.0' && l && l.click_count===1 && l.last_click_at>0 ? 'y' : 'n');
+" > /tmp/sl-click.txt 2>/dev/null
+chk "shortlinks-click-recorded" y "$(cat /tmp/sl-click.txt 2>/dev/null)"
+rm -f /tmp/sl-click.txt
+
+# truncation (UA ≤ 200) + no-region accept-language → NULL country hint
+LONG_UA=$(printf 'X%.0s' $(seq 1 300))
+curl -s -X POST "${AUTH[@]}" -d "{\"shortLinkId\":$SL_ID,\"userAgent\":\"$LONG_UA\",\"acceptLanguage\":\"en\"}" $B/api/internal/short-links/click > /dev/null
+node -e "
+const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/db/data.db');
+const c=db.prepare('SELECT LENGTH(user_agent) l, country_hint h FROM short_link_clicks WHERE short_link_id=? ORDER BY id DESC LIMIT 1').get($SL_ID);
+console.log(c && c.l===200 && c.h===null ? 'y' : 'n');
+" > /tmp/sl-trunc.txt 2>/dev/null
+chk "shortlinks-click-truncate-noregion" y "$(cat /tmp/sl-trunc.txt 2>/dev/null)"
+rm -f /tmp/sl-trunc.txt
+
+BAD=$(curl -s -X POST "${AUTH[@]}" -d '{"shortLinkId":0}' $B/api/internal/short-links/click)
+echo "$BAD" | grep -q '"ok":false' && chk "shortlinks-click-nonpositive" y y || chk "shortlinks-click-nonpositive" y n
+
+# delete + FK cascade over the click rows + click-after-delete FK error
+D=$(curl -s -X POST "${AUTH[@]}" -d "{\"id\":$SL_ID}" $B/api/internal/short-links/delete)
+echo "$D" | grep -q '"ok":true' && chk "shortlinks-delete-ok" y y || chk "shortlinks-delete-ok" y n
+node -e "
+const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/db/data.db');
+console.log(db.prepare('SELECT COUNT(*) n FROM short_link_clicks WHERE short_link_id=?').get($SL_ID).n);
+" > /tmp/sl-casc.txt 2>/dev/null
+[ "$(cat /tmp/sl-casc.txt 2>/dev/null)" = "0" ] && chk "shortlinks-delete-cascade" y y || chk "shortlinks-delete-cascade" y n
+rm -f /tmp/sl-casc.txt
+CD=$(curl -s -X POST "${AUTH[@]}" -d "{\"shortLinkId\":$SL_ID}" $B/api/internal/short-links/click)
+echo "$CD" | grep -q '"ok":false' && chk "shortlinks-click-after-delete" y y || chk "shortlinks-click-after-delete" y n
+
+# auto slug generation (no customSlug): 6-char no-look-alike alphabet
+C4=$(curl -s -X POST "${AUTH[@]}" -d '{"destination":"https://smoke-dest.test/auto"}' $B/api/internal/short-links/create)
+echo "$C4" | grep -q '"ok":true' && echo "$C4" | grep -qE '"slug":"[A-HJ-NP-Za-km-z2-9]{6}"' && chk "shortlinks-create-autoslug" y y || chk "shortlinks-create-autoslug" y n
+AUTO_ID=$(echo "$C4" | python3 -c "import json,sys; print(json.load(sys.stdin).get('id',0))" 2>/dev/null)
+[ -n "$AUTO_ID" ] && [ "$AUTO_ID" != "0" ] && curl -s -X POST "${AUTH[@]}" -d "{\"id\":$AUTO_ID}" $B/api/internal/short-links/delete > /dev/null
+
+# scratch cleanup (delete cascaded the clicks; activity rows are scratch too)
+node -e "
+const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/db/data.db');
+db.prepare(\"DELETE FROM short_links WHERE slug LIKE 'smoke-sl-%' OR destination LIKE 'https://smoke-dest.test%'\").run();
+db.prepare(\"DELETE FROM activity_log WHERE message LIKE 'Created short link /r/smoke-sl-%'\").run();
+" 2>/dev/null
+
 echo "----"
 echo "PASS=$pass FAIL=$fail"
 [ $fail -eq 0 ]

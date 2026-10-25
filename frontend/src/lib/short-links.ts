@@ -2,12 +2,19 @@
  * Smart-link redirector helpers. Generates URL-safe slugs, builds the
  * UTM-decorated destination URL, and provides a small set of helpers
  * the route handler + UI both rely on.
+ *
+ * 14.13 (write-gateway wave 1): recordClick moved onto the Rust
+ * /api/internal/short-links/click endpoint (the UA/referer truncation and
+ * the accept-language country guess moved with it), findUniqueSlug reads
+ * through the db-gateway. Nothing in this module touches SQLite directly
+ * any more.
  */
 
 import { randomBytes } from "node:crypto";
-import { eq, sql } from "drizzle-orm";
-import { db } from "@/db/client";
-import { shortLinks, shortLinkClicks, type ShortLink } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { db } from "@/lib/db-gateway";
+import { shortLinks, type ShortLink } from "@/db/schema";
+import { callBackend } from "./backend";
 
 const ALPHABET =
   "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
@@ -56,9 +63,12 @@ export function buildDestinationUrl(link: ShortLink): string {
 }
 
 /**
- * Record a click against a short link. Truncates the user-agent and
- * stores a country guess from the accept-language header so we never
- * hold raw IPs / fingerprintable data.
+ * Record a click against a short link via the Rust backend, which owns the
+ * truncation (UA ≤ 200, referer ≤ 500) and the country guess from the
+ * accept-language header — so we never hold raw IPs / fingerprintable
+ * data, and the two writes (click row + counter) commit atomically.
+ * Throws on transport failure / business error so the caller's
+ * fire-and-forget `.catch` keeps its old meaning.
  */
 export async function recordClick(opts: {
   shortLinkId: number;
@@ -66,33 +76,15 @@ export async function recordClick(opts: {
   referer: string | null;
   acceptLanguage: string | null;
 }): Promise<void> {
-  const ua = opts.userAgent?.slice(0, 200) ?? null;
-  const ref = opts.referer?.slice(0, 500) ?? null;
-  const country = guessCountryFromAcceptLanguage(opts.acceptLanguage);
-
-  await db.insert(shortLinkClicks).values({
-    shortLinkId: opts.shortLinkId,
-    userAgent: ua,
-    referer: ref,
-    countryHint: country,
+  const res = await callBackend<
+    { ok: true } | { ok: false; error: string }
+  >("/api/internal/short-links/click", {
+    body: {
+      shortLinkId: opts.shortLinkId,
+      userAgent: opts.userAgent,
+      referer: opts.referer,
+      acceptLanguage: opts.acceptLanguage,
+    },
   });
-
-  await db
-    .update(shortLinks)
-    .set({
-      clickCount: sql`${shortLinks.clickCount} + 1`,
-      lastClickAt: new Date(),
-    })
-    .where(eq(shortLinks.id, opts.shortLinkId));
-}
-
-/**
- * Cheap country guess from the first locale tag in `accept-language`.
- * "en-US,en;q=0.9" → "US". Returns null if no region is present.
- */
-function guessCountryFromAcceptLanguage(al: string | null): string | null {
-  if (!al) return null;
-  const first = al.split(",")[0].trim();
-  const m = first.match(/-([A-Z]{2})\b/i);
-  return m ? m[1].toUpperCase() : null;
+  if (!res.ok) throw new Error("error" in res ? res.error : "click failed");
 }

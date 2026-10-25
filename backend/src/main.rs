@@ -44,6 +44,11 @@
 //! of the src/app/*/export.csv/route.ts downloads (csv-export.ts serializer
 //! + client-scope.ts exportScope port), with the Next routes turned into
 //! thin proxies. In exports.rs + client_scope.rs.
+//!
+//! 14.13 scope: write-gateway wave 1 — the short-links domain
+//! (/api/internal/short-links/{click,create,delete}): the /r/<slug>
+//! redirector's click recording plus the /links CRUD create/delete, in
+//! short_links.rs. The Next redirector now has zero direct SQLite.
 
 mod audits;
 mod auth;
@@ -65,6 +70,7 @@ mod password;
 mod query;
 mod ratelimit;
 mod session;
+mod short_links;
 mod tasks;
 mod tools_basic;
 mod tools_compute;
@@ -250,6 +256,10 @@ async fn main() {
         )
         // ---- 14.8c: plan export (groupPlanByWeek port, canAccess 404 semantics) ----
         .route("/api/internal/exports/plan", post(exports::plan))
+        // ---- 14.13: write-gateway wave 1 — short-links domain ----
+        .route("/api/internal/short-links/click", post(short_links::click))
+        .route("/api/internal/short-links/create", post(short_links::create))
+        .route("/api/internal/short-links/delete", post(short_links::delete_link))
         .route(
             "/api/internal/tools/migration-map/run",
             post(tools_compute::migration_run),

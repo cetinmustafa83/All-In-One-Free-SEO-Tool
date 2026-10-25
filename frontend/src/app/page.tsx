@@ -69,8 +69,14 @@ export default async function DashboardPage() {
   // the await chain entirely and would 500 the dashboard. The dashboard
   // MUST always render so users can see what's wrong.
   try {
-    startScheduler();
-    tickScheduler().catch(() => {});
+    // SEO_DISABLE_SCHEDULER is the documented "no automations" switch (the
+    // scheduler itself honors it; smoke/e2e set it so golden DB state stays
+    // deterministic). The dashboard nudge must honor it too — a flagged
+    // process should never run an automation tick from a page render.
+    if (process.env.SEO_DISABLE_SCHEDULER !== "1") {
+      startScheduler();
+      tickScheduler().catch(() => {});
+    }
   } catch {}
 
   const [{ value: clientCount }] = await db

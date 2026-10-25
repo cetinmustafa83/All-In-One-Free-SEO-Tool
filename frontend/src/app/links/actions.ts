@@ -7,6 +7,7 @@ import { db } from "@/db/client";
 import { shortLinks } from "@/db/schema";
 import { findUniqueSlug } from "@/lib/short-links";
 import { logActivity } from "@/lib/activity";
+import { callBackend } from "@/lib/backend";
 import { guardAction } from "@/lib/action-guard";
 
 const createSchema = z.object({
@@ -92,58 +93,41 @@ export async function createShortLink(
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  let slug = parsed.data.customSlug;
-  if (slug) {
-    const [existing] = await db
-      .select({ id: shortLinks.id })
-      .from(shortLinks)
-      .where(eq(shortLinks.slug, slug))
-      .limit(1);
-    if (existing) {
-      return {
-        ok: false,
-        error: `Slug "${slug}" is already taken — pick another.`,
-      };
-    }
-  } else {
-    slug = await findUniqueSlug();
-  }
-
-  const [row] = await db
-    .insert(shortLinks)
-    .values({
-      clientId: parsed.data.clientId ?? null,
-      slug,
-      destination: parsed.data.destination,
-      label: parsed.data.label ?? null,
-      utmSource: parsed.data.utmSource ?? null,
-      utmMedium: parsed.data.utmMedium ?? null,
-      utmCampaign: parsed.data.utmCampaign ?? null,
-      utmTerm: parsed.data.utmTerm ?? null,
-      utmContent: parsed.data.utmContent ?? null,
-    })
-    .returning({ id: shortLinks.id });
-
-  if (parsed.data.clientId) {
-    await logActivity({
-      kind: "task.created",
-      message: `Created short link /r/${slug}`,
+  // 14.13: the slug check/uniqueness, the insert and the activity log live
+  // on the Rust backend now (zod already normalized `destination` above;
+  // the backend re-validates the shape message-for-message).
+  const created = await callBackend<
+    | { ok: true; id: number; slug: string }
+    | { ok: false; error: string }
+  >("/api/internal/short-links/create", {
+    body: {
       clientId: parsed.data.clientId,
-      entityType: "short_link",
-      entityId: row.id,
-    });
+      destination: parsed.data.destination,
+      label: parsed.data.label,
+      customSlug: parsed.data.customSlug,
+      utmSource: parsed.data.utmSource,
+      utmMedium: parsed.data.utmMedium,
+      utmCampaign: parsed.data.utmCampaign,
+      utmTerm: parsed.data.utmTerm,
+      utmContent: parsed.data.utmContent,
+    },
+  });
+  if (!created.ok) {
+    return { ok: false, error: created.error };
   }
 
   revalidatePath("/links");
   if (parsed.data.clientId)
     revalidatePath(`/clients/${parsed.data.clientId}`);
-  return { ok: true, id: row.id, slug };
+  return { ok: true, id: created.id, slug: created.slug };
 }
 
 export async function deleteShortLink(id: number): Promise<void> {
   await guardAction("edit");
   if (!Number.isFinite(id) || id <= 0) return;
-  await db.delete(shortLinks).where(eq(shortLinks.id, id));
+  // 14.13: the delete (and its FK cascade over short_link_clicks) moved to
+  // the Rust backend.
+  await callBackend("/api/internal/short-links/delete", { body: { id } });
   revalidatePath("/links");
 }
 
