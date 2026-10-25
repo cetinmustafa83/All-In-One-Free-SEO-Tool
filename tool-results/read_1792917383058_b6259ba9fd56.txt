@@ -1,0 +1,452 @@
+     1→#!/usr/bin/env bash
+     2→# Task 14.5a smoke — /api/internal/* (internal-token family, NOT the parity
+     3→# harness: those endpoints are Next-proxy-only by design).
+     4→# Usage: backend/tools/internal-smoke.sh  (expects backend on :3100, data.db
+     5→# with at least one client; TOKEN read from dataDir/.seo-internal-token)
+     6→set -u
+     7→ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+     8→TOKEN="${SEO_INTERNAL_TOKEN:-$(cat "$ROOT/.seo-internal-token" 2>/dev/null || cat "$ROOT/data/.seo-internal-token" 2>/dev/null)}"
+     9→B="http://127.0.0.1:3100"
+    10→AUTH=(-H "X-Internal-Token: $TOKEN" -H "Content-Type: application/json")
+    11→CID=$(node -e "const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');const r=db.prepare('SELECT id FROM clients ORDER BY id LIMIT 1').get();console.log(r?r.id:'')" 2>/dev/null)
+    12→pass=0; fail=0
+    13→chk() { # name expected actual
+    14→  if [ "$2" = "$3" ]; then pass=$((pass+1)); echo "PASS $1"; else fail=$((fail+1)); echo "FAIL $1 (expected=$2 got=$3)"; fi
+    15→}
+    16→# 1. no token -> 401
+    17→chk "401-no-token" 401 "$(curl -s -o /dev/null -w '%{http_code}' $B/api/internal/notifications/recent)"
+    18→# 2. notifications recent -> valid JSON
+    19→chk "notif-json" 200 "$(curl -s -o /dev/null -w '%{http_code}' "${AUTH[@]}" $B/api/internal/notifications/recent)"
+    20→# 3. task create -> id
+    21→TID=$(curl -s -X POST "${AUTH[@]}" -d "{\"clientId\":$CID,\"title\":\"smoke task $(date +%s)\",\"priority\":\"low\"}" $B/api/internal/tasks/create | python3 -c "import json,sys;print(json.load(sys.stdin).get('id',''))" 2>/dev/null)
+    22→[ -n "$TID" ] && chk "task-create" y y || chk "task-create" y n
+    23→# 4. FK violation surfaces (userId=999999) -> 500 ok:false
+    24→chk "task-status-fk-500" 500 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "${AUTH[@]}" -d '{"status":"done","userId":999999}' $B/api/internal/tasks/$TID/status)"
+    25→# 5. valid status -> ok:true
+    26→R=$(curl -s -X POST "${AUTH[@]}" -d '{"status":"done"}' $B/api/internal/tasks/$TID/status); echo "$R" | grep -q '"ok":true' && chk "task-status-ok" y y || chk "task-status-ok" y n
+    27→# 6. recurrence-free delete
+    28→chk "task-delete" 200 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "${AUTH[@]}" -d '{}' $B/api/internal/tasks/$TID/delete)"
+    29→# 7. keyword track + dedupe + untrack
+    30→KW=$(curl -s -X POST "${AUTH[@]}" -d "{\"clientId\":$CID,\"query\":\"smoke kw $(date +%s)\"}" $B/api/internal/keywords/track)
+    31→echo "$KW" | grep -q '"ok":true' && chk "kw-track" y y || chk "kw-track" y n
+    32→KID=$(node -e "const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');const r=db.prepare('SELECT id FROM keywords ORDER BY id DESC LIMIT 1').get();console.log(r?r.id:'')")
+    33→chk "kw-untrack" 200 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "${AUTH[@]}" $B/api/internal/keywords/$KID/untrack)"
+    34→# 8. backlink add/status/delete
+    35→BL=$(curl -s -X POST "${AUTH[@]}" -d "{\"clientId\":$CID,\"sourceUrl\":\"https://smoke.test/$(date +%s)\"}" $B/api/internal/backlinks/add)
+    36→BLID=$(echo "$BL" | python3 -c "import json,sys;print(json.load(sys.stdin).get('id',''))" 2>/dev/null)
+    37→[ -n "$BLID" ] && chk "bl-add" y y || chk "bl-add" y n
+    38→chk "bl-status" 200 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "${AUTH[@]}" -d '{"status":"lost"}' $B/api/internal/backlinks/$BLID/status)"
+    39→chk "bl-delete" 200 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "${AUTH[@]}" $B/api/internal/backlinks/$BLID/delete)"
+    40→# 9. ahrefs import (1 row)
+    41→R1=$(python3 -c "
+    42→import json,urllib.request
+    43→csv='Referring page URL,Domain rating,Anchor\\nhttps://smoke-ahrefs.test/'+'$(date +%s)'+',42,nice'
+    44→req=urllib.request.Request('$B/api/internal/backlinks/import-ahrefs',data=json.dumps({'clientId':$CID,'csvText':csv}).encode(),headers={'X-Internal-Token':'$TOKEN','Content-Type':'application/json'})
+    45→print(urllib.request.urlopen(req).read().decode())
+    46→")
+    47→echo "$R1" | grep -q '"inserted":1' && chk "ahrefs-import" y y || chk "ahrefs-import" y n
+    48→
+    49→# ---- 14.5b: clients domain ----
+    50→STAMP=$(date +%s)
+    51→# 10. create (saas + Next.js stack, one niche title preflight-skipped)
+    52→CR=$(curl -s -X POST "${AUTH[@]}" -d "{\"name\":\"Smoke Client $STAMP\",\"url\":\"https://smoke-client-$STAMP.test\",\"niche\":\"saas\",\"techStack\":[\"Next.js\"],\"precheck\":[{\"title\":\"Write SoftwareApplication schema for your homepage\",\"evidence\":\"smoke\"}]}" $B/api/internal/clients/create)
+    53→CID2=$(echo "$CR" | python3 -c "import json,sys;print(json.load(sys.stdin).get('id',''))" 2>/dev/null)
+    54→[ -n "$CID2" ] && chk "client-create" y y || chk "client-create" y n
+    55→echo "$CR" | grep -q "\"redirect\":\"/clients/$CID2/onboarding\"" && chk "client-create-redirect" y y || chk "client-create-redirect" y n
+    56→# 11. templates seeded (saas niche minus 1 skipped + Next.js stack rows)
+    57→TC=$(node -e "const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');console.log(db.prepare('SELECT COUNT(*) c FROM tasks WHERE client_id=?').get(Number('$CID2')).c)" 2>/dev/null)
+    58→[ -n "$TC" ] && [ "$TC" -gt 0 ] && chk "client-templates-seeded" y y || chk "client-templates-seeded" y n
+    59→SK=$(node -e "const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');console.log(db.prepare(\"SELECT COUNT(*) c FROM activity_log WHERE kind='task.template_skipped' AND client_id=? AND message LIKE 'Skipped 1 niche task%'\").get(Number('$CID2')).c)" 2>/dev/null)
+    60→[ "$SK" = "1" ] && chk "client-template-skip-logged" y y || chk "client-template-skip-logged" y n
+    61→# 12. re-apply is idempotent (11 titles exist, 1 preflight-skipped again → added:0)
+    62→RA=$(curl -s -X POST "${AUTH[@]}" -d '{"kind":"niche","precheck":[{"title":"Write SoftwareApplication schema for your homepage","evidence":"smoke"}]}' $B/api/internal/clients/$CID2/apply-templates)
+    63→echo "$RA" | grep -q '"added":0' && chk "apply-templates-idempotent" y y || chk "apply-templates-idempotent" y n
+    64→# 13. update (+redirect path)
+    65→UR=$(curl -s -X POST "${AUTH[@]}" -d "{\"id\":$CID2,\"name\":\"Smoke Renamed $STAMP\",\"url\":\"https://smoke-client-$STAMP.test\",\"niche\":\"blog\"}" $B/api/internal/clients/$CID2/update)
+    66→echo "$UR" | grep -q '"ok":true' && chk "client-update" y y || chk "client-update" y n
+    67→echo "$UR" | grep -q "\"redirect\":\"/clients/$CID2\"" && chk "client-update-redirect" y y || chk "client-update-redirect" y n
+    68→# 14. redetect-stack (technologies computed Next-side)
+    69→curl -s -X POST "${AUTH[@]}" -d '{"technologies":["WordPress","Cloudflare"]}' $B/api/internal/clients/$CID2/redetect-stack > /dev/null
+    70→TS=$(node -e "const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');console.log(db.prepare('SELECT tech_stack t FROM clients WHERE id=?').get(Number('$CID2')).t)" 2>/dev/null)
+    71→[ "$TS" = '["WordPress","Cloudflare"]' ] && chk "client-redetect-stack" y y || chk "client-redetect-stack" y n
+    72→# 15. share-token generate (24 bytes → 32 urlsafe chars) + revoke
+    73→SG=$(curl -s -X POST "${AUTH[@]}" -d '{"action":"generate"}' $B/api/internal/clients/$CID2/share-token)
+    74→echo "$SG" | grep -q '"ok":true' && chk "share-generate" y y || chk "share-generate" y n
+    75→TOK=$(node -e "const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');console.log(db.prepare('SELECT share_token t FROM clients WHERE id=?').get(Number('$CID2')).t)" 2>/dev/null)
+    76→echo -n "$TOK" | grep -qE '^[A-Za-z0-9_-]{32}$' && chk "share-token-format" y y || chk "share-token-format" y n
+    77→SR=$(curl -s -X POST "${AUTH[@]}" -d '{"action":"revoke"}' $B/api/internal/clients/$CID2/share-token)
+    78→echo "$SR" | grep -q '"ok":true' && chk "share-revoke" y y || chk "share-revoke" y n
+    79→TS2=$(node -e "const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');console.log(db.prepare('SELECT share_token t FROM clients WHERE id=?').get(Number('$CID2')).t)" 2>/dev/null)
+    80→[ "$TS2" = "null" ] && chk "share-token-cleared" y y || chk "share-token-cleared" y n
+    81→# 16. quick-add (meta over the wire, niche inferred from Shopify)
+    82→QA=$(curl -s -X POST "${AUTH[@]}" -d "{\"url\":\"https://smoke-qa-$STAMP.test\",\"meta\":{\"name\":\"Smoke QA\",\"url\":\"https://smoke-qa-$STAMP.test\",\"logoUrl\":\"https://smoke-qa-$STAMP.test/logo.png\",\"socialLinks\":{\"facebook\":\"https://facebook.com/smokeqa\"}},\"techStack\":[\"Shopify\"],\"precheck\":[]}" $B/api/internal/clients/quick-add)
+    83→QID=$(echo "$QA" | python3 -c "import json,sys;print(json.load(sys.stdin).get('id',''))" 2>/dev/null)
+    84→[ -n "$QID" ] && chk "client-quick-add" y y || chk "client-quick-add" y n
+    85→QN=$(node -e "const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');const r=db.prepare('SELECT niche n, social_links s FROM clients WHERE id=?').get(Number('$QID'));console.log(r.n+'|'+r.s)" 2>/dev/null)
+    86→[ "$QN" = 'ecommerce|{"facebook":"https://facebook.com/smokeqa"}' ] && chk "client-quick-add-niche-social" y y || chk "client-quick-add-niche-social" y n
+    87→# 17. delete + cascade cleanup (tasks of the client go with it)
+    88→curl -s -X POST "${AUTH[@]}" -d '{}' $B/api/internal/clients/$QID/delete > /dev/null
+    89→DL=$(curl -s -X POST "${AUTH[@]}" -d '{}' $B/api/internal/clients/$CID2/delete)
+    90→echo "$DL" | grep -q '"ok":true' && chk "client-delete" y y || chk "client-delete" y n
+    91→LEFT=$(node -e "const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');console.log(db.prepare('SELECT COUNT(*) c FROM clients WHERE id IN (?,?)').get(Number('$CID2'),Number('$QID')).c)" 2>/dev/null)
+    92→[ "$LEFT" = "0" ] && chk "client-delete-gone" y y || chk "client-delete-gone" y n
+    93→TL=$(node -e "const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');console.log(db.prepare('SELECT COUNT(*) c FROM tasks WHERE client_id=?').get(Number('$CID2')).c)" 2>/dev/null)
+    94→[ "$TL" = "0" ] && chk "client-delete-cascade-tasks" y y || chk "client-delete-cascade-tasks" y n
+    95→
+    96→# ---- 14.6a: tools wave 1 (pure-DB tool actions, backend/src/tools_basic.rs) ----
+    97→
+    98→# 18. token middleware covers the new family (401 without X-Internal-Token)
+    99→chk "tools-401-redirects" 401 "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' $B/api/internal/tools/redirects/add)"
+   100→chk "tools-401-robots" 401 "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' $B/api/internal/tools/robots-history/list)"
+   101→
+   102→# 19. redirects add golden path + DB row (status_code default baked 301)
+   103→RA=$(curl -s -X POST "${AUTH[@]}" -d '{"sourcePath":"/smoke-old","targetUrl":"https://smoke.test/new","statusCode":301,"note":"smoke"}' $B/api/internal/tools/redirects/add)
+   104→echo "$RA" | grep -q '"ok":true' && chk "redirect-add" y y || chk "redirect-add" y n
+   105→RDB=$(node -e "const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');const r=db.prepare(\"SELECT id, status_code s FROM redirect_rules WHERE source_path='/smoke-old' AND note='smoke' ORDER BY id DESC LIMIT 1\").get();console.log(r?r.id+'|'+r.s:'')" 2>/dev/null)
+   106→RID=$(echo "$RDB" | cut -d'|' -f1)
+   107→[ "$RDB" = "$RID|301" ] && chk "redirect-add-db" y y || chk "redirect-add-db" y n
+   108→# 20. redirects validation parity (hand-rolled action messages, 200 {ok:false})
+   109→RV1=$(curl -s -X POST "${AUTH[@]}" -d '{"sourcePath":"/x","targetUrl":"/y","statusCode":300}' $B/api/internal/tools/redirects/add)
+   110→echo "$RV1" | grep -q '"error":"Status code must be 301/302/307/308/410."' && chk "redirect-bad-status" y y || chk "redirect-bad-status" y n
+   111→RV2=$(curl -s -X POST "${AUTH[@]}" -d '{"sourcePath":"no-slash","targetUrl":"/y","statusCode":301}' $B/api/internal/tools/redirects/add)
+   112→echo "$RV2" | grep -q '"error":"Source path must start with /"' && chk "redirect-bad-source" y y || chk "redirect-bad-source" y n
+   113→RV3=$(curl -s -X POST "${AUTH[@]}" -d '{"sourcePath":"/x","targetUrl":"javascript:alert(1)","statusCode":301}' $B/api/internal/tools/redirects/add)
+   114→echo "$RV3" | grep -q '"error":"Target must be absolute URL or /-prefixed path."' && chk "redirect-bad-target" y y || chk "redirect-bad-target" y n
+   115→# 21. delete + idempotency (second delete still 200, row gone)
+   116→curl -s -X POST "${AUTH[@]}" -d "{\"id\":$RID}" $B/api/internal/tools/redirects/delete > /dev/null
+   117→RD2=$(curl -s -o /dev/null -w '%{http_code}' -X POST "${AUTH[@]}" -d "{\"id\":$RID}" $B/api/internal/tools/redirects/delete)
+   118→[ "$RD2" = "200" ] && chk "redirect-delete-idempotent" y y || chk "redirect-delete-idempotent" y n
+   119→RG=$(node -e "const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');console.log(db.prepare(\"SELECT COUNT(*) c FROM redirect_rules WHERE id=?\").get(Number('$RID')).c)" 2>/dev/null)
+   120→[ "$RG" = "0" ] && chk "redirect-delete-gone" y y || chk "redirect-delete-gone" y n
+   121→
+   122→# 22. 404 record (hits upsert) -> resolve (rule + resolved flag) flow
+   123→P404="/smoke-404-$(date +%s)"
+   124→curl -s -X POST "${AUTH[@]}" -d "{\"sourcePath\":\"$P404\"}" $B/api/internal/tools/redirects/404/record > /dev/null
+   125→FR=$(curl -s -X POST "${AUTH[@]}" -d "{\"sourcePath\":\"$P404\"}" $B/api/internal/tools/redirects/404/record)
+   126→echo "$FR" | grep -q '"ok":true' && chk "404-record" y y || chk "404-record" y n
+   127→NDB=$(node -e "const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');const r=db.prepare('SELECT id, hits h FROM not_found_log WHERE source_path=?').get('$P404');console.log(r?r.id+'|'+r.h:'')" 2>/dev/null)
+   128→NID=$(echo "$NDB" | cut -d'|' -f1)
+   129→[ "$NDB" = "$NID|2" ] && chk "404-record-hits2" y y || chk "404-record-hits2" y n
+   130→RZ=$(curl -s -X POST "${AUTH[@]}" -d "{\"id\":$NID,\"targetUrl\":\"/smoke-new\"}" $B/api/internal/tools/redirects/404/resolve)
+   131→echo "$RZ" | grep -q '"ok":true' && chk "404-resolve" y y || chk "404-resolve" y n
+   132→RZD=$(node -e "const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');const r=db.prepare(\"SELECT target_url t, note n FROM redirect_rules WHERE source_path=? ORDER BY id DESC LIMIT 1\").get('$P404');const l=db.prepare('SELECT resolved rv, resolved_to_url u FROM not_found_log WHERE id=?').get(Number('$NID'));console.log(r?r.t+'|'+r.n+'|'+l.rv+'|'+l.u:'')" 2>/dev/null)
+   133→[ "$RZD" = "/smoke-new|Auto-created from 404 log (2 hits)|1|/smoke-new" ] && chk "404-resolve-db" y y || chk "404-resolve-db" y n
+   134→RN=$(curl -s -X POST "${AUTH[@]}" -d '{"id":999999999,"targetUrl":"/x"}' $B/api/internal/tools/redirects/404/resolve)
+   135→echo "$RN" | grep -q '"ok":false' && chk "404-resolve-notfound" y y || chk "404-resolve-notfound" y n
+   136→curl -s -X POST "${AUTH[@]}" -d "{\"id\":$NID}" $B/api/internal/tools/redirects/404/delete > /dev/null
+   137→FN2=$(curl -s -o /dev/null -w '%{http_code}' -X POST "${AUTH[@]}" -d "{\"id\":$NID}" $B/api/internal/tools/redirects/404/delete)
+   138→[ "$FN2" = "200" ] && chk "404-delete-idempotent" y y || chk "404-delete-idempotent" y n
+   139→
+   140→# 23. uptime add/toggle/delete + validation (+ NaN -> NOT NULL 500)
+   141→UA=$(curl -s -X POST "${AUTH[@]}" -d '{"url":"https://smoke-uptime.test","label":"smoke","expectedStatus":200,"expectedText":null}' $B/api/internal/tools/uptime/add)
+   142→echo "$UA" | grep -q '"ok":true' && chk "uptime-add" y y || chk "uptime-add" y n
+   143→UID2=$(node -e "const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');const r=db.prepare(\"SELECT id, enabled e FROM uptime_targets WHERE url='https://smoke-uptime.test' ORDER BY id DESC LIMIT 1\").get();console.log(r?r.id+'|'+r.e:'')" 2>/dev/null)
+   144→UTID=$(echo "$UID2" | cut -d'|' -f1)
+   145→[ "$UID2" = "$UTID|1" ] && chk "uptime-add-db-enabled" y y || chk "uptime-add-db-enabled" y n
+   146→curl -s -X POST "${AUTH[@]}" -d "{\"id\":$UTID,\"enabled\":false}" $B/api/internal/tools/uptime/toggle > /dev/null
+   147→UE=$(node -e "const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');console.log(db.prepare('SELECT enabled e FROM uptime_targets WHERE id=?').get(Number('$UTID')).e)" 2>/dev/null)
+   148→[ "$UE" = "0" ] && chk "uptime-toggle-db" y y || chk "uptime-toggle-db" y n
+   149→UV1=$(curl -s -X POST "${AUTH[@]}" -d '{"url":"","expectedStatus":200}' $B/api/internal/tools/uptime/add)
+   150→echo "$UV1" | grep -q '"error":"URL required."' && chk "uptime-bad-url" y y || chk "uptime-bad-url" y n
+   151→UV2=$(curl -s -X POST "${AUTH[@]}" -d '{"url":"ftp://x.test","expectedStatus":200}' $B/api/internal/tools/uptime/add)
+   152→echo "$UV2" | grep -q '"error":"URL must start with http(s)://"' && chk "uptime-bad-scheme" y y || chk "uptime-bad-scheme" y n
+   153→chk "uptime-nan-status-500" 500 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "${AUTH[@]}" -d '{"url":"https://x.test","expectedStatus":null}' $B/api/internal/tools/uptime/add)"
+   154→curl -s -X POST "${AUTH[@]}" -d "{\"id\":$UTID}" $B/api/internal/tools/uptime/delete > /dev/null
+   155→UD2=$(curl -s -o /dev/null -w '%{http_code}' -X POST "${AUTH[@]}" -d "{\"id\":$UTID}" $B/api/internal/tools/uptime/delete)
+   156→[ "$UD2" = "200" ] && chk "uptime-delete-idempotent" y y || chk "uptime-delete-idempotent" y n
+   157→
+   158→# 24. person-schema save (tool_runs row) + validation parity
+   159→PSR=$(curl -s -X POST "${AUTH[@]}" -d '{"name":"Smoke Person","jsonld":"{\"@type\":\"Person\"}"}' $B/api/internal/tools/person-schema/save)
+   160→PRID=$(echo "$PSR" | python3 -c "import json,sys;print(json.load(sys.stdin).get('runId',''))" 2>/dev/null)
+   161→[ -n "$PRID" ] && chk "person-schema-save" y y || chk "person-schema-save" y n
+   162→PDB=$(node -e "const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');const r=db.prepare('SELECT tool_id t, label l, input_json i, result_json r FROM tool_runs WHERE id=?').get(Number('$PRID'));console.log(r.t+'|'+r.l+'|'+r.i+'|'+r.r)" 2>/dev/null)
+   163→[ "$PDB" = 'person-schema|Smoke Person|{"name":"Smoke Person"}|{"jsonld":"{\"@type\":\"Person\"}"}' ] && chk "person-schema-db" y y || chk "person-schema-db" y n
+   164→PV1=$(curl -s -X POST "${AUTH[@]}" -d '{"name":"","jsonld":"x"}' $B/api/internal/tools/person-schema/save)
+   165→echo "$PV1" | grep -q '"error":"Person name is required."' && chk "person-schema-no-name" y y || chk "person-schema-no-name" y n
+   166→PV2=$(curl -s -X POST "${AUTH[@]}" -d '{"name":"x","jsonld":""}' $B/api/internal/tools/person-schema/save)
+   167→echo "$PV2" | grep -q '"error":"Generate the JSON-LD first."' && chk "person-schema-no-jsonld" y y || chk "person-schema-no-jsonld" y n
+   168→
+   169→# 25. migration-map import (rows over the wire) + empty + NOT NULL failure
+   170→OA="/old-a-$(date +%s)"; OB="/old-b-$(date +%s)"
+   171→MM=$(curl -s -X POST "${AUTH[@]}" -d "{\"rows\":[{\"sourcePath\":\"$OA\",\"targetUrl\":\"/new-a\",\"note\":\"Auto-imported from migration map (90% confidence)\"},{\"sourcePath\":\"$OB\",\"targetUrl\":\"/new-b\",\"note\":\"Auto-imported from migration map (95% confidence)\"}]}" $B/api/internal/tools/migration-map/import)
+   172→echo "$MM" | grep -q '"inserted":2' && chk "migration-import-2" y y || chk "migration-import-2" y n
+   173→ME=$(curl -s -X POST "${AUTH[@]}" -d '{"rows":[]}' $B/api/internal/tools/migration-map/import)
+   174→echo "$ME" | grep -q '"inserted":0' && chk "migration-import-empty" y y || chk "migration-import-empty" y n
+   175→chk "migration-import-notnull-500" 500 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "${AUTH[@]}" -d '{"rows":[{"targetUrl":"/x"}]}' $B/api/internal/tools/migration-map/import)"
+   176→MMN=$(node -e "const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');console.log(db.prepare(\"SELECT COUNT(*) c FROM redirect_rules WHERE source_path IN ('$OA','$OB') AND status_code=301 AND note LIKE 'Auto-imported from migration map%'\").get().c)" 2>/dev/null)
+   177→[ "$MMN" = "2" ] && chk "migration-import-db" y y || chk "migration-import-db" y n
+   178→
+   179→# 26. serp-features delete + idempotency (seed a row directly — runCapture stays Next)
+   180→SID=$(node -e "const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');db.prepare(\"INSERT INTO serp_feature_snapshots (query, country) VALUES ('smoke serp 14.6a','US')\").run();console.log(db.prepare(\"SELECT id FROM serp_feature_snapshots WHERE query='smoke serp 14.6a' ORDER BY id DESC LIMIT 1\").get().id)" 2>/dev/null)
+   181→SD1=$(curl -s -X POST "${AUTH[@]}" -d "{\"id\":$SID}" $B/api/internal/tools/serp-features/delete)
+   182→echo "$SD1" | grep -q '"ok":true' && chk "serp-delete" y y || chk "serp-delete" y n
+   183→SD2=$(curl -s -X POST "${AUTH[@]}" -d "{\"id\":$SID}" $B/api/internal/tools/serp-features/delete)
+   184→echo "$SD2" | grep -q '"ok":true' && chk "serp-delete-idempotent" y y || chk "serp-delete-idempotent" y n
+   185→
+   186→# 27. robots-history list: parseHost normalization + invalid host -> []
+   187→RHOST="smoke-robots-$(date +%s).test"
+   188→node -e "const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');const ins=db.prepare('INSERT INTO robots_snapshots (hostname, content, content_hash) VALUES (?,?,?)');ins.run('$RHOST','User-agent: *','smokehash1');ins.run('$RHOST','User-agent: *\\nAllow: /','smokehash2')" 2>/dev/null
+   189→RL=$(curl -s -X POST "${AUTH[@]}" -d "{\"host\":\"$RHOST\"}" $B/api/internal/tools/robots-history/list)
+   190→echo "$RL" | python3 -c "import json,sys,re;d=json.load(sys.stdin);assert len(d)==2 and all(re.match(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$', r['fetchedAt']) for r in d);assert sorted(r['contentHash'] for r in d)==['smokehash1','smokehash2']" 2>/dev/null && chk "robots-list-iso" y y || chk "robots-list-iso" y n
+   191→RL2=$(curl -s -X POST "${AUTH[@]}" -d "{\"host\":\"https://$(echo $RHOST | tr a-z A-Z)/some/path\"}" $B/api/internal/tools/robots-history/list)
+   192→echo "$RL2" | python3 -c "import json,sys;assert len(json.load(sys.stdin))==2" 2>/dev/null && chk "robots-list-host-norm" y y || chk "robots-list-host-norm" y n
+   193→RL3=$(curl -s -X POST "${AUTH[@]}" -d '{"host":"!!!"}' $B/api/internal/tools/robots-history/list)
+   194→[ "$RL3" = "[]" ] && chk "robots-list-invalid-host" y y || chk "robots-list-invalid-host" y n
+   195→
+   196→# 28. settings set/delete (bing + youtube keys share the settings-store path)
+   197→SS=$(curl -s -X POST "${AUTH[@]}" -d '{"key":"bing.api_key","value":"smoke-key-123"}' $B/api/internal/tools/settings/set)
+   198→echo "$SS" | grep -q '"ok":true' && chk "settings-set" y y || chk "settings-set" y n
+   199→SV=$(node -e "const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');console.log(db.prepare(\"SELECT value v FROM workspace_settings WHERE key='bing.api_key'\").get().v)" 2>/dev/null)
+   200→[ "$SV" = '"smoke-key-123"' ] && chk "settings-set-json-text" y y || chk "settings-set-json-text" y n
+   201→curl -s -X POST "${AUTH[@]}" -d '{"key":"bing.api_key","value":"smoke-key-456"}' $B/api/internal/tools/settings/set > /dev/null
+   202→SV2=$(node -e "const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');console.log(db.prepare(\"SELECT value v FROM workspace_settings WHERE key='bing.api_key'\").get().v)" 2>/dev/null)
+   203→[ "$SV2" = '"smoke-key-456"' ] && chk "settings-set-upsert" y y || chk "settings-set-upsert" y n
+   204→curl -s -X POST "${AUTH[@]}" -d '{"key":"youtube.api_key","value":"smoke-yt"}' $B/api/internal/tools/settings/set > /dev/null
+   205→SY=$(node -e "const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');console.log(db.prepare(\"SELECT value v FROM workspace_settings WHERE key='youtube.api_key'\").get().v)" 2>/dev/null)
+   206→[ "$SY" = '"smoke-yt"' ] && chk "settings-youtube-key" y y || chk "settings-youtube-key" y n
+   207→curl -s -X POST "${AUTH[@]}" -d '{"key":"bing.api_key"}' $B/api/internal/tools/settings/delete > /dev/null
+   208→curl -s -X POST "${AUTH[@]}" -d '{"key":"youtube.api_key"}' $B/api/internal/tools/settings/delete > /dev/null
+   209→SG=$(node -e "const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');console.log(db.prepare(\"SELECT COUNT(*) c FROM workspace_settings WHERE key IN ('bing.api_key','youtube.api_key')\").get().c)" 2>/dev/null)
+   210→[ "$SG" = "0" ] && chk "settings-delete-gone" y y || chk "settings-delete-gone" y n
+   211→SDX=$(curl -s -X POST "${AUTH[@]}" -d '{"key":"bing.api_key"}' $B/api/internal/tools/settings/delete)
+   212→echo "$SDX" | grep -q '"ok":true' && chk "settings-delete-idempotent" y y || chk "settings-delete-idempotent" y n
+   213→
+   214→# ---- 14.6b: tools wave 2 (COMPUTE tool actions, backend/src/tools_compute.rs) ----
+   215→
+   216→# 29. token middleware covers the compute family (401 without X-Internal-Token)
+   217→chk "compute-401-utm" 401 "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' $B/api/internal/tools/utm-attribution/run)"
+   218→chk "compute-401-map" 401 "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' $B/api/internal/tools/migration-map/run)"
+   219→
+   220→# 30. utm-attribution golden path — REAL pasted CSV, outputs hand-traced from
+   221→# the original TypeScript action (channels[3]=Direct before Email: the
+   222→# last-touch insertion precedes the assisted loop in the source).
+   223→UTM_FIX='timestamp,source,medium,campaign,userId,isConversion\r\n2024-01-01T00:00:00.000Z,google,cpc,Brand,u1,1\r\n2024-01-02T00:00:00.000Z,google,organic,Brand,u1,\r\n2024-01-03T00:00:00.000Z,"facebook",paid_social,Spring,u2,1\r\n2024-01-04T00:00:00.000Z,newsletter,email,Launch,u2,\r\n2024-01-05T00:00:00.000Z,,(none),Direct,u2,\r\n'
+   224→UTM=$(python3 -c "
+   225→import json,urllib.request
+   226→req=urllib.request.Request('$B/api/internal/tools/utm-attribution/run',data=json.dumps({'touches':'$UTM_FIX'}).encode(),headers={'X-Internal-Token':'$TOKEN','Content-Type':'application/json'})
+   227→print(urllib.request.urlopen(req).read().decode())
+   228→")
+   229→echo "$UTM" | python3 -c '
+   230→import json,sys
+   231→d=json.load(sys.stdin)
+   232→assert d["ok"] is True, d
+   233→r=d["result"]
+   234→assert (r["totalTouches"],r["totalConversions"],r["uniqueUsers"])==(5,2,2), r
+   235→names=[c["channel"] for c in r["channels"]]
+   236→assert names==["Paid Search","Organic Search","Paid Social","Direct","Email"], names
+   237→assert r["channels"][0]["linearCredit"]==0.5 and r["channels"][0]["positionCredit"]==0.5 and r["channels"][0]["pathInclusion"]==1
+   238→assert r["channels"][3]["linearCredit"]==0.33 and r["channels"][3]["positionCredit"]==0.4
+   239→assert r["channels"][4]["assistedTouches"]==1 and r["channels"][4]["positionCredit"]==0.2
+   240→assert r["topPaths"][0]=={"path":["Paid Search","Organic Search"],"count":1}, r["topPaths"]
+   241→assert r["averagePathLength"]==2.5
+   242→' 2>/dev/null && chk "utm-golden" y y || chk "utm-golden" y n
+   243→
+   244→# 31. utm validation parity (200 {ok:false} envelopes, direct-caller defense)
+   245→UV=$(curl -s -X POST "${AUTH[@]}" -d '{"touches":""}' $B/api/internal/tools/utm-attribution/run)
+   246→echo "$UV" | grep -q '"error":"Paste touch data first."' && chk "utm-empty" y y || chk "utm-empty" y n
+   247→UV2=$(curl -s -X POST "${AUTH[@]}" -d '{"touches":"just-one-cell"}' $B/api/internal/tools/utm-attribution/run)
+   248→echo "$UV2" | grep -q '"error":"Couldn'"'"'t parse any touches."' && chk "utm-unparsable" y y || chk "utm-unparsable" y n
+   249→
+   250→# 32. utm tool_runs write (saveToolRun port: label, input.lineCount, result)
+   251→UTMDB=$(node -e "const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');const r=db.prepare(\"SELECT tool_id t, label l, input_json i, result_json r FROM tool_runs WHERE tool_id='utm-attribution' ORDER BY id DESC LIMIT 1\").get();console.log(r?r.t+'|'+r.l+'|'+r.i:'')" 2>/dev/null)
+   252→[ "$UTMDB" = "utm-attribution|2 conversions · 2 users|{\"lineCount\":6}" ] && chk "utm-tool-run-db" y y || chk "utm-tool-run-db" y n
+   253→echo "$UTMDB" | grep -q '|{"lineCount":6}$' && echo "$UTM" | grep -q '"totalTouches":5' && chk "utm-tool-run-result" y y || chk "utm-tool-run-result" y n
+   254→
+   255→# 33. migration-map golden path — REAL URL lists, expected values verified
+   256→# against buildMigrationMap/renderRedirectMap (parity harness 3/3 identical).
+   257→MAPR=$(python3 -c "
+   258→import json,urllib.request
+   259→def shape(u):
+   260→    return {'url':u,'pathname':u,'search':'','ok':True}
+   261→olds=['/old-blog/my-post.html','/blog/my-post','/contact','/legacy-page','/products/red-shoes']
+   262→news=['/blog/my-post','/contact-us','/products/red-shoes-sneakers','/about']
+   263→req=urllib.request.Request('$B/api/internal/tools/migration-map/run',data=json.dumps({'olds':[shape(u) for u in olds],'news':[shape(u) for u in news]}).encode(),headers={'X-Internal-Token':'$TOKEN','Content-Type':'application/json'})
+   264→print(urllib.request.urlopen(req).read().decode())
+   265→")
+   266→echo "$MAPR" | python3 -c '
+   267→import json,sys
+   268→d=json.load(sys.stdin)
+   269→assert d["ok"] is True, d
+   270→m=d["map"]
+   271→assert m["summary"]=={"total":5,"matched":2,"review":1,"avgConfidence":0.61}, m["summary"]
+   272→r=m["rows"]
+   273→assert r[0]["newUrl"]=="/blog/my-post" and r[0]["confidence"]==0.9125 and r[0]["reason"]=="Shared: blog, my, post (91%)", r[0]
+   274→assert r[1]["confidence"]==1 and r[1]["reason"]=="Exact path match", r[1]
+   275→assert r[2]["newUrl"] is None and r[2]["confidence"]==0.425 and r[2]["reason"]=="No confident match — pick a category or 410", r[2]
+   276→assert r[4]["newUrl"]=="/products/red-shoes-sneakers" and r[4]["confidence"]==0.7125 and r[4]["reason"]=="Shared: products, red, shoes (71%) — review", r[4]
+   277→o=d["output"]
+   278→assert o["nginx"].split("\n")[0]=="rewrite ^/old-blog/my-post\\.html$ /blog/my-post permanent;", o["nginx"]
+   279→assert o["apache"].split("\n")[0]=="Redirect 301 /old-blog/my-post.html /blog/my-post", o["apache"]
+   280→assert "{ source: \"/blog/my-post\", destination: \"/blog/my-post\", permanent: true }," in o["nextjs"]
+   281→assert o["nextjs"].startswith("module.exports = {") and o["nextjs"].endswith("};")
+   282→' 2>/dev/null && chk "migration-golden" y y || chk "migration-golden" y n
+   283→# 34. migration validation parity (missing/empty lists, 200 {ok:false})
+   284→MV1=$(curl -s -X POST "${AUTH[@]}" -d '{}' $B/api/internal/tools/migration-map/run)
+   285→echo "$MV1" | grep -q '"error":"Paste old URLs (one per line)."' && chk "migration-no-olds" y y || chk "migration-no-olds" y n
+   286→MV2=$(curl -s -X POST "${AUTH[@]}" -d '{"olds":[{"url":"/a","pathname":"/a","search":"","ok":true}],"news":[]}' $B/api/internal/tools/migration-map/run)
+   287→echo "$MV2" | grep -q '"error":"Paste new URLs (one per line)."' && chk "migration-no-news" y y || chk "migration-no-news" y n
+   288→
+   289→# 35. migration tool_runs write (label "N → M URLs · K matched", input counts)
+   290→MAPDB=$(node -e "const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');const r=db.prepare(\"SELECT tool_id t, label l, input_json i FROM tool_runs WHERE tool_id='migration-map' ORDER BY id DESC LIMIT 1\").get();console.log(r?r.t+'|'+r.l+'|'+r.i:'')" 2>/dev/null)
+   291→[ "$MAPDB" = "migration-map|5 → 4 URLs · 5 matched|{\"oldCount\":5,\"newCount\":4}" ] && chk "migration-tool-run-db" y y || chk "migration-tool-run-db" y n
+   292→echo "$MAPR" | grep -q '"matched":2' && chk "migration-tool-run-result" y y || chk "migration-tool-run-result" y n
+   293→
+   294→# ---- 14.7a: query gateway (backend/src/query.rs — drizzle sqlite-proxy read path) ----
+   295→
+   296→# 36. token middleware covers the gateway (401 without X-Internal-Token)
+   297→chk "query-401" 401 "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"sql":"SELECT 1"}' $B/api/internal/query)"
+   298→
+   299→# 37. SELECT roundtrip incl. params — positional rows, columns, value types
+   300→Q1=$(curl -s -X POST "${AUTH[@]}" -d "{\"sql\":\"SELECT id, name FROM clients WHERE id = ?\",\"params\":[$CID]}" $B/api/internal/query)
+   301→echo "$Q1" | python3 -c "
+   302→import json,sys
+   303→d=json.load(sys.stdin)
+   304→assert d['ok'] is True, d
+   305→assert d['columns']==['id','name'], d['columns']
+   306→assert len(d['rows'])==1 and isinstance(d['rows'][0][0],int) and isinstance(d['rows'][0][1],str), d['rows']
+   307→assert d['rows'][0][1]=='Seed Client', d['rows']
+   308→" 2>/dev/null && chk "query-select-params" y y || chk "query-select-params" y n
+   309→
+   310→# 38. readonly guard (authoritative sqlite3_stmt_readonly) → 403
+   311→chk "query-403-insert" 403 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "${AUTH[@]}" -d '{"sql":"INSERT INTO clients (name, url) VALUES (''x'',''y'')"}' $B/api/internal/query)"
+   312→chk "query-403-update" 403 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "${AUTH[@]}" -d '{"sql":"UPDATE clients SET name=''x''"}' $B/api/internal/query)"
+   313→chk "query-403-delete" 403 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "${AUTH[@]}" -d '{"sql":"DELETE FROM clients"}' $B/api/internal/query)"
+   314→chk "query-403-drop" 403 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "${AUTH[@]}" -d '{"sql":"DROP TABLE clients"}' $B/api/internal/query)"
+   315→chk "query-403-pragma" 403 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "${AUTH[@]}" -d '{"sql":"PRAGMA journal_mode"}' $B/api/internal/query)"
+   316→# WITH-smuggled write passes the textual guard, is caught by stmt.readonly()
+   317→chk "query-403-with-delete" 403 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "${AUTH[@]}" -d '{"sql":"WITH x AS (SELECT 1) DELETE FROM clients"}' $B/api/internal/query)"
+   318→
+   319→# 39. multi-statement textual reject → 403
+   320→chk "query-403-multistmt" 403 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "${AUTH[@]}" -d '{"sql":"SELECT 1; SELECT 2"}' $B/api/internal/query)"
+   321→chk "query-403-trailing-junk" 403 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "${AUTH[@]}" -d '{"sql":"SELECT 1; DROP TABLE clients"}' $B/api/internal/query)"
+   322→
+   323→# 40. WITH cte allowed (positional rows)
+   324→Q2=$(curl -s -X POST "${AUTH[@]}" -d '{"sql":"WITH cte AS (SELECT 1 AS x) SELECT * FROM cte"}' $B/api/internal/query)
+   325→echo "$Q2" | python3 -c "
+   326→import json,sys
+   327→d=json.load(sys.stdin)
+   328→assert d['ok'] is True and d['columns']==['x'] and d['rows']==[[1]], d
+   329→" 2>/dev/null && chk "query-with-cte" y y || chk "query-with-cte" y n
+   330→
+   331→# 41. value types: NULL / REAL / INTEGER / TEXT / bool→1 (JSON surface)
+   332→Q3=$(curl -s -X POST "${AUTH[@]}" -d '{"sql":"SELECT ? AS n, ? AS r, ? AS t, ? AS i, ? AS b","params":[null,1.5,"txt",7,true]}' $B/api/internal/query)
+   333→echo "$Q3" | python3 -c "
+   334→import json,sys
+   335→d=json.load(sys.stdin)
+   336→assert d['ok'] is True, d
+   337→row=d['rows'][0]
+   338→assert row[0] is None and isinstance(row[1],float) and row[1]==1.5, row
+   339→assert isinstance(row[2],str) and row[2]=='txt', row
+   340→assert isinstance(row[3],int) and not isinstance(row[3],bool) and row[3]==7, row
+   341→assert row[4]==1 and isinstance(row[4],int), row
+   342→" 2>/dev/null && chk "query-value-types" y y || chk "query-value-types" y n
+   343→
+   344→# 42. body contract: non-array params → 400, empty sql → 400
+   345→chk "query-400-bad-params" 400 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "${AUTH[@]}" -d '{"sql":"SELECT 1","params":"x"}' $B/api/internal/query)"
+   346→chk "query-400-empty-sql" 400 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "${AUTH[@]}" -d '{"sql":""}' $B/api/internal/query)"
+   347→
+   348→# 43. prepare failure → 500 ok:false (bare sqlite message, db_error_response envelope)
+   349→Q4=$(curl -s -w '|%{http_code}' -X POST "${AUTH[@]}" -d '{"sql":"SELECT * FROM missing_table_xyz"}' $B/api/internal/query)
+   350→echo "$Q4" | grep -q '|500$' && echo "$Q4" | grep -q '"ok":false,"error":"no such table' && chk "query-500-missing-table" y y || chk "query-500-missing-table" y n
+   351→
+   352→# ---- 14.8a: CSV exports (backend/src/exports.rs + client_scope.rs) ----
+   353→# Golden-fixture protocol: seed-14.8.ts re-creates the deterministic FIX148
+   354→# rows under fixed ids (9901+) and removes the wall-clock rows the earlier
+   355→# sections of THIS run leave behind (Smoke Client/smoke-qa clients,
+   356→# smoke-ahrefs backlinks), so each endpoint's output must byte-match the
+   357→# fixture captured from the ORIGINAL Next implementation before the port
+   358→# (backend/fixtures/14.8/*.csv).
+   359→
+   360→# 44. token middleware covers the exports family
+   361→chk "exports-401-clients" 401 "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' $B/api/internal/exports/clients)"
+   362→chk "exports-401-backlinks" 401 "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' $B/api/internal/exports/backlinks)"
+   363→
+   364→# 45. re-seed (idempotent: DELETE marker rows by id/prefix, INSERT same ids)
+   365→(cd "$ROOT" && bun run backend/tools/seed-14.8.ts) > /dev/null 2>&1
+   366→
+   367→# 46. envelope contract + byte-compare vs golden fixtures (4 endpoints)
+   368→for r in clients competitors audits backlinks; do
+   369→  curl -s -X POST "${AUTH[@]}" -d '{}' "$B/api/internal/exports/$r" | FIX="$ROOT/backend/fixtures/14.8/$r.csv" R="$r" python3 -c "
+   370→import json,sys,os
+   371→d=json.load(sys.stdin)
+   372→assert d['ok'] is True, d
+   373→assert d['filename']==os.environ['R']+'.csv', d['filename']
+   374→assert d['contentType']=='text/csv; charset=utf-8', d['contentType']
+   375→assert d['disposition']=='attachment; filename=\"%s.csv\"' % os.environ['R'], d['disposition']
+   376→open('/tmp/14.8-'+os.environ['R']+'.csv','w').write(d['csv'])
+   377→" 2>/dev/null
+   378→  if [ -f "/tmp/14.8-$r.csv" ] && cmp -s "/tmp/14.8-$r.csv" "$ROOT/backend/fixtures/14.8/$r.csv"; then
+   379→    chk "export-fixture-$r" y y
+   380→  else
+   381→    chk "export-fixture-$r" y n
+   382→  fi
+   383→  rm -f "/tmp/14.8-$r.csv"
+   384→done
+   385→
+   386→# 47. client scope port (visibleClientIds/exportScope semantics).
+   387→# Temp users are created and deleted inside this block — while they exist
+   388→# the Next process must NOT be asked to render gated pages (its
+   389→# accountsEnabled() cache would flip for the process lifetime).
+   390→SCOPE_ENV=$(node -e "
+   391→const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');
+   392→db.pragma('journal_mode = WAL');
+   393→db.prepare('DELETE FROM client_members WHERE user_id BETWEEN 9801 AND 9803').run();
+   394→db.prepare('DELETE FROM users WHERE id BETWEEN 9801 AND 9803').run();
+   395→const u=db.prepare('INSERT INTO users (id, email, password_hash, role, active, created_at) VALUES (?,?,?,?,1,1700000300)');
+   396→u.run(9801,'fix148-smoke-empty@test.local','scrypt:1:aa:bb','member');
+   397→u.run(9802,'fix148-smoke-assigned@test.local','scrypt:1:aa:bb','member');
+   398→u.run(9803,'fix148-smoke-owner@test.local','scrypt:1:aa:bb','owner');
+   399→db.prepare('INSERT INTO client_members (user_id, client_id, created_at) VALUES (9802, 1, 1700000300)').run();
+   400→" 2>/dev/null)
+   401→# header WITHOUT trailing newline (csv lines join "\n", no trailing byte)
+   402→printf '%s' "$(head -n 1 "$ROOT/backend/fixtures/14.8/clients.csv")" > /tmp/14.8-clients-header.csv
+   403→# 47a. member with NO assignments → IN(-1) → header-only CSV
+   404→curl -s -X POST "${AUTH[@]}" -d '{"userId":9801}' "$B/api/internal/exports/clients" | python3 -c "
+   405→import json,sys
+   406→d=json.load(sys.stdin)
+   407→open('/tmp/14.8-scope-empty.csv','w').write(d['csv'])
+   408→" 2>/dev/null
+   409→cmp -s /tmp/14.8-scope-empty.csv /tmp/14.8-clients-header.csv && chk "exports-scope-empty-in-minus-1" y y || chk "exports-scope-empty-in-minus-1" y n
+   410→# 47b. member assigned client 1 sees exactly the clientId=1 slice (IN(ids))
+   411→curl -s -X POST "${AUTH[@]}" -d '{"userId":9802}' "$B/api/internal/exports/audits" | python3 -c "
+   412→import json,sys
+   413→open('/tmp/14.8-scope-member.csv','w').write(json.load(sys.stdin)['csv'])
+   414→" 2>/dev/null
+   415→curl -s -X POST "${AUTH[@]}" -d '{"clientId":1}' "$B/api/internal/exports/audits" | python3 -c "
+   416→import json,sys
+   417→open('/tmp/14.8-scope-c1.csv','w').write(json.load(sys.stdin)['csv'])
+   418→" 2>/dev/null
+   419→cmp -s /tmp/14.8-scope-member.csv /tmp/14.8-scope-c1.csv && chk "exports-scope-member-in-ids" y y || chk "exports-scope-member-in-ids" y n
+   420→# 47c. owner → unrestricted, byte-identical to the anonymous (no userId) call
+   421→curl -s -X POST "${AUTH[@]}" -d '{"userId":9803}' "$B/api/internal/exports/clients" | python3 -c "
+   422→import json,sys
+   423→open('/tmp/14.8-scope-owner.csv','w').write(json.load(sys.stdin)['csv'])
+   424→" 2>/dev/null
+   425→curl -s -X POST "${AUTH[@]}" -d '{}' "$B/api/internal/exports/clients" | python3 -c "
+   426→import json,sys
+   427→open('/tmp/14.8-scope-anon.csv','w').write(json.load(sys.stdin)['csv'])
+   428→" 2>/dev/null
+   429→cmp -s /tmp/14.8-scope-owner.csv /tmp/14.8-scope-anon.csv && chk "exports-scope-owner-unrestricted" y y || chk "exports-scope-owner-unrestricted" y n
+   430→# 47d. direct-caller sentinel: clientId -1 (proxy's normalization of any
+   431→# unparseable raw param) → always-false filter → header-only
+   432→curl -s -X POST "${AUTH[@]}" -d '{"clientId":-1}' "$B/api/internal/exports/clients" | python3 -c "
+   433→import json,sys
+   434→open('/tmp/14.8-scope-sentinel.csv','w').write(json.load(sys.stdin)['csv'])
+   435→" 2>/dev/null
+   436→cmp -s /tmp/14.8-scope-sentinel.csv /tmp/14.8-clients-header.csv && chk "exports-sentinel-header-only" y y || chk "exports-sentinel-header-only" y n
+   437→node -e "
+   438→const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');
+   439→db.prepare('DELETE FROM client_members WHERE user_id BETWEEN 9801 AND 9803').run();
+   440→db.prepare('DELETE FROM users WHERE id BETWEEN 9801 AND 9803').run();
+   441→console.log(db.prepare('SELECT COUNT(*) n FROM users').get().n);
+   442→" > /tmp/14.8-users-left.txt 2>/dev/null
+   443→[ "$(cat /tmp/14.8-users-left.txt 2>/dev/null)" = "0" ] && chk "exports-scope-users-cleaned" y y || chk "exports-scope-users-cleaned" y n
+   444→rm -f /tmp/14.8-scope-*.csv /tmp/14.8-clients-header.csv /tmp/14.8-users-left.txt
+   445→
+   446→# 48. disallowed writes on the query gateway still 403 (14.8 didn't touch it)
+   447→chk "exports-query-gateway-403-still" 403 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "${AUTH[@]}" -d '{"sql":"INSERT INTO clients (name, url) VALUES (''x'',''y'')"}' $B/api/internal/query)"
+   448→
+   449→echo "----"
+   450→echo "PASS=$pass FAIL=$fail"
+   451→[ $fail -eq 0 ]
+   452→
