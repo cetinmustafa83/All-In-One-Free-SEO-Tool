@@ -65,7 +65,7 @@ API surface that stays stable for the frontend.
 | **14.4** | Port settings/auth/workspace: admin auth, api-keys CRUD, settings CRUD | parity green; secrets handling unchanged |
 | **14.5** | Domain CRUD wave 1: clients, keywords, audits, backlinks, tasks, notifications → REST + action wrappers | UI flows pass E2E |
 | **14.6** | Tools wave: ~90 `tools/*` actions → REST + wrappers (batched) | spot E2E per batch |
-| **14.7** | RSC renewal: 150 direct-DB imports → `@/lib/backend` server fetch helper | no non-API file imports `@/lib/db` anymore |
+| **14.7** | RSC renewal: 110 pages + 3 components + 4 satellites → drizzle sqlite-proxy (`@/lib/db-gateway`) over the Rust SELECT-only query gateway | zero RSC-surface files import `@/db/client` anymore (actions/libs follow domain-port waves) |
 | **14.8** | Exports: CSV → Rust; PDF/screenshots/playwright native deps stay in a thin Next BFF until a dedicated phase (decision documented) | CSV parity green |
 | **14.9** | Cutover: `next.config` rewrites `/api/* → 127.0.0.1:3100` behind `API_BACKEND_URL` env; retire ported Next routes; full agent-browser E2E | full app works with Rust serving `/api` |
 | **14.10** | Devops packaging: `docker-compose.yml` (frontend + backend + db volume), Makefile, CI (Next lint + `cargo check`), `.env.example`, README architecture, desktop packaging bundles the static Rust binary | CI green; compose up works |
@@ -112,12 +112,12 @@ API surface that stays stable for the frontend.
 | 14.4 settings/auth | ✅ done | parity 34/34, scrypt interop IDENTICAL |
 | 14.5 domain CRUD | ✅ done | 24 endpoints (17 tasks-family + 7 clients), smoke 29/29, UI E2E |
 | 14.6 tools wave | ✅ done (2026 batch) | see decision below + 14.6a/b/c worklog entries; smoke 82/82 |
-| 14.7 RSC renewal | next | 110 page.tsx + 3 components still import `db` directly |
+| 14.7 RSC renewal | ✅ done (2026 batch) | 110/110 pages + 3 components + 4 satellites on `@/lib/db-gateway` (drizzle sqlite-proxy → `/api/internal/query`, SELECT-only stmt.readonly guard); E2E 110/110 + dashboard/clients-detail verified; smoke 97/97; parity 34/34. Remaining `@/db/client` importers: 62 unported action files + ~77 libs (domain-port waves) + 18 non-/api routes (14.8) + tests |
 | 14.8 exports | pending | CSV ×11 → Rust; PDF/screenshot stay Next BFF |
 | 14.9 cutover | pending | `/api/*` rewrite behind `API_BACKEND_URL` |
 | 14.10 devops | pending | compose, CI, desktop bundle |
 
-Internal endpoint count: 38 (`/api/internal/*`) + v1/misc/auth surface; Rust ~7.9k lines.
+Internal endpoint count: 39 (`/api/internal/*`, incl. SELECT-only `/api/internal/query`) + v1/misc/auth surface; Rust ~8.2k lines.
 
 ## 7. Phase 14.6 decision record — NET/AI tools stay in Next BFF
 

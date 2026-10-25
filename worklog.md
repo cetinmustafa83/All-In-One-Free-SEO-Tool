@@ -547,3 +547,19 @@ Stage Summary:
 - Smoke 97/97; parity 34/34; tsc src 0 (yalnız 7 pre-existing backend/tools hatası — 14.7a baseline'ı); lint 111 pre-existing (skills/examples/upload + backend/tools/parity.ts) — dokunulan 47 dosyadan 0 bulgu; dev.log temiz; E2E 40/40 rota (2 retry, 1 boş-diff dal notu).
 - E2E seed notu: data.db'ye 1 ad_account + 2 ad_metric_snapshot + 1 ad_automation_event (hepsi boş tablolardı) ve clients.share_token (NULL'du) eklendi — davranış değişikliği yok.
 - 14.7 sıradaki: kalan component'ler (settings/mcp-setup.tsx vb. — varsa) + actions/route-handler renewalleri (yazma yolları — ayrı faz) veya 14.8'e geçiş.
+
+---
+Task ID: 14.7d
+Agent: Z.ai Code (main)
+Task: Faz 14.7 kapanışı — exit-criterion doğrulaması + plan doc düzeltmesi
+
+Work Log:
+- 14.7a (sub-agent): backend/src/query.rs — POST /api/internal/query SELECT-only gateway (çift katman guard: textual prefix + Statement::readonly; param conversion null/bool/int/real/text; positional rows + columns; BLOB→base64). src/lib/db-gateway.ts — drizzle sqlite-proxy (0.45.2) callBackend üzerinden; get-method pass-through sapması kanıtlandı (mapGetResult callback rows'u TEK satır olarak ele alıyor). Batch 1: 35 sayfa import swap, E2E 35/35, smoke +15 → 97/97. Push 8ea1792.
+- 14.7b (sub-agent): batch 2, 35 sayfa swap; settings/team sync .all()×3 → await. KRİTİK BULGU: proxy db tipi .all()'ı sync gibi gösteriyor → tsc missing-await YAKALAYAMIYOR; rg-scan protokolü kuruldu. E2E 35/35 (audits/1 toLocaleString Date mapping kanıtlandı). Push c55e9a0.
+- 14.7c (sub-agent): batch 3 — 40 kompleks sayfa (dashboard 683 satır, clients/[id] 17 sorgu, capacity raw sql<> fragmanları, settings/ai-usage join+groupBy, settings/health 9 count) + 3 component + 4 satellite = 47/47 swap, 0 await gerekti, skip yok. E2E 40/40 (clients/1 8/8 bölüm marker'ı; capacity gerçek integer). Push 061585e.
+- 14.7d: exit-criterion doğrulandı — src/app+src/components altında RSC yüzeyinde (actions/route hariç) @/db/client importcu: 0. Kalan importerlar: 62 action dosyası + ~77 lib (domain-port dalgaları) + 18 non-/api route (14.8) + testler. Plan doc'ta 14.7 satırı gerçek export yolu @/db/client ile düzeltildi + scope kararı (sqlite-proxy yaklaşımı) yazıldı; progress log güncellendi (internal endpoint 38→39, Rust ~8.2k satır).
+
+Stage Summary:
+- Faz 14.7 TAMAM. RSC okuma yüzeyi %100 Rust gateway üzerinden (110 sayfa + 3 component + 4 satellite); Next process'i artık sayfa render'ları için SQLite'a dokunmuyor.
+- Mimari kazanç: sayfa sorgu sözdizimi DEĞİŞMEDİ (drizzle sqlite-proxy) — 147 dosyada yalnız import satırı değişti; camelCase/Date/json mapping drizzle core'da kaldı (davranış eşliği ücretsiz).
+- Sıradaki: 14.8 (CSV exports ×11 → Rust; PDF/screenshot Next BFF kalır) veya kalan action dosyalarının domain dalgaları.
