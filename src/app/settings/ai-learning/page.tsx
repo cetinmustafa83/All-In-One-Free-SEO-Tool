@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { ArrowLeft, Brain, Sparkles, Zap } from "lucide-react";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { aiFeedback, aiPreferences, clients } from "@/db/schema";
 import { count, desc, asc } from "drizzle-orm";
 import { PageHeader } from "@/components/shell/page-header";

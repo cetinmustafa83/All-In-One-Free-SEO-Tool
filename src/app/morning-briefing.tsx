@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import {
   audits,
   clients,

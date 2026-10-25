@@ -10,7 +10,7 @@ import {
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { cachedNarrative } from "@/lib/cached-narrative";
 import {
   backlinks,

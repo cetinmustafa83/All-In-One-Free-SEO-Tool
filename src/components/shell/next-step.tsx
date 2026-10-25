@@ -12,7 +12,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { count, eq, gte } from "drizzle-orm";
 import { ArrowRight, Sparkles } from "lucide-react";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import {
   clients,
   audits,

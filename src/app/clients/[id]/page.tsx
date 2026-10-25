@@ -22,7 +22,7 @@ import {
   Trash2,
   Wand2,
 } from "lucide-react";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { audits, clients, keywords, tasks } from "@/db/schema";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { SubmitButton } from "@/components/ui/submit-button";

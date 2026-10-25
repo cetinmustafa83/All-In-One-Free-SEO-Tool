@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { desc, eq, asc, inArray } from "drizzle-orm";
 import { Search, X, Camera, Activity } from "lucide-react";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { clients, keywords, keywordRankings } from "@/db/schema";
 import { PageHeader } from "@/components/shell/page-header";
 import { ClientToolHeader } from "@/components/shell/client-tool-grid";

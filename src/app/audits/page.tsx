@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { ClipboardList } from "lucide-react";
 import { redirect } from "next/navigation";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { clients, audits } from "@/db/schema";
 import { desc, eq, and, count } from "drizzle-orm";
 import { PageHeader } from "@/components/shell/page-header";

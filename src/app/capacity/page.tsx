@@ -9,7 +9,7 @@ import {
   Clock,
   Users,
 } from "lucide-react";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { audits, clients, tasks } from "@/db/schema";
 import { PageHeader } from "@/components/shell/page-header";
 import { clientScope } from "@/lib/client-scope";

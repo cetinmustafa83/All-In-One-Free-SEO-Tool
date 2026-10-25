@@ -13,7 +13,7 @@ import {
   Filter,
 } from "lucide-react";
 import Link from "next/link";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { activityLog, clients } from "@/db/schema";
 import { PageHeader } from "@/components/shell/page-header";
 import { EmptyState } from "@/components/ui/empty-state";

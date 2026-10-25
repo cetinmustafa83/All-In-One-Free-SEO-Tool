@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { MapPin } from "lucide-react";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { clients, resourceSubmissions } from "@/db/schema";
 import { desc, eq, count, and, inArray } from "drizzle-orm";
 import { PageHeader } from "@/components/shell/page-header";

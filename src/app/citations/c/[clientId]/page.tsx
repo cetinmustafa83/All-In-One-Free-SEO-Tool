@@ -10,7 +10,7 @@ import {
   MapPin,
   Plus,
 } from "lucide-react";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import {
   clients,
   resourceSubmissions,

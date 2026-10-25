@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { SmtpForm } from "./smtp-form";
 import { getGoogleConnectionStatus } from "@/lib/google-oauth";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { audits, clients, keywords, tasks, users } from "@/db/schema";
 import { PageHeader } from "@/components/shell/page-header";
 import { getSetting } from "@/lib/settings-store";
@@ -48,7 +48,7 @@ import {
 import { BrowserForm } from "./browser-form";
 import { loadBrowserSettings } from "./browser-actions";
 import { ApiKeyManager } from "./api-keys/manager";
-import { db as dbClient } from "@/db/client";
+import { db as dbClient } from "@/lib/db-gateway";
 import { apiKeys, inboundWebhooks } from "@/db/schema";
 import { desc as descSql } from "drizzle-orm";
 import { InboundWebhooksManager } from "./inbound-webhooks/manager";

@@ -1,4 +1,4 @@
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { clientMetricSnapshots } from "@/db/schema";
 import { asc, eq } from "drizzle-orm";
 import { TrendingDown, TrendingUp } from "lucide-react";

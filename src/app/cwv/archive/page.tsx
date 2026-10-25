@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
 import { Gauge } from "lucide-react";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { clients, cwvReports } from "@/db/schema";
 import { PageHeader } from "@/components/shell/page-header";
 import { clientScope } from "@/lib/client-scope";

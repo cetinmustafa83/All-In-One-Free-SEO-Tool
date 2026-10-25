@@ -483,3 +483,67 @@ Stage Summary:
 - Önemli bulgu (batch-3 için): drizzle sqlite-proxy tipi `.all()`'u tip düzeyinde sync-miş gibi gösteriyor — missing-await tsc'de GÖRÜNMEZ; kalan sayfa/component'lerde rg ile `= db.select...all()` kalıbı taranmalı.
 - E2E seed notu: data.db'ye 1 invoice (INV-SEED-001), 1 keyword ('seed keyword', id=8), 2 tool_snapshot (cwv, id 1-2) eklendi — boş tablolar, davranış değişikliği yok.
 - 14.7 sıradaki: batch 3 (kalan page + component renewalleri; findFirst/db.query kullananlar 'get' passthrough yoluyla test edilecek).
+
+---
+Task ID: 14.7c
+Agent: GLM (sub-agent, batch 3 renew — 40 page + 3 component + 4 satellite)
+Task: Faz 14.7c — RSC read renewal dalga 3 (en zor 40 sayfa + 3 shell/snapshot component + 4 satellite app dosyası): import swap `@/db/client` → `@/lib/db-gateway`, sync-terminator taraması, doğrulama süiti + E2E süpürme (dashboard ve clients/[id] en son, ayrı dalga).
+
+Work Log:
+- Envanter: scope'un 47 dosyasının (40 page.tsx + src/components/shell/ai-usage-pill.tsx + src/components/shell/next-step.tsx + src/components/snapshot-sparklines.tsx + src/app/agency-week.tsx + src/app/morning-briefing.tsx + src/app/autonomy-prompt.tsx + src/app/clients/[id]/daily-automation-card.tsx) 47'si de bulundu; hepsinde import tam olarak `import { db } from "@/db/client";` (settings/page.tsx EK OLARAK 51. satırda `import { db as dbClient } from "@/db/client";` — DUAL import flag doğrulandı, ikisi de swap edildi, dbClient kullanım yerleri aynen korundu). Hiçbirinde "use client" yok (47/47 server component — node:fs konvansiyonuyla uyumlu).
+- Yazma-istek teyidi (swap öncesi rg, 47 dosya): db.insert/update/delete/transaction/run, db.query.*, better-sqlite3 import → 0 eşleşme. Skip listesi BOŞ.
+- MANDATORY sync-terminator taraması (`\.all\(\)|\.get\(\)|\.values\(\)|\.run\(\)`, 47 dosya): 3 eşleşme, HEPSİ JS Map.values() false-positive — morning/page.tsx:48 (`latestPos.values()`), morning/page.tsx:65 (`recentByClient.values()`), ai-visibility/c/[clientId]/page.tsx:174 (`Array.from(latestByProvider.values())`). Drizzle `.all()`/`.get()`/`.run()` terminator YOK; 14.7b'nin "settings/team'deki gibi eksik await" kalıbı bu batch'te YOK → AWAIT EKLENEN DOSYA 0 (tsc'nin bu kalıbı yakalayamama caveat'i gereği rg ile satır satır teyit edildi; tüm sorgu zincirleri doğrudan `await db...` veya thenable olarak Promise.all içinde).
+- Swap 4 dalga: dalga 1 = 3 component + 4 satellite (7 dosya); dalga 2 = 38 page (dashboard + clients/[id] hariç); dalga 3 = dashboard src/app/page.tsx (~682 satır: count() agregatları, recentAudits/trendAudits/priorityTasks, getSetting, startScheduler()/tickScheduler() side-effect çağrıları DOKUNULMADI — libs untouched); dalga 4 = src/app/clients/[id]/page.tsx (1305 satır "17-sorgu canavarı": client, recentAudits, latestCompleted, openTaskCount/keywordCount count(), recentSnapshots, 2 id-listesi select'i, 7'lü Promise.all count() bloğu (conditional inArray dalları Promise.resolve([{value:0}]) ile), approvalDoc, scheduleRow, 2×getSetting — hepsi read, swap tek satır). Her dalga sonrası `bunx tsc --noEmit` → src 0 yeni hata. Swap sonrası scope'ta @/db/client leftover 0; src/app+src/components'te kalan tek .tsx: settings/mcp-setup.tsx (scope DIŞI, bilinçli bırakıldı) — kalanlar actions/route-handler'lar (kendi fazları).
+- Rust tarafı: DEĞİŞİKLİK YOK (query.rs/main.rs'e dokunulmadı, backend restart edilmedi).
+- E2E veri hazırlığı (better-sqlite3, yalnız boş tablolar + null kolon): ad_accounts boştu → 1 hesap (id=1, client 1, google/demo-123-456-789 'Seed Ads Account') + 2 ad_metric_snapshots + 1 ad_automation_event (MONITOR_ALERT) — /ads/accounts/1 gerçek dolu dalı render etsin; clients.share_token NULL'du → client 1'e 'seedsharetoken14c000001' (portal/[token] flag'i gereği; client_share_tokens tablosu yok, token clients.shareToken kolonundan). invoices/keywords/snapshots 14.7b seed'lerinden aynen kullanıldı.
+- E2E süpürme: 40 rota (38 page + / + /clients/1), curl -L --max-time 120-240: 38/40 ilk denemede 200; /monitor ve /capacity ilk denemede 000 (Turbopack on-demand derleme yavaşlığı) → retry 200. 0 "Application error". İçerik-marker doğrulaması: /clients/1 için 8 bölüm başlığı ayrı ayrı grep'lendi (aşağıda). capacity (sql`count(*)` raw fragment flag'i): tabular-nums hücrelerinde gerçek tam sayılar (0/0/1) render, NaN yok — drizzle üretimi SQL proxy'den şeffaf geçti. settings/ai-usage (leftJoin+groupBy+count(aiCalls.id)): 200. welcome/settings/health (Promise.all count() → {value}): 200. audits/diff?a=1&b=1: 200 (tek audit olduğundan a=b=1 — boş-diff dalı; "Fixed (n)" bölümleri yalnız non-empty'de render olduğu için sayfa-markeri yerine ScoreGauge + 200 + app-error-yok kanıtı). dashboard: "Seed Client" + "Agency week" (agency-week.tsx satellite) + "Autonomy" (autonomy-prompt.tsx) markerları; morning-briefing satellite'ı /morning üzerinden ("Morning briefing") doğrulandı; shell component'leri (ai-usage-pill, next-step) /clients/1 ve /portal/[token] render'ları üzerinden; snapshot-sparklines /portal/[token] üzerinden.
+- dev.log: tail + rg 'Application error|ECONNREFUSED|fetch failed|⨯' → 0 eşleşme (parity 401'leri beklenen).
+
+E2E Batch-3 tablosu (rota → HTTP + marker):
+  /ads/accounts/1 → 200 OK ("Seed Ads Account" — seed satırı, snapshot/event dolu dal)
+  /ads → 200 OK ("Ads Autopilot")
+  /ads/reports → 200 OK ("Ads report")
+  /ai-visibility/c/1 → 200 OK ("AI visibility · Seed Client")
+  /audits → 200 OK ("Audits")
+  /cwv → 200 OK ("Core Web Vitals")
+  /invoices → 200 OK ("Invoices" + INV-SEED-001 satırı)
+  /keywords/c/1 → 200 OK ("Seed Client" render)
+  /monitor/c/1 → 200 OK ("Page monitor · Seed Client")
+  /reports → 200 OK ("Reports")
+  /settings/ai-learning → 200 OK ("AI learning")
+  /agent → 200 OK ("AI agent")
+  /ai-visibility → 200 OK ("AI visibility")
+  /audits/diff?a=1&b=1 → 200 OK (boş-diff dalı, ScoreGauge; a=b tek audit — marker bölümü non-empty-only)
+  /automations → 200 OK ("Automations")
+  /backlinks → 200 OK ("Backlinks")
+  /citations → 200 OK ("Citations & local SEO")
+  /cwv/archive → 200 OK ("Core Web Vitals archive")
+  /keywords/8/screenshots → 200 OK ("SERP screenshots" — seed keyword id=8)
+  /keywords → 200 OK ("Keywords")
+  /monitor → 200 OK* ("Page monitor" — ilk 000, retry 200)
+  /outreach → 200 OK ("Outreach")
+  /portal/seedsharetoken14c000001 → 200 OK ("Seed Client" — share_token seed'i; snapshot-sparklines + shell component'leri bu render'da)
+  /reports/archive → 200 OK ("Report archive")
+  /reports/c/1 → 200 OK ("Reports · Seed Client")
+  /tasks → 200 OK ("Tasks")
+  /activity → 200 OK ("Activity")
+  /link-building/c/1 → 200 OK ("Link building — Seed Client")
+  /tools/geo-swot → 200 OK ("GEO SWOT")
+  /citations/c/1 → 200 OK ("Citations · Seed Client")
+  /morning → 200 OK ("Morning briefing" — morning-briefing.tsx satellite canlı)
+  /serp-scans → 200 OK ("SERP scans archive")
+  /welcome → 200 OK ("Get started")
+  /settings → 200 OK ("Settings" — DUAL import dalı: db + dbClient ikisi de gateway'den)
+  /settings/ai-usage → 200 OK ("AI usage" — leftJoin+groupBy+count flag'i)
+  /link-building → 200 OK ("Link building")
+  /capacity → 200 OK* ("Capacity" — ilk 000, retry 200; sql`count(*)` raw fragment flag'i: gerçek sayılar 0/0/1 render, NaN yok)
+  /settings/health → 200 OK ("System health" — Promise.all count() {value} flag'i)
+  / (dashboard, dalga 3) → 200 OK ("Seed Client" + "Agency week" + "Autonomy"; startScheduler/tickScheduler çağrıları aynen)
+  /clients/1 (dalga 4, 17 sorgu) → 200 OK — 8 bölüm grep'i: "Seed Client", "Google Search Console + Analytics", "Scheduled report email", "Tech stack", "Recent audits", "Danger zone", "Niche tasks", "Tech-stack checklist" (hepsi HTML'de; 7'lü Promise.all count() bloğu + conditional inArray dalları hatasız yürüdü)
+  (* = 000 ilk deneme, retry 200 — dev derleme yavaşlığı, swap hatası değil)
+
+Stage Summary:
+- Faz 14.7c TAMAM: batch-3 47/47 dosya (40 page + 3 component + 4 satellite) RSC okuma yolunda Rust gateway'e geçti — davranış değişikliği yok, tek satır import değişimi (settings/page.tsx'te iki satır). Skip listesi BOŞ; await eklenmesi gerektiren drizzle terminator yok (yalnız 3 JS Map.values() false-positive). 110 sayfalık @/db/client envanterinden page.tsx tarafı TAMAMEN bitti (kalanlar: actions/route-handler'lar + scope dışı settings/mcp-setup.tsx).
+- Smoke 97/97; parity 34/34; tsc src 0 (yalnız 7 pre-existing backend/tools hatası — 14.7a baseline'ı); lint 111 pre-existing (skills/examples/upload + backend/tools/parity.ts) — dokunulan 47 dosyadan 0 bulgu; dev.log temiz; E2E 40/40 rota (2 retry, 1 boş-diff dal notu).
+- E2E seed notu: data.db'ye 1 ad_account + 2 ad_metric_snapshot + 1 ad_automation_event (hepsi boş tablolardı) ve clients.share_token (NULL'du) eklendi — davranış değişikliği yok.
+- 14.7 sıradaki: kalan component'ler (settings/mcp-setup.tsx vb. — varsa) + actions/route-handler renewalleri (yazma yolları — ayrı faz) veya 14.8'e geçiş.

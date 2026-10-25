@@ -12,7 +12,7 @@ import {
   Globe,
   Activity,
 } from "lucide-react";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { audits, clients, tasks } from "@/db/schema";
 import { ScoreGauge } from "@/components/ui/score-gauge";
 import { displayName, loadBrand } from "@/lib/brand";

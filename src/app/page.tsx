@@ -1,4 +1,4 @@
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { audits, clients, tasks } from "@/db/schema";
 
 export const dynamic = "force-dynamic";

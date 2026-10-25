@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { and, eq } from "drizzle-orm";
 import { Calendar, Inbox, Sparkles } from "lucide-react";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { dailySchedules, publishQueue } from "@/db/schema";
 
 /**

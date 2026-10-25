@@ -14,7 +14,7 @@ import {
   X,
   ArrowRight,
 } from "lucide-react";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { automations, clients } from "@/db/schema";
 import { PageHeader } from "@/components/shell/page-header";
 import { EmptyState } from "@/components/ui/empty-state";

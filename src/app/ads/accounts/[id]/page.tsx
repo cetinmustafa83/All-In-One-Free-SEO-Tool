@@ -1,7 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { Megaphone, Settings2 } from "lucide-react";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { adAccounts, adAutomationEvents, adMetricSnapshots, clients } from "@/db/schema";
 import { metricIsHigherBetter } from "@/lib/ads-engine";
 import { PageHeader } from "@/components/shell/page-header";

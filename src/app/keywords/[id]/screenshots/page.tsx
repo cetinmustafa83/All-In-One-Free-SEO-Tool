@@ -5,7 +5,7 @@ import { eq, desc } from "drizzle-orm";
 export const dynamic = "force-dynamic";
 
 import { Camera, ArrowLeft } from "lucide-react";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { clients, keywords, serpScreenshots } from "@/db/schema";
 import { PageHeader } from "@/components/shell/page-header";
 

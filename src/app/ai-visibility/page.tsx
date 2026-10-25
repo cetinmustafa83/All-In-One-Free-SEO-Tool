@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { Sparkles } from "lucide-react";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { clients, keywords, aiVisibilityChecks } from "@/db/schema";
 import { desc, eq, count, inArray } from "drizzle-orm";
 import { PageHeader } from "@/components/shell/page-header";

@@ -10,7 +10,7 @@ import {
   Plus,
   Minus,
 } from "lucide-react";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { audits, auditIssues, clients } from "@/db/schema";
 import { ScoreGauge } from "@/components/ui/score-gauge";
 import { assertClientAccess } from "@/lib/client-scope";

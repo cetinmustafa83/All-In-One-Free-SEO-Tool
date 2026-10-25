@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { Link2 } from "lucide-react";
 import { redirect } from "next/navigation";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { backlinks, clients } from "@/db/schema";
 import { desc, eq, count, and } from "drizzle-orm";
 import { PageHeader } from "@/components/shell/page-header";

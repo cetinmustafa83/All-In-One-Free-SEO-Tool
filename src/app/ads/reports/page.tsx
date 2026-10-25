@@ -1,6 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 import { FileDown, Megaphone } from "lucide-react";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { adAccounts, adAutomationEvents, adMetricSnapshots, clients } from "@/db/schema";
 import { fmtMetric, metricIsHigherBetter } from "@/lib/ads-engine";
 import { PageHeader } from "@/components/shell/page-header";

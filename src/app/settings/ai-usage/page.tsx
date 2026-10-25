@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { gte, desc, eq, sql as drizzleSql, count, sum } from "drizzle-orm";
 import { Activity, Coins, Users, Zap } from "lucide-react";
 import Link from "next/link";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { aiCalls, clients } from "@/db/schema";
 import { PageHeader } from "@/components/shell/page-header";
 import { microsToDisplay } from "@/lib/ai-cost";

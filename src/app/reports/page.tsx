@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { FileText } from "lucide-react";
 import { redirect } from "next/navigation";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import {
   clients,
   audits,

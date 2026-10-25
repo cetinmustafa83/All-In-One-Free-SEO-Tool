@@ -17,7 +17,7 @@ import {
   Search,
   Users,
 } from "lucide-react";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import {
   audits,
   clients,

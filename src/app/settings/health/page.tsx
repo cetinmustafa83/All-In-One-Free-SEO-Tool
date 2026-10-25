@@ -14,7 +14,7 @@ import {
   Globe,
 } from "lucide-react";
 import { count, eq, gte } from "drizzle-orm";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import {
   audits,
   clients,

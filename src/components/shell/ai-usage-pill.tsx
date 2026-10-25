@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Activity } from "lucide-react";
 import { gte, sum } from "drizzle-orm";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { aiCalls } from "@/db/schema";
 import { microsToDisplay } from "@/lib/ai-cost";
 import { checkMonthlyCap } from "@/lib/ai-usage";

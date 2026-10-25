@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { desc, eq } from "drizzle-orm";
 import { FileDown } from "lucide-react";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { clients, reportArchives } from "@/db/schema";
 import { PageHeader } from "@/components/shell/page-header";
 import { clientScope } from "@/lib/client-scope";
