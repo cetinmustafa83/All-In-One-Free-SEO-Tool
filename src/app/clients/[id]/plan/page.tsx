@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, asc, eq } from "drizzle-orm";
 import { ArrowLeft, CalendarRange, Download } from "lucide-react";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { clients, tasks } from "@/db/schema";
 import { PageHeader } from "@/components/shell/page-header";
 import { groupPlanByWeek } from "@/lib/plan-view";

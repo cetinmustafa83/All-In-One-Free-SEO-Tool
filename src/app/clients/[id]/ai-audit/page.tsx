@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { and, desc, eq } from "drizzle-orm";
 import { ArrowLeft, Bot, ExternalLink } from "lucide-react";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { audits, clients } from "@/db/schema";
 import { PageHeader } from "@/components/shell/page-header";
 import { RunForm } from "./run-form";

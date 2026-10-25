@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { Activity } from "lucide-react";
 import { and, desc, gte, inArray } from "drizzle-orm";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { clients, keywords, keywordRankings } from "@/db/schema";
 import { PageHeader } from "@/components/shell/page-header";
 import { clientScope } from "@/lib/client-scope";

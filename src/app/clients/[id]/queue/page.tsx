@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Calendar, Inbox } from "lucide-react";
 import { desc, eq } from "drizzle-orm";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { clients, publishQueue } from "@/db/schema";
 import { PageHeader } from "@/components/shell/page-header";
 import { QueueList } from "./queue-list";

@@ -14,7 +14,7 @@ import {
   Sparkles,
   Trophy,
 } from "lucide-react";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { clients, keywords, serpScans } from "@/db/schema";
 import { PageHeader } from "@/components/shell/page-header";
 

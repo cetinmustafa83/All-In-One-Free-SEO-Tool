@@ -423,3 +423,63 @@ Stage Summary:
 - Sapmalar: (1) db-gateway 'get' sözleşmesi spec'teki `return {rows: r.rows}` snippet'inden bilinçli farklı (tek satır passthrough) — drizzle 0.45.2 runtime davranışı gereği, deneylerle doğrulandı, yorumlandı; (2) textual guard'ın SQL-literal ';' false-positive'i kabul edildi (cheap guard, authoritative readonly asıl katman); (3) Blob → base64 string (blob kolon yok, dokümante); (4) params object/array elemanları 400 (better-sqlite3 TypeError paritesi); (5) NaN/Inf REAL → JSON null (JSON taşıyamaz; SQLite dosyasında oluşamaz).
 - Bilinen kısıtlar: INTEGER > 2^53 JSON number hassasiyeti kaybı (schema'da böyle id/timestamp yok); gateway Mutex<Connection> üzerinden sıralı yürütür (mevcut tek-bağlantı disipliniyle aynı).
 - 14.7 sıradaki: batch 2/3 (kalan ~75 page/component; findFirst/db.query kullananlar 'get' yoluyla test edilecek) + komponent renewalleri.
+
+---
+Task ID: 14.7b
+Agent: GLM (sub-agent, batch 2 renew)
+Task: Faz 14.7b — RSC read renewal dalga 2: batch-2'deki 35 page.tsx import swap'i `@/db/client` → `@/lib/db-gateway` (drizzle sözdizimi değişmedi), sync-terminator düzeltmeleri, doğrulama süiti + E2E sayfa süpürmesi.
+
+Work Log:
+- Envanter teyidi: scope listesindeki 35 sayfanın tamamı bulundu (listede kısa yazılan "cannibalization/c", "gbp/c", "audits/c" vb. gerçek yollar `c/[clientId]` dinamik segmentli: src/app/cannibalization/c/[clientId]/page.tsx, src/app/gbp/c/[clientId]/page.tsx, src/app/audits/c/[clientId]/page.tsx, backlinks/c, brand-monitor/c, competitors/c, cwv/c, local-grid/c, outreach/c, content-gap/c, landing-perf/c, meta-rewrite/c, agent/c, tools/geo-swot/c — hepsi [clientId]). 35'in hepsinde import TAM olarak `import { db } from "@/db/client";` (sqlite/yandan import yok → 35/35 swap UYGUN; skip listesi BOŞ).
+- Yazma-istek teyidi (swap öncesi rg): 35 dosyada db.insert/update/delete/transaction/db.query/$client/run YOK; `.values()` eşleşmeleri Array.from(map.values()) gibi JS Map metotları (drizzle değil). Yalnız 'all' metodu tetikleniyor.
+- Swap: 35 dosyada tek satır import değişimi; swap sonrası batch içinde @/db/client leftover 0; batch dışında src/app'te kalan @/db/client dosyaları (kalan ~75 component/page + actions) bu dalgada DOKUNULMADI.
+- Sync-terminator düzeltmesi: SADECE src/app/settings/team/page.tsx — 3 satıra `await` eklendi: `db.select().from(users).orderBy(asc(users.id)).all()`, çok satırlı `db.select({id,name}).from(clients).orderBy(...).all()` ve `db.select().from(clientMembers).all()` (proxy db'de bunlar Promise döndürür; better-sqlite3 tipi sync sanıldığı için tsc bunları yakalamaz — bilinen flag gereği proaktif düzeltildi, tsc sonrası 0 hata). DİKKAT-notu: drizzle sqlite-proxy db tipi BetterSQLite3Database yüzeyini taşıdığı için `.all()` tip tarafında meşru görünüyor — missing-await'leri tsc YAKALAMIYOR; batch-2'nin diğer 34 dosyası zaten `await db.select()` kullanıyordu (rg ile ekranlandı; history/page.tsx'teki `let q = db.select().$dynamic()` lazy builder — `await q` ile kapanıyor, sorun değil).
+- Rust tarafı: DEĞİŞİKLİK YOK (cargo build 0.41s Finished, 0 error, 6 pre-existing warning; restart gerekmedi, backend restart edilmedi).
+- Doğrulama: bash backend/tools/internal-smoke.sh → 97/97 PASS; bun backend/tools/parity.ts → 34/34 PASS; bunx tsc --noEmit → src/ 0 hata (yalnız 7 pre-existing backend/tools/api-inventory.ts + parity.ts hatası — 14.7a baseline'ının aynısı); bun run lint → 111 pre-existing bulgu (skills/ + examples/ + upload/ + backend/tools/parity.ts) — src/'den 0 bulgu, 35 sayfadan 0 yeni bulgu.
+- E2E veri hazırlığı (better-sqlite3 ile data.db'ye minimal seed — empty tablolar): invoices boştu → INV-SEED-001 (client 1, draft, JSON items); keywords boştu → 'seed keyword' (id=8); tool_snapshots boştu → 2 adet kind='cwv' snapshot (id 1,2 — /snapshots/compare?a=1&b=2 için). serp_scans 0 bırakıldı (sayfa empty-state'i destekliyor). Audits zaten id=1 mevcuttu.
+- E2E süpürme: 35/35 HTTP 200, hiçbirinde "Application error" yok; dev.log'ta yeni sunucu hatası yok (rg Application error/ECONNREFUSED/fetch failed/⨯ → 0 satır).
+
+E2E Batch-2 tablosu (route → HTTP + marker):
+  /cannibalization/c/1 → 200 OK* (sayfanın kendi GSC-kurulum gate'i: "Seed Client" gateway üzerinden render — db yolu ÇALIŞIYOR)
+  /clients/1/ai-audit → 200 OK ("runs a 25-point SEO checklist")
+  /clients/1/plan → 200 OK ("The 30-day plan")
+  /clients/1/queue → 200 OK ("Approve to publish on the next agent tick")
+  /content-gap/c/1 → 200 OK ("losing the click")
+  /gbp/c/1 → 200 OK ("GBP · Seed Client")
+  /invoices/1 → 200 OK ("Invoice INV-SEED-001" — seed satırı)
+  /landing-perf/c/1 → 200 OK* (GSC-kurulum gate'i, client adı render)
+  /links → 200 OK ("Smart links")
+  /meta-rewrite/c/1 → 200 OK ("below-expected CTR")
+  /outreach/templates → 200 OK ("Outreach templates")
+  /snapshots/compare?a=1&b=2 → 200 OK ("Compare snapshots" — seed 2 snapshot)
+  /title-tests → 200 OK ("Title A/B testing")
+  /tools/geo-swot/c/1 → 200 OK ("Strengths")
+  /tools/redirects-manager → 200 OK ("Redirect manager")
+  /agent/autopilot → 200 OK ("Autopilot")
+  /agent/c/1 → 200 OK ("drafts specific title rewrites")
+  /audits/1 → 200 OK ("Audit results" + "Completed 10/25/2026, 6:26:29 AM · Seed Client" — toLocaleString Date mapping gateway'den birebir; bilinen flag doğrulandı)
+  /audits/c/1 → 200 OK ("Every audit run for this client")
+  /backlinks/c/1 → 200 OK* ("Backlinks · Seed Client" + NAP quick-copy UI; marker tahminimdeki empty-state metni değil gerçek UI — sayfa dolu yolda render)
+  /brand-monitor/c/1 → 200 OK ("Surface unlinked mentions")
+  /brand-monitor → 200 OK ("Brand monitoring")
+  /clients/1/ai-audit/1 → 200 OK ("Audit · Seed Client" — audit id=1)
+  /clients/1/automations → 200 OK ("recurring auto-generation")
+  /competitors/c/1 → 200 OK ("No competitors tracked yet")
+  /competitors → 200 OK ("Competitors")
+  /cwv/c/1 → 200 OK ("Free PageSpeed Insights scans")
+  /history → 200 OK ("Run history"; $dynamic builder `await q` — çalışıyor)
+  /keywords/8/serp → 200 OK ("SERP intel · \"seed keyword\"" — seed satırı)
+  /local-grid/c/1 → 200 OK ("samples ranking from a grid")
+  /local-grid → 200 OK ("Local-pack heatmap")
+  /outreach/c/1 → 200 OK ("No outreach contacts yet")
+  /proposals → 200 OK ("Proposals")
+  /settings/team → 200 OK ("Team"; bu DB'de accounts kapalı → sayfanın single-password erken-dönüş dalı render oldu; db sorgularının olduğu accounts-enabled dalı bu tohumda çalıştırılamaz — 3 await tsc + kod incelemesiyle doğrulandı, runtime dal notu aşağıda)
+  /tools/serp-volatility → 200 OK ("SERP volatility"; full-table keywords select — 0 satırda empty-state, gateway çağrısı hatasız)
+  (* = işaret metni sayfanın erken-dönüş/boş dalından; içerik gateway verisiyle render edildi — "Seed Client" RSC'den geliyor.)
+
+Stage Summary:
+- Faz 14.7b TAMAM: batch-2 35/35 sayfa RSC okuma yolunda Rust gateway'e geçti (davranış değişikliği yok, tek satır import + settings/team 3 await). Skip listesi boş — hiçbir sayfada write/transaction/db.query yok, hiçbirinde sqlite doğrudan import yok.
+- Smoke 97/97; parity 34/34; tsc src 0; lint 0 yeni; E2E 35/35 (3'ü içerik-doğrulamalı: GSC-gate/NAP dilleri); dev.log temiz; Rust + backend DOKUNULMADI.
+- Önemli bulgu (batch-3 için): drizzle sqlite-proxy tipi `.all()`'u tip düzeyinde sync-miş gibi gösteriyor — missing-await tsc'de GÖRÜNMEZ; kalan sayfa/component'lerde rg ile `= db.select...all()` kalıbı taranmalı.
+- E2E seed notu: data.db'ye 1 invoice (INV-SEED-001), 1 keyword ('seed keyword', id=8), 2 tool_snapshot (cwv, id 1-2) eklendi — boş tablolar, davranış değişikliği yok.
+- 14.7 sıradaki: batch 3 (kalan page + component renewalleri; findFirst/db.query kullananlar 'get' passthrough yoluyla test edilecek).

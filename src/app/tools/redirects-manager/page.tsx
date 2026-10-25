@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { desc } from "drizzle-orm";
 import { CornerDownRight } from "lucide-react";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { redirectRules, notFoundLog } from "@/db/schema";
 import { PageHeader } from "@/components/shell/page-header";
 import { Manager } from "./manager";

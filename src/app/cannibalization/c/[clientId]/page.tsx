@@ -7,7 +7,7 @@ import {
   ExternalLink,
   GitMerge,
 } from "lucide-react";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { clients } from "@/db/schema";
 import { PageHeader } from "@/components/shell/page-header";
 import { ClientToolHeader } from "@/components/shell/client-tool-grid";

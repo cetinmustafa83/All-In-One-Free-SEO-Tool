@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 export const dynamic = "force-dynamic";
 
 import { Receipt, FileDown, Send, Check, X, Trash2 } from "lucide-react";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { clients, invoices } from "@/db/schema";
 import { PageHeader } from "@/components/shell/page-header";
 import { Button, buttonVariants } from "@/components/ui/button";

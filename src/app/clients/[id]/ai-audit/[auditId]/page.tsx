@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { and, asc, eq } from "drizzle-orm";
 import { ArrowLeft, ExternalLink } from "lucide-react";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { audits, auditIssues, clients } from "@/db/schema";
 import { PageHeader } from "@/components/shell/page-header";
 import { ChecklistView } from "./checklist-view";

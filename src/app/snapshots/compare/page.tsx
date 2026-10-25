@@ -12,7 +12,7 @@ import {
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { toolSnapshots } from "@/db/schema";
 import { PageHeader } from "@/components/shell/page-header";
 import { snapshotKindLabel } from "@/lib/snapshots";

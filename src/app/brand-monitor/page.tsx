@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { Megaphone } from "lucide-react";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { brandMentions, clients } from "@/db/schema";
 import { desc, eq, count } from "drizzle-orm";
 import { PageHeader } from "@/components/shell/page-header";

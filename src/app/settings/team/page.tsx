@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { asc } from "drizzle-orm";
 import { Users2 } from "lucide-react";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { clientMembers, clients, users } from "@/db/schema";
 import { PageHeader } from "@/components/shell/page-header";
 import { accountsEnabled, canManageTeam, currentUser } from "@/lib/auth";
@@ -52,13 +52,13 @@ export default async function TeamPage() {
     );
   }
 
-  const allUsers = db.select().from(users).orderBy(asc(users.id)).all();
-  const allClients = db
+  const allUsers = await db.select().from(users).orderBy(asc(users.id)).all();
+  const allClients = await db
     .select({ id: clients.id, name: clients.name })
     .from(clients)
     .orderBy(asc(clients.name))
     .all();
-  const assignments = db.select().from(clientMembers).all();
+  const assignments = await db.select().from(clientMembers).all();
   const invites = pendingInvites();
 
   return (

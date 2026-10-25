@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { asc, desc, inArray } from "drizzle-orm";
 import { FileSignature } from "lucide-react";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { clients, graderLeads, proposals } from "@/db/schema";
 import { PageHeader } from "@/components/shell/page-header";
 import { clientScope } from "@/lib/client-scope";
