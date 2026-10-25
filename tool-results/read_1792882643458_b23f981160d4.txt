@@ -1,0 +1,402 @@
+     1→/home/z/my-project/src/app/outreach/actions.ts:export async function addOutreachContact(
+     2→/home/z/my-project/src/app/outreach/actions.ts:export async function setContactStatus(
+     3→/home/z/my-project/src/app/outreach/actions.ts:export async function deleteOutreachContact(contactId: number) {
+     4→/home/z/my-project/src/app/outreach/actions.ts:export async function saveOutreachTemplate(
+     5→/home/z/my-project/src/app/outreach/actions.ts:export async function deleteOutreachTemplate(id: number) {
+     6→/home/z/my-project/src/app/outreach/actions.ts:export async function seedDefaultTemplatesIfEmpty(): Promise<void> {
+     7→/home/z/my-project/src/app/outreach/actions.ts:export async function sendOutreachAction(
+     8→/home/z/my-project/src/app/outreach/actions.ts:export async function loadTemplatesForClient(clientId: number) {
+     9→/home/z/my-project/src/app/outreach/actions.ts:export async function loadMessagesForContact(contactId: number) {
+    10→/home/z/my-project/src/app/outreach/actions.ts:export async function setSenderName(formData: FormData) {
+    11→/home/z/my-project/src/app/report-data/actions.ts:export async function parseReportDataPaste(
+    12→/home/z/my-project/src/app/report-data/actions.ts:export async function deleteEntry(id: number): Promise<void> {
+    13→/home/z/my-project/src/app/report-data/actions.ts:export async function listForClient(clientId: number) {
+    14→/home/z/my-project/src/app/news/actions.ts:export async function seedDefaultFeedsIfEmpty(): Promise<void> {
+    15→/home/z/my-project/src/app/news/actions.ts:export async function addFeed(input: {
+    16→/home/z/my-project/src/app/news/actions.ts:export async function cleanupOldItems(opts: {
+    17→/home/z/my-project/src/app/news/actions.ts:export async function clearAllItems(): Promise<{ deleted: number }> {
+    18→/home/z/my-project/src/app/news/actions.ts:export async function deleteOneItem(itemId: number): Promise<void> {
+    19→/home/z/my-project/src/app/news/actions.ts:export async function removeFeed(feedId: number): Promise<void> {
+    20→/home/z/my-project/src/app/news/actions.ts:export async function toggleFeed(feedId: number, enabled: boolean): Promise<void> {
+    21→/home/z/my-project/src/app/news/actions.ts:export async function refreshFeeds(): Promise<RefreshResult> {
+    22→/home/z/my-project/src/app/news/actions.ts:export async function listRecentItems(limit = 60) {
+    23→/home/z/my-project/src/app/knowledge-panel/actions.ts:export async function runKpCapture(
+    24→/home/z/my-project/src/app/knowledge-panel/actions.ts:export async function listKpSnapshots(clientId: number, limit = 10) {
+    25→/home/z/my-project/src/app/embed/grader/actions.ts:export async function publicGrade(
+    26→/home/z/my-project/src/app/embed/grader/actions.ts:export async function gradeForVisitor(input: {
+    27→/home/z/my-project/src/app/embed/grader/actions.ts:export async function captureLead(input: {
+    28→/home/z/my-project/src/app/proposals/actions.ts:export async function createProposal(input: {
+    29→/home/z/my-project/src/app/proposals/actions.ts:export async function buildProposal(input: {
+    30→/home/z/my-project/src/app/proposals/actions.ts:export async function updateProposal(
+    31→/home/z/my-project/src/app/proposals/actions.ts:export async function deleteProposal(
+    32→/home/z/my-project/src/app/proposals/actions.ts:export async function buildKickoffReport(
+    33→/home/z/my-project/src/app/capture/actions.ts:export async function captureUrl(rawUrl: string): Promise<CaptureResult> {
+    34→/home/z/my-project/src/app/capture/actions.ts:export async function saveAsCompetitor(input: {
+    35→/home/z/my-project/src/app/capture/actions.ts:export async function saveAsMonitoredPage(input: {
+    36→/home/z/my-project/src/app/search/actions.ts:export async function search(rawQuery: string): Promise<SearchResults> {
+    37→/home/z/my-project/src/app/title-tests/actions.ts:export async function createTitleTest(
+    38→/home/z/my-project/src/app/title-tests/actions.ts:export async function cancelTitleTest(id: number): Promise<void> {
+    39→/home/z/my-project/src/app/title-tests/actions.ts:export async function deleteTitleTest(id: number): Promise<void> {
+    40→/home/z/my-project/src/app/notifications/actions.ts:export async function recentNotifications(): Promise<Notification[]> {
+    41→/home/z/my-project/src/app/audits/fix-actions.ts:export async function getFixSuggestions(
+    42→/home/z/my-project/src/app/ads/actions.ts:export async function addAdAccount(
+    43→/home/z/my-project/src/app/ads/actions.ts:export async function updateGuardrails(
+    44→/home/z/my-project/src/app/ads/actions.ts:export async function deleteAdAccount(
+    45→/home/z/my-project/src/app/ads/actions.ts:export async function resumeAdAccount(
+    46→/home/z/my-project/src/app/ads/actions.ts:export async function syncDemoData(): Promise<ActionResult> {
+    47→/home/z/my-project/src/app/ads/actions.ts:export async function runEngineNow(): Promise<ActionResult> {
+    48→/home/z/my-project/src/app/ads/actions.ts:export async function resolveProposal(
+    49→/home/z/my-project/src/app/ads/actions.ts:export async function clearSnapshots(
+    50→/home/z/my-project/src/app/audits/wp-apply-actions.ts:export async function applyFixViaWp(opts: {
+    51→/home/z/my-project/src/app/link-building/prospects/actions.ts:export async function findLinkProspects(
+    52→/home/z/my-project/src/app/link-building/prospects/actions.ts:export async function trackProspect(formData: FormData): Promise<void> {
+    53→/home/z/my-project/src/app/audits/actions.ts:export async function runAuditForClient(clientId: number) {
+    54→/home/z/my-project/src/app/audits/issue-actions.ts:export async function setIssueStatus(
+    55→/home/z/my-project/src/app/audits/issue-actions.ts:export async function setStatusForType(
+    56→/home/z/my-project/src/app/link-building/c/[clientId]/actions.ts:export async function fetchBespokeIdeas(
+    57→/home/z/my-project/src/app/link-building/c/[clientId]/actions.ts:export async function trackBespokeIdea(
+    58→/home/z/my-project/src/app/link-building/c/[clientId]/actions.ts:export async function bulkTrackResources(
+    59→/home/z/my-project/src/app/link-building/c/[clientId]/actions.ts:export async function setStatusForClient(
+    60→/home/z/my-project/src/app/link-building/c/[clientId]/actions.ts:export async function setLiveUrlForClient(
+    61→/home/z/my-project/src/app/link-building/c/[clientId]/actions.ts:export async function runLinkHealthCheck(
+    62→/home/z/my-project/src/app/link-building/c/[clientId]/actions.ts:export async function removeForClient(
+    63→/home/z/my-project/src/app/link-building/actions.ts:export async function trackResource(
+    64→/home/z/my-project/src/app/link-building/actions.ts:export async function setSubmissionStatus(
+    65→/home/z/my-project/src/app/link-building/actions.ts:export async function deleteSubmission(submissionId: number) {
+    66→/home/z/my-project/src/app/link-building/actions.ts:export async function setSubmittedUrl(
+    67→/home/z/my-project/src/app/grader/actions.ts:export async function gradeSite(
+    68→/home/z/my-project/src/app/algorithm-updates/actions.ts:export async function refreshGoogleUpdatesAction(): Promise<RefreshUpdatesResult> {
+    69→/home/z/my-project/src/app/backlinks/bing-actions.ts:export async function importBingBacklinksAction(
+    70→/home/z/my-project/src/app/content-gap/actions.ts:export async function analyzeContentGap(opts: {
+    71→/home/z/my-project/src/app/import/actions.ts:export async function extractScreenshotText(
+    72→/home/z/my-project/src/app/backlinks/actions.ts:export async function addBacklink(
+    73→/home/z/my-project/src/app/backlinks/actions.ts:export async function setBacklinkStatus(
+    74→/home/z/my-project/src/app/backlinks/actions.ts:export async function deleteBacklink(backlinkId: number) {
+    75→/home/z/my-project/src/app/backlinks/actions.ts:export async function logBuiltLink(
+    76→/home/z/my-project/src/app/backlinks/actions.ts:export async function importAhrefsBacklinks(
+    77→/home/z/my-project/src/app/reports/batch/actions.ts:export async function startBatch(input: {
+    78→/home/z/my-project/src/app/reports/batch/actions.ts:export async function pollBatch(batchId: number): Promise<BatchProgress | null> {
+    79→/home/z/my-project/src/app/reports/batch/actions.ts:export async function approveReport(
+    80→/home/z/my-project/src/app/reports/batch/actions.ts:export async function rejectReport(
+    81→/home/z/my-project/src/app/reports/batch/actions.ts:export async function sendReport(
+    82→/home/z/my-project/src/app/reports/c/[clientId]/preview-actions.ts:export async function previewExecSummary(
+    83→/home/z/my-project/src/app/reports/archive/actions.ts:export async function deleteArchivedReport(id: number) {
+    84→/home/z/my-project/src/app/reports/archive/actions.ts:export async function pinArchivedReport(id: number) {
+    85→/home/z/my-project/src/app/tools/wayback/actions.ts:export async function runWayback(
+    86→/home/z/my-project/src/app/chats/actions.ts:export async function fetchChats(opts: {
+    87→/home/z/my-project/src/app/chats/actions.ts:export async function fetchChat(
+    88→/home/z/my-project/src/app/chats/actions.ts:export async function deleteChat(id: number) {
+    89→/home/z/my-project/src/app/chats/actions.ts:export async function pinChat(id: number) {
+    90→/home/z/my-project/src/app/chats/actions.ts:export async function renameChat(id: number, formData: FormData) {
+    91→/home/z/my-project/src/app/chats/actions.ts:export async function clearChats(kind?: ChatKind) {
+    92→/home/z/my-project/src/app/tools/browser-agent/actions.ts:export async function runAgent(
+    93→/home/z/my-project/src/app/compare/actions.ts:export async function compareDomains(
+    94→/home/z/my-project/src/app/tools/disavow/actions.ts:export async function runDisavow(
+    95→/home/z/my-project/src/app/links/actions.ts:export async function createShortLink(
+    96→/home/z/my-project/src/app/links/actions.ts:export async function deleteShortLink(id: number): Promise<void> {
+    97→/home/z/my-project/src/app/links/actions.ts:export async function importShortLinksCsv(
+    98→/home/z/my-project/src/app/tools/intent-classifier/actions.ts:export async function runClassify(
+    99→/home/z/my-project/src/app/tools/internal-linking/actions.ts:export async function suggestInternalLinks(input: {
+   100→/home/z/my-project/src/app/tools/render/actions.ts:export async function runRender(
+   101→/home/z/my-project/src/app/tools/ai-overview/actions.ts:export async function analyzeAiOverview(
+   102→/home/z/my-project/src/app/settings/backup/auto-backup-actions.ts:export async function saveAutoBackupSettings(formData: FormData) {
+   103→/home/z/my-project/src/app/tools/sxo/actions.ts:export async function runSxoAudit(
+   104→/home/z/my-project/src/app/settings/api-keys/actions.ts:export async function createApiKey(
+   105→/home/z/my-project/src/app/settings/api-keys/actions.ts:export async function revokeApiKey(id: number): Promise<{ ok: boolean }> {
+   106→/home/z/my-project/src/app/tools/redirects-manager/actions.ts:export async function addRule(formData: FormData) {
+   107→/home/z/my-project/src/app/tools/redirects-manager/actions.ts:export async function deleteRule(id: number) {
+   108→/home/z/my-project/src/app/tools/redirects-manager/actions.ts:export async function record404(formData: FormData) {
+   109→/home/z/my-project/src/app/tools/redirects-manager/actions.ts:export async function resolve404(formData: FormData) {
+   110→/home/z/my-project/src/app/tools/redirects-manager/actions.ts:export async function deleteNotFound(id: number) {
+   111→/home/z/my-project/src/app/settings/connection-mode-actions.ts:export async function getConnectionMode(): Promise<ConnectionMode> {
+   112→/home/z/my-project/src/app/settings/connection-mode-actions.ts:export async function getMcpStatus(): Promise<McpStatus> {
+   113→/home/z/my-project/src/app/settings/connection-mode-actions.ts:export async function generateMcpToken(): Promise<{ token: string }> {
+   114→/home/z/my-project/src/app/settings/connection-mode-actions.ts:export async function revokeMcpToken(): Promise<void> {
+   115→/home/z/my-project/src/app/settings/connection-mode-actions.ts:export async function generateMcpReadOnlyToken(): Promise<{ token: string }> {
+   116→/home/z/my-project/src/app/settings/connection-mode-actions.ts:export async function revokeMcpReadOnlyToken(): Promise<void> {
+   117→/home/z/my-project/src/app/settings/connection-mode-actions.ts:export async function getAiConnectionStatus(): Promise<{
+   118→/home/z/my-project/src/app/tools/perf-budget/actions.ts:export async function runBudget(
+   119→/home/z/my-project/src/app/settings/inbound-webhooks/actions.ts:export async function createInboundWebhook(
+   120→/home/z/my-project/src/app/settings/inbound-webhooks/actions.ts:export async function deleteInboundWebhook(id: number): Promise<{ ok: true }> {
+   121→/home/z/my-project/src/app/settings/inbound-webhooks/actions.ts:export async function toggleInboundWebhook(
+   122→/home/z/my-project/src/app/tools/hreflang/actions.ts:export async function checkHreflang(rawUrl: string): Promise<HreflangResult> {
+   123→/home/z/my-project/src/app/settings/desktop-config-actions.ts:export async function installDesktopConfig(): Promise<InstallResult> {
+   124→/home/z/my-project/src/app/settings/timezone-actions.ts:export async function saveWorkspaceTimeZone(
+   125→/home/z/my-project/src/app/tools/gsc-coverage/actions.ts:export async function runCoverage(
+   126→/home/z/my-project/src/app/tools/gsc-coverage/actions.ts:export async function analyzeFixesForCoverage(
+   127→/home/z/my-project/src/app/settings/key-actions.ts:export async function saveApiKey(
+   128→/home/z/my-project/src/app/settings/key-actions.ts:export async function saveOllamaUrl(formData: FormData): Promise<void> {
+   129→/home/z/my-project/src/app/settings/key-actions.ts:export async function setActiveProvider(
+   130→/home/z/my-project/src/app/settings/key-actions.ts:export async function setCreditSaverEnabled(enabled: boolean): Promise<void> {
+   131→/home/z/my-project/src/app/tools/local-cwv/actions.ts:export async function runLocalCwv(
+   132→/home/z/my-project/src/app/settings/ai-usage/actions.ts:export async function saveCap(
+   133→/home/z/my-project/src/app/tools/image-gen/actions.ts:export async function runImageGen(
+   134→/home/z/my-project/src/app/settings/actions.ts:export async function saveWebhookUrl(
+   135→/home/z/my-project/src/app/settings/actions.ts:export async function testWebhook(
+   136→/home/z/my-project/src/app/settings/actions.ts:export async function saveDefaultModel(model: string): Promise<void> {
+   137→/home/z/my-project/src/app/tools/dns-whois/actions.ts:export async function runDns(
+   138→/home/z/my-project/src/app/settings/errors/actions.ts:export async function resolveErrorAction(id: number): Promise<void> {
+   139→/home/z/my-project/src/app/settings/errors/actions.ts:export async function clearResolvedAction(): Promise<void> {
+   140→/home/z/my-project/src/app/tools/og-image/actions.ts:export async function runOgImage(
+   141→/home/z/my-project/src/app/settings/team/actions.ts:export async function inviteMember(input: {
+   142→/home/z/my-project/src/app/settings/team/actions.ts:export async function cancelInvite(id: number): Promise<ActionResult> {
+   143→/home/z/my-project/src/app/settings/team/actions.ts:export async function changeRole(
+   144→/home/z/my-project/src/app/settings/team/actions.ts:export async function setActive(
+   145→/home/z/my-project/src/app/settings/team/actions.ts:export async function setClientAccess(
+   146→/home/z/my-project/src/app/tools/serp-features/actions.ts:export async function runCapture(
+   147→/home/z/my-project/src/app/tools/serp-features/actions.ts:export async function removeSnapshot(id: number): Promise<{ ok: true }> {
+   148→/home/z/my-project/src/app/settings/ui-actions.ts:export async function setUiMode(mode: "guided" | "pro") {
+   149→/home/z/my-project/src/app/settings/ui-actions.ts:export async function getUiMode(): Promise<"guided" | "pro"> {
+   150→/home/z/my-project/src/app/tools/refresh/actions.ts:export async function runRefresh(
+   151→/home/z/my-project/src/app/settings/theme-actions.ts:export async function getThemePreference(): Promise<ThemePreference> {
+   152→/home/z/my-project/src/app/settings/theme-actions.ts:export async function setThemePreference(theme: ThemePreference) {
+   153→/home/z/my-project/src/app/settings/theme-actions.ts:export async function cycleTheme() {
+   154→/home/z/my-project/src/app/tools/llms-txt/actions.ts:export async function generateLlmsTxt(opts: {
+   155→/home/z/my-project/src/app/tools/llms-txt/actions.ts:export async function validateLlmsTxt(
+   156→/home/z/my-project/src/app/settings/edge/actions.ts:export async function rotateEdgeTokenAction(): Promise<
+   157→/home/z/my-project/src/app/settings/browser-actions.ts:export async function saveBrowserSettings(
+   158→/home/z/my-project/src/app/settings/browser-actions.ts:export async function testProxies(): Promise<ProxyHealthState> {
+   159→/home/z/my-project/src/app/settings/browser-actions.ts:export async function loadBrowserSettings() {
+   160→/home/z/my-project/src/app/tools/trending/actions.ts:export async function runTrending(
+   161→/home/z/my-project/src/app/settings/google/actions.ts:export async function saveGoogleCredentials(
+   162→/home/z/my-project/src/app/settings/google/actions.ts:export async function clearGoogleCredentials() {
+   163→/home/z/my-project/src/app/settings/google/actions.ts:export async function disconnectGoogleAccount() {
+   164→/home/z/my-project/src/app/settings/google/actions.ts:export async function saveServiceAccount(
+   165→/home/z/my-project/src/app/settings/google/actions.ts:export async function removeServiceAccount() {
+   166→/home/z/my-project/src/app/settings/google/actions.ts:export async function testServiceAccount(): Promise<{
+   167→/home/z/my-project/src/app/tools/facet-trap/actions.ts:export async function runFacetTrap(
+   168→/home/z/my-project/src/app/settings/brand-actions.ts:export async function saveBrand(
+   169→/home/z/my-project/src/app/settings/brand-actions.ts:export async function clearLogo(): Promise<void> {
+   170→/home/z/my-project/src/app/tools/traffic-drop/actions.ts:export async function runDiagnostic(
+   171→/home/z/my-project/src/app/settings/smtp-actions.ts:export async function saveSmtpConfig(
+   172→/home/z/my-project/src/app/settings/smtp-actions.ts:export async function testSmtpConnection(): Promise<{
+   173→/home/z/my-project/src/app/settings/smtp-actions.ts:export async function sendTestEmail(
+   174→/home/z/my-project/src/app/settings/smtp-actions.ts:export async function clearSmtpConfig() {
+   175→/home/z/my-project/src/app/tools/redirects-bulk/actions.ts:export async function runBulk(
+   176→/home/z/my-project/src/app/settings/ai-learning/actions.ts:export async function runDistill(): Promise<{
+   177→/home/z/my-project/src/app/settings/ai-learning/actions.ts:export async function togglePreference(id: number): Promise<void> {
+   178→/home/z/my-project/src/app/settings/ai-learning/actions.ts:export async function deletePreference(id: number): Promise<void> {
+   179→/home/z/my-project/src/app/tools/youtube-audit/actions.ts:export async function runYtAudit(
+   180→/home/z/my-project/src/app/tools/anchor-distribution/actions.ts:export async function runAnchor(
+   181→/home/z/my-project/src/app/guest-posts/c/[clientId]/actions.ts:export async function generateGuestPost(
+   182→/home/z/my-project/src/app/guest-posts/c/[clientId]/actions.ts:export async function updateDraftMarkdown(
+   183→/home/z/my-project/src/app/guest-posts/c/[clientId]/actions.ts:export async function setDraftStatus(
+   184→/home/z/my-project/src/app/guest-posts/c/[clientId]/actions.ts:export async function setDraftLiveUrl(draftId: number, formData: FormData) {
+   185→/home/z/my-project/src/app/guest-posts/c/[clientId]/actions.ts:export async function deleteDraft(draftId: number) {
+   186→/home/z/my-project/src/app/guest-posts/c/[clientId]/actions.ts:export async function listDraftsForClient(clientId: number) {
+   187→/home/z/my-project/src/app/guest-posts/c/[clientId]/actions.ts:export async function suggestGuestPostTitles(
+   188→/home/z/my-project/src/app/tools/uptime/actions.ts:export async function addTarget(formData: FormData) {
+   189→/home/z/my-project/src/app/tools/uptime/actions.ts:export async function deleteTarget(id: number) {
+   190→/home/z/my-project/src/app/tools/uptime/actions.ts:export async function toggleTarget(id: number, enabled: boolean) {
+   191→/home/z/my-project/src/app/tools/uptime/actions.ts:export async function runPingNow() {
+   192→/home/z/my-project/src/app/autonomy-actions.ts:export async function chooseAutonomyAction(
+   193→/home/z/my-project/src/app/tools/cluster/actions.ts:export async function runCluster(
+   194→/home/z/my-project/src/app/leads/actions.ts:export async function setLeadStatus(
+   195→/home/z/my-project/src/app/leads/actions.ts:export async function setLeadNotes(
+   196→/home/z/my-project/src/app/leads/actions.ts:export async function convertLeadToClient(
+   197→/home/z/my-project/src/app/leads/actions.ts:export async function deleteLead(
+   198→/home/z/my-project/src/app/tools/youtube/actions.ts:export async function saveYouTubeKey(formData: FormData): Promise<void> {
+   199→/home/z/my-project/src/app/tools/youtube/actions.ts:export async function clearYouTubeKey(): Promise<void> {
+   200→/home/z/my-project/src/app/tools/youtube/actions.ts:export async function researchOnYouTube(
+   201→/home/z/my-project/src/app/author-authority/actions.ts:export async function runAuthorScan(
+   202→/home/z/my-project/src/app/author-authority/actions.ts:export async function listAuthorRecords(clientId: number) {
+   203→/home/z/my-project/src/app/tools/link-checker/actions.ts:export async function analyzeLinks(rawUrl: string): Promise<LinkAnalysisResult> {
+   204→/home/z/my-project/src/app/meta-rewrite/actions.ts:export async function findCandidates(
+   205→/home/z/my-project/src/app/meta-rewrite/actions.ts:export async function applyRewrite(
+   206→/home/z/my-project/src/app/local-rank/actions.ts:export async function runLocalRanks(opts: {
+   207→/home/z/my-project/src/app/bot-logs/actions.ts:export async function parseAndStoreLog(input: {
+   208→/home/z/my-project/src/app/bot-logs/actions.ts:export async function listUploads(opts?: { limit?: number }) {
+   209→/home/z/my-project/src/app/bot-logs/actions.ts:export async function deleteUpload(id: number): Promise<void> {
+   210→/home/z/my-project/src/app/tools/health-check/actions.ts:export async function runHealthCheck(
+   211→/home/z/my-project/src/app/tools/health-check/actions.ts:export async function saveHealthSnapshot(opts: {
+   212→/home/z/my-project/src/app/seo-chat/actions.ts:export async function seoChat(
+   213→/home/z/my-project/src/app/tools/canonical-audit/actions.ts:export async function runCanonical(
+   214→/home/z/my-project/src/app/tools/github-pr/actions.ts:export async function runOpenPr(
+   215→/home/z/my-project/src/app/tools/person-schema/actions.ts:export async function savePersonSchema(
+   216→/home/z/my-project/src/app/tools/bulk-alt/actions.ts:export async function runBulkAlt(
+   217→/home/z/my-project/src/app/local-grid/actions.ts:export async function runGrid(
+   218→/home/z/my-project/src/app/local-grid/actions.ts:export async function getRecentGrids(clientId: number) {
+   219→/home/z/my-project/src/app/local-grid/actions.ts:export async function createGridSchedule(
+   220→/home/z/my-project/src/app/local-grid/actions.ts:export async function toggleGridSchedule(id: number): Promise<void> {
+   221→/home/z/my-project/src/app/local-grid/actions.ts:export async function deleteGridSchedule(id: number): Promise<void> {
+   222→/home/z/my-project/src/app/local-grid/actions.ts:export async function listGridSchedules(clientId: number) {
+   223→/home/z/my-project/src/app/tools/search-volume/actions.ts:export async function estimateVolumes(
+   224→/home/z/my-project/src/app/ask/actions.ts:export async function askTheTool(input: {
+   225→/home/z/my-project/src/app/tools/freshness/actions.ts:export async function runFreshnessAudit(
+   226→/home/z/my-project/src/app/competitors/playbook/actions.ts:export async function runCompetitorAnalysis(
+   227→/home/z/my-project/src/app/competitors/playbook/actions.ts:export async function playbookToTasks(opts: {
+   228→/home/z/my-project/src/app/competitors/actions.ts:export async function addCompetitor(
+   229→/home/z/my-project/src/app/competitors/actions.ts:export async function deleteCompetitor(competitorId: number) {
+   230→/home/z/my-project/src/app/tools/link-recommender/actions.ts:export async function recommendLinks(
+   231→/home/z/my-project/src/app/tools/migration-parity/actions.ts:export async function runParity(
+   232→/home/z/my-project/src/app/monitor/actions.ts:export async function addMonitoredPage(
+   233→/home/z/my-project/src/app/monitor/actions.ts:export async function deleteMonitoredPage(monitoredPageId: number) {
+   234→/home/z/my-project/src/app/monitor/actions.ts:export async function setMonitorStatus(
+   235→/home/z/my-project/src/app/monitor/actions.ts:export async function checkPageChanges(monitoredPageId: number) {
+   236→/home/z/my-project/src/app/monitor/actions.ts:export async function checkAllMonitoredPages() {
+   237→/home/z/my-project/src/app/tools/bulk-scan/actions.ts:export async function runBulkScan(opts: {
+   238→/home/z/my-project/src/app/tools/rank-where/actions.ts:export async function checkRank(
+   239→/home/z/my-project/src/app/tools/programmatic-seo/actions.ts:export async function runProgram(
+   240→/home/z/my-project/src/app/annotations/actions.ts:export async function addAnnotation(
+   241→/home/z/my-project/src/app/annotations/actions.ts:export async function removeAnnotation(id: number) {
+   242→/home/z/my-project/src/app/annotations/actions.ts:export async function fetchAnnotations(
+   243→/home/z/my-project/src/app/tools/gbp-reply/actions.ts:export async function listReplyLocations(): Promise<
+   244→/home/z/my-project/src/app/tools/gbp-reply/actions.ts:export async function fetchReviewsWithDrafts(
+   245→/home/z/my-project/src/app/tools/gbp-reply/actions.ts:export async function submitReply(
+   246→/home/z/my-project/src/app/tools/soft-404/actions.ts:export async function runSoft404(
+   247→/home/z/my-project/src/app/tools/mobile-friendly/actions.ts:export async function runMobile(
+   248→/home/z/my-project/src/app/clients/import/actions.ts:export async function listImportableProperties(): Promise<ListImportableResult> {
+   249→/home/z/my-project/src/app/clients/import/actions.ts:export async function importSelectedProperties(opts: {
+   250→/home/z/my-project/src/app/tools/ads-funnel/actions.ts:export async function generateAdsFunnel(
+   251→/home/z/my-project/src/app/clients/share-actions.ts:export async function generateShareToken(clientId: number): Promise<void> {
+   252→/home/z/my-project/src/app/clients/share-actions.ts:export async function revokeShareToken(clientId: number): Promise<void> {
+   253→/home/z/my-project/src/app/clients/share-actions.ts:export async function emailPortalLink(input: {
+   254→/home/z/my-project/src/app/tools/crux/actions.ts:export async function runCrux(
+   255→/home/z/my-project/src/app/tools/crux/actions.ts:export async function runOriginSummary(
+   256→/home/z/my-project/src/app/tools/crux/actions.ts:export async function runCruxHistory(
+   257→/home/z/my-project/src/app/tools/headers/actions.ts:export async function inspectHeaders(
+   258→/home/z/my-project/src/app/tools/headers/actions.ts:export async function saveHeadersSnapshot(opts: {
+   259→/home/z/my-project/src/app/clients/actions.ts:export async function fetchClientMetadata(
+   260→/home/z/my-project/src/app/clients/actions.ts:export async function createClient(
+   261→/home/z/my-project/src/app/clients/actions.ts:export async function applyStackTemplates(clientId: number) {
+   262→/home/z/my-project/src/app/clients/actions.ts:export async function applyNicheTemplates(clientId: number) {
+   263→/home/z/my-project/src/app/clients/actions.ts:export async function redetectTechStack(clientId: number) {
+   264→/home/z/my-project/src/app/clients/actions.ts:export async function updateClient(
+   265→/home/z/my-project/src/app/clients/actions.ts:export async function refreshClientMetadata(
+   266→/home/z/my-project/src/app/clients/actions.ts:export async function refreshClientMetadataForm(clientId: number): Promise<void> {
+   267→/home/z/my-project/src/app/clients/actions.ts:export async function quickAddClient(rawUrl: string): Promise<QuickAddResult> {
+   268→/home/z/my-project/src/app/clients/actions.ts:export async function deleteClient(id: number) {
+   269→/home/z/my-project/src/app/tools/content-score/actions.ts:export async function scoreContent(opts: {
+   270→/home/z/my-project/src/app/tools/content-score/actions.ts:export async function saveContentScoreSnapshot(opts: {
+   271→/home/z/my-project/src/app/clients/import-actions.ts:export async function importClientsCsv(
+   272→/home/z/my-project/src/app/tools/plagiarism/actions.ts:export async function checkPlagiarism(input: {
+   273→/home/z/my-project/src/app/tools/sitemap/actions.ts:export async function generateSitemap(
+   274→/home/z/my-project/src/app/tools/branded-split/actions.ts:export async function runSplit(
+   275→/home/z/my-project/src/app/tools/social-preview/actions.ts:export async function runSocial(
+   276→/home/z/my-project/src/app/tools/cannibalization/actions.ts:export async function runCannibalScan(
+   277→/home/z/my-project/src/app/clients/[id]/schedule-actions.ts:export async function saveSchedule(
+   278→/home/z/my-project/src/app/clients/[id]/schedule-actions.ts:export async function deleteSchedule(scheduleId: number, clientId: number) {
+   279→/home/z/my-project/src/app/clients/[id]/schedule-actions.ts:export async function sendReportNow(opts: {
+   280→/home/z/my-project/src/app/tools/content-helpers/actions.ts:export async function getCoverImagePrompts(formData: FormData): Promise<ImagePromptResult> {
+   281→/home/z/my-project/src/app/tools/content-helpers/actions.ts:export async function getCategorySuggestions(
+   282→/home/z/my-project/src/app/tools/schema/actions.ts:export async function generateSchema(opts: {
+   283→/home/z/my-project/src/app/clients/[id]/ai-audit/actions.ts:export async function startAiAudit(
+   284→/home/z/my-project/src/app/clients/[id]/ai-audit/actions.ts:export async function toggleResolved(
+   285→/home/z/my-project/src/app/clients/[id]/ai-audit/actions.ts:export async function saveIssueNotes(
+   286→/home/z/my-project/src/app/tools/wp-hack-scan/actions.ts:export async function runWpHackScan(
+   287→/home/z/my-project/src/app/tools/domain-overview/actions.ts:export async function runDomainOverview(
+   288→/home/z/my-project/src/app/tools/outreach-personalize/actions.ts:export async function runPersonalize(
+   289→/home/z/my-project/src/app/tools/reddit-research/actions.ts:export async function searchReddit(opts: {
+   290→/home/z/my-project/src/app/clients/[id]/onboarding/actions.ts:export async function saveBrandStep(
+   291→/home/z/my-project/src/app/clients/[id]/onboarding/actions.ts:export async function saveTargetingStep(
+   292→/home/z/my-project/src/app/clients/[id]/onboarding/actions.ts:export async function saveSurfacesStep(
+   293→/home/z/my-project/src/app/clients/[id]/onboarding/actions.ts:export async function runKeywordDiscovery(
+   294→/home/z/my-project/src/app/clients/[id]/onboarding/actions.ts:export async function acceptDiscoveredKeywords(
+   295→/home/z/my-project/src/app/clients/[id]/onboarding/actions.ts:export async function generateMonthlyCalendar(
+   296→/home/z/my-project/src/app/clients/[id]/onboarding/actions.ts:export async function skipOnboarding(clientId: number): Promise<void> {
+   297→/home/z/my-project/src/app/clients/[id]/onboarding/actions.ts:export async function getLearnedRulesForClient(
+   298→/home/z/my-project/src/app/clients/[id]/onboarding/actions.ts:export async function getAuditProgress(
+   299→/home/z/my-project/src/app/tools/utm-attribution/actions.ts:export async function runAttribution(
+   300→/home/z/my-project/src/app/tools/robots/actions.ts:export async function checkRobots(
+   301→/home/z/my-project/src/app/tools/robots-history/actions.ts:export async function runSnapshot(
+   302→/home/z/my-project/src/app/tools/robots-history/actions.ts:export async function loadSnapshots(host: string) {
+   303→/home/z/my-project/src/app/clients/[id]/automations/actions.ts:export async function createSchedule(
+   304→/home/z/my-project/src/app/clients/[id]/automations/actions.ts:export async function toggleScheduleEnabled(
+   305→/home/z/my-project/src/app/clients/[id]/automations/actions.ts:export async function deleteSchedule(
+   306→/home/z/my-project/src/app/clients/[id]/automations/actions.ts:export async function runScheduleNow(
+   307→/home/z/my-project/src/app/tools/link-graph/actions.ts:export async function runLinkGraph(
+   308→/home/z/my-project/src/app/clients/[id]/google-actions.ts:export async function fetchGoogleProperties(): Promise<FetchPropertiesResult> {
+   309→/home/z/my-project/src/app/clients/[id]/google-actions.ts:export async function saveGoogleProperties(opts: {
+   310→/home/z/my-project/src/app/tools/content-grader/actions.ts:export async function gradeContent(
+   311→/home/z/my-project/src/app/tools/meta-tag-generator/actions.ts:export async function generateMetaTags(
+   312→/home/z/my-project/src/app/tools/summarizer/actions.ts:export async function runSummarize(
+   313→/home/z/my-project/src/app/tools/keyword-difficulty/actions.ts:export async function estimateDifficulty(
+   314→/home/z/my-project/src/app/tools/schema-validate/actions.ts:export async function runValidate(
+   315→/home/z/my-project/src/app/tools/reputation-abuse-risk/actions.ts:export async function scanForRisk(
+   316→/home/z/my-project/src/app/clients/[id]/queue/actions.ts:export async function approveQueueItem(
+   317→/home/z/my-project/src/app/clients/[id]/queue/actions.ts:export async function approveAndPublishNow(
+   318→/home/z/my-project/src/app/clients/[id]/queue/actions.ts:export async function rejectQueueItem(
+   319→/home/z/my-project/src/app/clients/[id]/queue/actions.ts:export async function deleteQueueItem(
+   320→/home/z/my-project/src/app/tools/pagerank/actions.ts:export async function runPagerank(
+   321→/home/z/my-project/src/app/clients/[id]/wp-actions.ts:export async function saveWpCreds(
+   322→/home/z/my-project/src/app/clients/[id]/wp-actions.ts:export async function disconnectWpBridge(clientId: number): Promise<void> {
+   323→/home/z/my-project/src/app/clients/[id]/wp-actions.ts:export async function pushWpFix(
+   324→/home/z/my-project/src/app/clients/[id]/wp-actions.ts:export async function pushImageAltFix(opts: {
+   325→/home/z/my-project/src/app/tools/news-headline/actions.ts:export async function runHeadline(
+   326→/home/z/my-project/src/app/clients/[id]/per-client-google-actions.ts:export async function disconnectPerClientGoogle(
+   327→/home/z/my-project/src/app/tools/backlink-discovery/actions.ts:export async function runBacklinkDiscovery(
+   328→/home/z/my-project/src/app/tools/bing/actions.ts:export async function saveBingKey(formData: FormData): Promise<void> {
+   329→/home/z/my-project/src/app/tools/bing/actions.ts:export async function clearBingKey(): Promise<void> {
+   330→/home/z/my-project/src/app/tools/bing/actions.ts:export async function fetchBingInsights(
+   331→/home/z/my-project/src/app/tools/bing/actions.ts:export async function submitBingUrls(
+   332→/home/z/my-project/src/app/tools/bing/actions.ts:export async function fetchBingSites(): Promise<
+   333→/home/z/my-project/src/app/tools/auto-link/actions.ts:export async function runAutoLink(
+   334→/home/z/my-project/src/app/tools/ai-robots/actions.ts:export async function runAiRobotsAudit(
+   335→/home/z/my-project/src/app/tasks/actions.ts:export async function setTaskStatus(
+   336→/home/z/my-project/src/app/tasks/actions.ts:export async function deleteTask(taskId: number) {
+   337→/home/z/my-project/src/app/tasks/actions.ts:export async function createTask(
+   338→/home/z/my-project/src/app/tasks/actions.ts:export async function setTaskRecurrence(
+   339→/home/z/my-project/src/app/tasks/actions.ts:export async function logTaskTime(input: {
+   340→/home/z/my-project/src/app/tasks/actions.ts:export async function setTaskEstimate(
+   341→/home/z/my-project/src/app/tasks/actions.ts:export async function bulkSetTaskStatus(
+   342→/home/z/my-project/src/app/tasks/actions.ts:export async function bulkSetTaskPriority(
+   343→/home/z/my-project/src/app/tasks/actions.ts:export async function bulkDeleteTasks(ids: number[]) {
+   344→/home/z/my-project/src/app/tasks/actions.ts:export async function applyPlaybookToClient(input: {
+   345→/home/z/my-project/src/app/tools/aio-passage/actions.ts:export async function analyzePassages(
+   346→/home/z/my-project/src/app/tools/aio-passage/actions.ts:export async function suggestRewrite(
+   347→/home/z/my-project/src/app/tools/aio-passage/actions.ts:export async function analyzeUrl(
+   348→/home/z/my-project/src/app/tools/aio-passage/actions.ts:export async function batchRewrite(
+   349→/home/z/my-project/src/app/tools/security/actions.ts:export async function checkSecurity(
+   350→/home/z/my-project/src/app/broken-links/actions.ts:export async function checkUrl(url: string): Promise<BrokenLinksResult> {
+   351→/home/z/my-project/src/app/tools/link-intersect/actions.ts:export async function runLinkIntersect(
+   352→/home/z/my-project/src/app/tools/screenshot-import/actions.ts:export async function parseScreenshot(input: {
+   353→/home/z/my-project/src/app/tools/code-generator/actions.ts:export async function generateCode(
+   354→/home/z/my-project/src/app/cwv/actions.ts:export async function runCwvScan(opts: {
+   355→/home/z/my-project/src/app/cwv/actions.ts:export async function deleteCwvReport(id: number, clientId: number) {
+   356→/home/z/my-project/src/app/tools/indexnow/actions.ts:export async function submitIndexNow(
+   357→/home/z/my-project/src/app/tools/indexnow/actions.ts:export async function verifyIndexNowKeyFile(
+   358→/home/z/my-project/src/app/tools/migration-map/actions.ts:export async function importToRedirectRules(
+   359→/home/z/my-project/src/app/tools/migration-map/actions.ts:export async function runMapping(
+   360→/home/z/my-project/src/app/tools/ai-schema/actions.ts:export async function runAiSchema(
+   361→/home/z/my-project/src/app/tools/eeat-audit/actions.ts:export async function runEeatAudit(
+   362→/home/z/my-project/src/app/tools/geo-score/actions.ts:export async function runGeoScore(
+   363→/home/z/my-project/src/app/gbp/c/[clientId]/reviews/actions.ts:export async function loadReviewDesk(
+   364→/home/z/my-project/src/app/gbp/c/[clientId]/reviews/actions.ts:export async function listLocationChoices(
+   365→/home/z/my-project/src/app/gbp/c/[clientId]/reviews/actions.ts:export async function chooseLocation(
+   366→/home/z/my-project/src/app/gbp/c/[clientId]/reviews/actions.ts:export async function syncReviews(clientId: number): Promise<SyncResult> {
+   367→/home/z/my-project/src/app/gbp/c/[clientId]/reviews/actions.ts:export async function draftNextReplies(opts: {
+   368→/home/z/my-project/src/app/gbp/c/[clientId]/reviews/actions.ts:export async function saveDraft(opts: {
+   369→/home/z/my-project/src/app/gbp/c/[clientId]/reviews/actions.ts:export async function publishReply(opts: {
+   370→/home/z/my-project/src/app/gbp/c/[clientId]/reviews/actions.ts:export async function publishAllDrafts(
+   371→/home/z/my-project/src/app/gbp/c/[clientId]/playbook-actions.ts:export async function togglePlaybookItem(
+   372→/home/z/my-project/src/app/gbp/c/[clientId]/playbook-actions.ts:export async function getCompletionsForClient(clientId: number): Promise<{
+   373→/home/z/my-project/src/app/digest/actions.ts:export async function sendDigest(
+   374→/home/z/my-project/src/app/digest/actions.ts:export async function setSchedule(
+   375→/home/z/my-project/src/app/digest/actions.ts:export async function loadDigestSettings() {
+   376→/home/z/my-project/src/app/gbp/actions.ts:export async function runGbpScrape(
+   377→/home/z/my-project/src/app/gbp/actions.ts:export async function generateReviewReply(opts: {
+   378→/home/z/my-project/src/app/gbp/actions.ts:export async function loadGbpForClient(
+   379→/home/z/my-project/src/app/gbp/actions.ts:export async function postGbpReply(opts: {
+   380→/home/z/my-project/src/app/gbp/actions.ts:export async function composeGbpPost(opts: {
+   381→/home/z/my-project/src/app/gbp/actions.ts:export async function generateGbpPostIdeas(opts: {
+   382→/home/z/my-project/src/app/gbp/actions.ts:export async function pingGbpLocation(opts: {
+   383→/home/z/my-project/src/app/automations/actions.ts:export async function createAutomation(
+   384→/home/z/my-project/src/app/automations/actions.ts:export async function setAutomationEnabled(id: number, enabled: boolean) {
+   385→/home/z/my-project/src/app/automations/actions.ts:export async function deleteAutomation(id: number) {
+   386→/home/z/my-project/src/app/automations/actions.ts:export async function testWebhook(url: string): Promise<
+   387→/home/z/my-project/src/app/automations/actions.ts:export async function installWorkflowTemplate(input: {
+   388→/home/z/my-project/src/app/portal/[token]/chat-actions.ts:export async function portalChat(
+   389→/home/z/my-project/src/app/agent/autopilot/actions.ts:export async function saveAgentSettings(
+   390→/home/z/my-project/src/app/agent/autopilot/actions.ts:export async function setLevel(level: AutonomyLevel): Promise<AgentSettings> {
+   391→/home/z/my-project/src/app/agent/autopilot/actions.ts:export async function runNow(clientId?: number): Promise<RunNowResult> {
+   392→/home/z/my-project/src/app/agent/autopilot/actions.ts:export async function approveAction(
+   393→/home/z/my-project/src/app/agent/autopilot/actions.ts:export async function rejectAction(
+   394→/home/z/my-project/src/app/agent/autopilot/actions.ts:export async function undoAction(
+   395→/home/z/my-project/src/app/agent/autopilot/actions.ts:export async function undoRun(
+   396→/home/z/my-project/src/app/agent/autopilot/actions.ts:export async function approveAllOfKind(opts: {
+   397→/home/z/my-project/src/app/agent/autopilot/actions.ts:export async function waitingByKind(
+   398→/home/z/my-project/src/app/agent/actions.ts:export async function runAgent(clientId: number): Promise<AgentRunResult> {
+   399→/home/z/my-project/src/app/agent/actions.ts:export async function runAgentExecute(
+   400→/home/z/my-project/src/app/agent/actions.ts:export async function applySuggestion(suggestionId: number) {
+   401→
+   402→[Showing results with pagination = limit: 400]

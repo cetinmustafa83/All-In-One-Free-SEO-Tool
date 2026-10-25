@@ -1,0 +1,402 @@
+/home/z/my-project/src/app/outreach/actions.ts:export async function addOutreachContact(
+/home/z/my-project/src/app/outreach/actions.ts:export async function setContactStatus(
+/home/z/my-project/src/app/outreach/actions.ts:export async function deleteOutreachContact(contactId: number) {
+/home/z/my-project/src/app/outreach/actions.ts:export async function saveOutreachTemplate(
+/home/z/my-project/src/app/outreach/actions.ts:export async function deleteOutreachTemplate(id: number) {
+/home/z/my-project/src/app/outreach/actions.ts:export async function seedDefaultTemplatesIfEmpty(): Promise<void> {
+/home/z/my-project/src/app/outreach/actions.ts:export async function sendOutreachAction(
+/home/z/my-project/src/app/outreach/actions.ts:export async function loadTemplatesForClient(clientId: number) {
+/home/z/my-project/src/app/outreach/actions.ts:export async function loadMessagesForContact(contactId: number) {
+/home/z/my-project/src/app/outreach/actions.ts:export async function setSenderName(formData: FormData) {
+/home/z/my-project/src/app/report-data/actions.ts:export async function parseReportDataPaste(
+/home/z/my-project/src/app/report-data/actions.ts:export async function deleteEntry(id: number): Promise<void> {
+/home/z/my-project/src/app/report-data/actions.ts:export async function listForClient(clientId: number) {
+/home/z/my-project/src/app/news/actions.ts:export async function seedDefaultFeedsIfEmpty(): Promise<void> {
+/home/z/my-project/src/app/news/actions.ts:export async function addFeed(input: {
+/home/z/my-project/src/app/news/actions.ts:export async function cleanupOldItems(opts: {
+/home/z/my-project/src/app/news/actions.ts:export async function clearAllItems(): Promise<{ deleted: number }> {
+/home/z/my-project/src/app/news/actions.ts:export async function deleteOneItem(itemId: number): Promise<void> {
+/home/z/my-project/src/app/news/actions.ts:export async function removeFeed(feedId: number): Promise<void> {
+/home/z/my-project/src/app/news/actions.ts:export async function toggleFeed(feedId: number, enabled: boolean): Promise<void> {
+/home/z/my-project/src/app/news/actions.ts:export async function refreshFeeds(): Promise<RefreshResult> {
+/home/z/my-project/src/app/news/actions.ts:export async function listRecentItems(limit = 60) {
+/home/z/my-project/src/app/knowledge-panel/actions.ts:export async function runKpCapture(
+/home/z/my-project/src/app/knowledge-panel/actions.ts:export async function listKpSnapshots(clientId: number, limit = 10) {
+/home/z/my-project/src/app/embed/grader/actions.ts:export async function publicGrade(
+/home/z/my-project/src/app/embed/grader/actions.ts:export async function gradeForVisitor(input: {
+/home/z/my-project/src/app/embed/grader/actions.ts:export async function captureLead(input: {
+/home/z/my-project/src/app/proposals/actions.ts:export async function createProposal(input: {
+/home/z/my-project/src/app/proposals/actions.ts:export async function buildProposal(input: {
+/home/z/my-project/src/app/proposals/actions.ts:export async function updateProposal(
+/home/z/my-project/src/app/proposals/actions.ts:export async function deleteProposal(
+/home/z/my-project/src/app/proposals/actions.ts:export async function buildKickoffReport(
+/home/z/my-project/src/app/capture/actions.ts:export async function captureUrl(rawUrl: string): Promise<CaptureResult> {
+/home/z/my-project/src/app/capture/actions.ts:export async function saveAsCompetitor(input: {
+/home/z/my-project/src/app/capture/actions.ts:export async function saveAsMonitoredPage(input: {
+/home/z/my-project/src/app/search/actions.ts:export async function search(rawQuery: string): Promise<SearchResults> {
+/home/z/my-project/src/app/title-tests/actions.ts:export async function createTitleTest(
+/home/z/my-project/src/app/title-tests/actions.ts:export async function cancelTitleTest(id: number): Promise<void> {
+/home/z/my-project/src/app/title-tests/actions.ts:export async function deleteTitleTest(id: number): Promise<void> {
+/home/z/my-project/src/app/notifications/actions.ts:export async function recentNotifications(): Promise<Notification[]> {
+/home/z/my-project/src/app/audits/fix-actions.ts:export async function getFixSuggestions(
+/home/z/my-project/src/app/ads/actions.ts:export async function addAdAccount(
+/home/z/my-project/src/app/ads/actions.ts:export async function updateGuardrails(
+/home/z/my-project/src/app/ads/actions.ts:export async function deleteAdAccount(
+/home/z/my-project/src/app/ads/actions.ts:export async function resumeAdAccount(
+/home/z/my-project/src/app/ads/actions.ts:export async function syncDemoData(): Promise<ActionResult> {
+/home/z/my-project/src/app/ads/actions.ts:export async function runEngineNow(): Promise<ActionResult> {
+/home/z/my-project/src/app/ads/actions.ts:export async function resolveProposal(
+/home/z/my-project/src/app/ads/actions.ts:export async function clearSnapshots(
+/home/z/my-project/src/app/audits/wp-apply-actions.ts:export async function applyFixViaWp(opts: {
+/home/z/my-project/src/app/link-building/prospects/actions.ts:export async function findLinkProspects(
+/home/z/my-project/src/app/link-building/prospects/actions.ts:export async function trackProspect(formData: FormData): Promise<void> {
+/home/z/my-project/src/app/audits/actions.ts:export async function runAuditForClient(clientId: number) {
+/home/z/my-project/src/app/audits/issue-actions.ts:export async function setIssueStatus(
+/home/z/my-project/src/app/audits/issue-actions.ts:export async function setStatusForType(
+/home/z/my-project/src/app/link-building/c/[clientId]/actions.ts:export async function fetchBespokeIdeas(
+/home/z/my-project/src/app/link-building/c/[clientId]/actions.ts:export async function trackBespokeIdea(
+/home/z/my-project/src/app/link-building/c/[clientId]/actions.ts:export async function bulkTrackResources(
+/home/z/my-project/src/app/link-building/c/[clientId]/actions.ts:export async function setStatusForClient(
+/home/z/my-project/src/app/link-building/c/[clientId]/actions.ts:export async function setLiveUrlForClient(
+/home/z/my-project/src/app/link-building/c/[clientId]/actions.ts:export async function runLinkHealthCheck(
+/home/z/my-project/src/app/link-building/c/[clientId]/actions.ts:export async function removeForClient(
+/home/z/my-project/src/app/link-building/actions.ts:export async function trackResource(
+/home/z/my-project/src/app/link-building/actions.ts:export async function setSubmissionStatus(
+/home/z/my-project/src/app/link-building/actions.ts:export async function deleteSubmission(submissionId: number) {
+/home/z/my-project/src/app/link-building/actions.ts:export async function setSubmittedUrl(
+/home/z/my-project/src/app/grader/actions.ts:export async function gradeSite(
+/home/z/my-project/src/app/algorithm-updates/actions.ts:export async function refreshGoogleUpdatesAction(): Promise<RefreshUpdatesResult> {
+/home/z/my-project/src/app/backlinks/bing-actions.ts:export async function importBingBacklinksAction(
+/home/z/my-project/src/app/content-gap/actions.ts:export async function analyzeContentGap(opts: {
+/home/z/my-project/src/app/import/actions.ts:export async function extractScreenshotText(
+/home/z/my-project/src/app/backlinks/actions.ts:export async function addBacklink(
+/home/z/my-project/src/app/backlinks/actions.ts:export async function setBacklinkStatus(
+/home/z/my-project/src/app/backlinks/actions.ts:export async function deleteBacklink(backlinkId: number) {
+/home/z/my-project/src/app/backlinks/actions.ts:export async function logBuiltLink(
+/home/z/my-project/src/app/backlinks/actions.ts:export async function importAhrefsBacklinks(
+/home/z/my-project/src/app/reports/batch/actions.ts:export async function startBatch(input: {
+/home/z/my-project/src/app/reports/batch/actions.ts:export async function pollBatch(batchId: number): Promise<BatchProgress | null> {
+/home/z/my-project/src/app/reports/batch/actions.ts:export async function approveReport(
+/home/z/my-project/src/app/reports/batch/actions.ts:export async function rejectReport(
+/home/z/my-project/src/app/reports/batch/actions.ts:export async function sendReport(
+/home/z/my-project/src/app/reports/c/[clientId]/preview-actions.ts:export async function previewExecSummary(
+/home/z/my-project/src/app/reports/archive/actions.ts:export async function deleteArchivedReport(id: number) {
+/home/z/my-project/src/app/reports/archive/actions.ts:export async function pinArchivedReport(id: number) {
+/home/z/my-project/src/app/tools/wayback/actions.ts:export async function runWayback(
+/home/z/my-project/src/app/chats/actions.ts:export async function fetchChats(opts: {
+/home/z/my-project/src/app/chats/actions.ts:export async function fetchChat(
+/home/z/my-project/src/app/chats/actions.ts:export async function deleteChat(id: number) {
+/home/z/my-project/src/app/chats/actions.ts:export async function pinChat(id: number) {
+/home/z/my-project/src/app/chats/actions.ts:export async function renameChat(id: number, formData: FormData) {
+/home/z/my-project/src/app/chats/actions.ts:export async function clearChats(kind?: ChatKind) {
+/home/z/my-project/src/app/tools/browser-agent/actions.ts:export async function runAgent(
+/home/z/my-project/src/app/compare/actions.ts:export async function compareDomains(
+/home/z/my-project/src/app/tools/disavow/actions.ts:export async function runDisavow(
+/home/z/my-project/src/app/links/actions.ts:export async function createShortLink(
+/home/z/my-project/src/app/links/actions.ts:export async function deleteShortLink(id: number): Promise<void> {
+/home/z/my-project/src/app/links/actions.ts:export async function importShortLinksCsv(
+/home/z/my-project/src/app/tools/intent-classifier/actions.ts:export async function runClassify(
+/home/z/my-project/src/app/tools/internal-linking/actions.ts:export async function suggestInternalLinks(input: {
+/home/z/my-project/src/app/tools/render/actions.ts:export async function runRender(
+/home/z/my-project/src/app/tools/ai-overview/actions.ts:export async function analyzeAiOverview(
+/home/z/my-project/src/app/settings/backup/auto-backup-actions.ts:export async function saveAutoBackupSettings(formData: FormData) {
+/home/z/my-project/src/app/tools/sxo/actions.ts:export async function runSxoAudit(
+/home/z/my-project/src/app/settings/api-keys/actions.ts:export async function createApiKey(
+/home/z/my-project/src/app/settings/api-keys/actions.ts:export async function revokeApiKey(id: number): Promise<{ ok: boolean }> {
+/home/z/my-project/src/app/tools/redirects-manager/actions.ts:export async function addRule(formData: FormData) {
+/home/z/my-project/src/app/tools/redirects-manager/actions.ts:export async function deleteRule(id: number) {
+/home/z/my-project/src/app/tools/redirects-manager/actions.ts:export async function record404(formData: FormData) {
+/home/z/my-project/src/app/tools/redirects-manager/actions.ts:export async function resolve404(formData: FormData) {
+/home/z/my-project/src/app/tools/redirects-manager/actions.ts:export async function deleteNotFound(id: number) {
+/home/z/my-project/src/app/settings/connection-mode-actions.ts:export async function getConnectionMode(): Promise<ConnectionMode> {
+/home/z/my-project/src/app/settings/connection-mode-actions.ts:export async function getMcpStatus(): Promise<McpStatus> {
+/home/z/my-project/src/app/settings/connection-mode-actions.ts:export async function generateMcpToken(): Promise<{ token: string }> {
+/home/z/my-project/src/app/settings/connection-mode-actions.ts:export async function revokeMcpToken(): Promise<void> {
+/home/z/my-project/src/app/settings/connection-mode-actions.ts:export async function generateMcpReadOnlyToken(): Promise<{ token: string }> {
+/home/z/my-project/src/app/settings/connection-mode-actions.ts:export async function revokeMcpReadOnlyToken(): Promise<void> {
+/home/z/my-project/src/app/settings/connection-mode-actions.ts:export async function getAiConnectionStatus(): Promise<{
+/home/z/my-project/src/app/tools/perf-budget/actions.ts:export async function runBudget(
+/home/z/my-project/src/app/settings/inbound-webhooks/actions.ts:export async function createInboundWebhook(
+/home/z/my-project/src/app/settings/inbound-webhooks/actions.ts:export async function deleteInboundWebhook(id: number): Promise<{ ok: true }> {
+/home/z/my-project/src/app/settings/inbound-webhooks/actions.ts:export async function toggleInboundWebhook(
+/home/z/my-project/src/app/tools/hreflang/actions.ts:export async function checkHreflang(rawUrl: string): Promise<HreflangResult> {
+/home/z/my-project/src/app/settings/desktop-config-actions.ts:export async function installDesktopConfig(): Promise<InstallResult> {
+/home/z/my-project/src/app/settings/timezone-actions.ts:export async function saveWorkspaceTimeZone(
+/home/z/my-project/src/app/tools/gsc-coverage/actions.ts:export async function runCoverage(
+/home/z/my-project/src/app/tools/gsc-coverage/actions.ts:export async function analyzeFixesForCoverage(
+/home/z/my-project/src/app/settings/key-actions.ts:export async function saveApiKey(
+/home/z/my-project/src/app/settings/key-actions.ts:export async function saveOllamaUrl(formData: FormData): Promise<void> {
+/home/z/my-project/src/app/settings/key-actions.ts:export async function setActiveProvider(
+/home/z/my-project/src/app/settings/key-actions.ts:export async function setCreditSaverEnabled(enabled: boolean): Promise<void> {
+/home/z/my-project/src/app/tools/local-cwv/actions.ts:export async function runLocalCwv(
+/home/z/my-project/src/app/settings/ai-usage/actions.ts:export async function saveCap(
+/home/z/my-project/src/app/tools/image-gen/actions.ts:export async function runImageGen(
+/home/z/my-project/src/app/settings/actions.ts:export async function saveWebhookUrl(
+/home/z/my-project/src/app/settings/actions.ts:export async function testWebhook(
+/home/z/my-project/src/app/settings/actions.ts:export async function saveDefaultModel(model: string): Promise<void> {
+/home/z/my-project/src/app/tools/dns-whois/actions.ts:export async function runDns(
+/home/z/my-project/src/app/settings/errors/actions.ts:export async function resolveErrorAction(id: number): Promise<void> {
+/home/z/my-project/src/app/settings/errors/actions.ts:export async function clearResolvedAction(): Promise<void> {
+/home/z/my-project/src/app/tools/og-image/actions.ts:export async function runOgImage(
+/home/z/my-project/src/app/settings/team/actions.ts:export async function inviteMember(input: {
+/home/z/my-project/src/app/settings/team/actions.ts:export async function cancelInvite(id: number): Promise<ActionResult> {
+/home/z/my-project/src/app/settings/team/actions.ts:export async function changeRole(
+/home/z/my-project/src/app/settings/team/actions.ts:export async function setActive(
+/home/z/my-project/src/app/settings/team/actions.ts:export async function setClientAccess(
+/home/z/my-project/src/app/tools/serp-features/actions.ts:export async function runCapture(
+/home/z/my-project/src/app/tools/serp-features/actions.ts:export async function removeSnapshot(id: number): Promise<{ ok: true }> {
+/home/z/my-project/src/app/settings/ui-actions.ts:export async function setUiMode(mode: "guided" | "pro") {
+/home/z/my-project/src/app/settings/ui-actions.ts:export async function getUiMode(): Promise<"guided" | "pro"> {
+/home/z/my-project/src/app/tools/refresh/actions.ts:export async function runRefresh(
+/home/z/my-project/src/app/settings/theme-actions.ts:export async function getThemePreference(): Promise<ThemePreference> {
+/home/z/my-project/src/app/settings/theme-actions.ts:export async function setThemePreference(theme: ThemePreference) {
+/home/z/my-project/src/app/settings/theme-actions.ts:export async function cycleTheme() {
+/home/z/my-project/src/app/tools/llms-txt/actions.ts:export async function generateLlmsTxt(opts: {
+/home/z/my-project/src/app/tools/llms-txt/actions.ts:export async function validateLlmsTxt(
+/home/z/my-project/src/app/settings/edge/actions.ts:export async function rotateEdgeTokenAction(): Promise<
+/home/z/my-project/src/app/settings/browser-actions.ts:export async function saveBrowserSettings(
+/home/z/my-project/src/app/settings/browser-actions.ts:export async function testProxies(): Promise<ProxyHealthState> {
+/home/z/my-project/src/app/settings/browser-actions.ts:export async function loadBrowserSettings() {
+/home/z/my-project/src/app/tools/trending/actions.ts:export async function runTrending(
+/home/z/my-project/src/app/settings/google/actions.ts:export async function saveGoogleCredentials(
+/home/z/my-project/src/app/settings/google/actions.ts:export async function clearGoogleCredentials() {
+/home/z/my-project/src/app/settings/google/actions.ts:export async function disconnectGoogleAccount() {
+/home/z/my-project/src/app/settings/google/actions.ts:export async function saveServiceAccount(
+/home/z/my-project/src/app/settings/google/actions.ts:export async function removeServiceAccount() {
+/home/z/my-project/src/app/settings/google/actions.ts:export async function testServiceAccount(): Promise<{
+/home/z/my-project/src/app/tools/facet-trap/actions.ts:export async function runFacetTrap(
+/home/z/my-project/src/app/settings/brand-actions.ts:export async function saveBrand(
+/home/z/my-project/src/app/settings/brand-actions.ts:export async function clearLogo(): Promise<void> {
+/home/z/my-project/src/app/tools/traffic-drop/actions.ts:export async function runDiagnostic(
+/home/z/my-project/src/app/settings/smtp-actions.ts:export async function saveSmtpConfig(
+/home/z/my-project/src/app/settings/smtp-actions.ts:export async function testSmtpConnection(): Promise<{
+/home/z/my-project/src/app/settings/smtp-actions.ts:export async function sendTestEmail(
+/home/z/my-project/src/app/settings/smtp-actions.ts:export async function clearSmtpConfig() {
+/home/z/my-project/src/app/tools/redirects-bulk/actions.ts:export async function runBulk(
+/home/z/my-project/src/app/settings/ai-learning/actions.ts:export async function runDistill(): Promise<{
+/home/z/my-project/src/app/settings/ai-learning/actions.ts:export async function togglePreference(id: number): Promise<void> {
+/home/z/my-project/src/app/settings/ai-learning/actions.ts:export async function deletePreference(id: number): Promise<void> {
+/home/z/my-project/src/app/tools/youtube-audit/actions.ts:export async function runYtAudit(
+/home/z/my-project/src/app/tools/anchor-distribution/actions.ts:export async function runAnchor(
+/home/z/my-project/src/app/guest-posts/c/[clientId]/actions.ts:export async function generateGuestPost(
+/home/z/my-project/src/app/guest-posts/c/[clientId]/actions.ts:export async function updateDraftMarkdown(
+/home/z/my-project/src/app/guest-posts/c/[clientId]/actions.ts:export async function setDraftStatus(
+/home/z/my-project/src/app/guest-posts/c/[clientId]/actions.ts:export async function setDraftLiveUrl(draftId: number, formData: FormData) {
+/home/z/my-project/src/app/guest-posts/c/[clientId]/actions.ts:export async function deleteDraft(draftId: number) {
+/home/z/my-project/src/app/guest-posts/c/[clientId]/actions.ts:export async function listDraftsForClient(clientId: number) {
+/home/z/my-project/src/app/guest-posts/c/[clientId]/actions.ts:export async function suggestGuestPostTitles(
+/home/z/my-project/src/app/tools/uptime/actions.ts:export async function addTarget(formData: FormData) {
+/home/z/my-project/src/app/tools/uptime/actions.ts:export async function deleteTarget(id: number) {
+/home/z/my-project/src/app/tools/uptime/actions.ts:export async function toggleTarget(id: number, enabled: boolean) {
+/home/z/my-project/src/app/tools/uptime/actions.ts:export async function runPingNow() {
+/home/z/my-project/src/app/autonomy-actions.ts:export async function chooseAutonomyAction(
+/home/z/my-project/src/app/tools/cluster/actions.ts:export async function runCluster(
+/home/z/my-project/src/app/leads/actions.ts:export async function setLeadStatus(
+/home/z/my-project/src/app/leads/actions.ts:export async function setLeadNotes(
+/home/z/my-project/src/app/leads/actions.ts:export async function convertLeadToClient(
+/home/z/my-project/src/app/leads/actions.ts:export async function deleteLead(
+/home/z/my-project/src/app/tools/youtube/actions.ts:export async function saveYouTubeKey(formData: FormData): Promise<void> {
+/home/z/my-project/src/app/tools/youtube/actions.ts:export async function clearYouTubeKey(): Promise<void> {
+/home/z/my-project/src/app/tools/youtube/actions.ts:export async function researchOnYouTube(
+/home/z/my-project/src/app/author-authority/actions.ts:export async function runAuthorScan(
+/home/z/my-project/src/app/author-authority/actions.ts:export async function listAuthorRecords(clientId: number) {
+/home/z/my-project/src/app/tools/link-checker/actions.ts:export async function analyzeLinks(rawUrl: string): Promise<LinkAnalysisResult> {
+/home/z/my-project/src/app/meta-rewrite/actions.ts:export async function findCandidates(
+/home/z/my-project/src/app/meta-rewrite/actions.ts:export async function applyRewrite(
+/home/z/my-project/src/app/local-rank/actions.ts:export async function runLocalRanks(opts: {
+/home/z/my-project/src/app/bot-logs/actions.ts:export async function parseAndStoreLog(input: {
+/home/z/my-project/src/app/bot-logs/actions.ts:export async function listUploads(opts?: { limit?: number }) {
+/home/z/my-project/src/app/bot-logs/actions.ts:export async function deleteUpload(id: number): Promise<void> {
+/home/z/my-project/src/app/tools/health-check/actions.ts:export async function runHealthCheck(
+/home/z/my-project/src/app/tools/health-check/actions.ts:export async function saveHealthSnapshot(opts: {
+/home/z/my-project/src/app/seo-chat/actions.ts:export async function seoChat(
+/home/z/my-project/src/app/tools/canonical-audit/actions.ts:export async function runCanonical(
+/home/z/my-project/src/app/tools/github-pr/actions.ts:export async function runOpenPr(
+/home/z/my-project/src/app/tools/person-schema/actions.ts:export async function savePersonSchema(
+/home/z/my-project/src/app/tools/bulk-alt/actions.ts:export async function runBulkAlt(
+/home/z/my-project/src/app/local-grid/actions.ts:export async function runGrid(
+/home/z/my-project/src/app/local-grid/actions.ts:export async function getRecentGrids(clientId: number) {
+/home/z/my-project/src/app/local-grid/actions.ts:export async function createGridSchedule(
+/home/z/my-project/src/app/local-grid/actions.ts:export async function toggleGridSchedule(id: number): Promise<void> {
+/home/z/my-project/src/app/local-grid/actions.ts:export async function deleteGridSchedule(id: number): Promise<void> {
+/home/z/my-project/src/app/local-grid/actions.ts:export async function listGridSchedules(clientId: number) {
+/home/z/my-project/src/app/tools/search-volume/actions.ts:export async function estimateVolumes(
+/home/z/my-project/src/app/ask/actions.ts:export async function askTheTool(input: {
+/home/z/my-project/src/app/tools/freshness/actions.ts:export async function runFreshnessAudit(
+/home/z/my-project/src/app/competitors/playbook/actions.ts:export async function runCompetitorAnalysis(
+/home/z/my-project/src/app/competitors/playbook/actions.ts:export async function playbookToTasks(opts: {
+/home/z/my-project/src/app/competitors/actions.ts:export async function addCompetitor(
+/home/z/my-project/src/app/competitors/actions.ts:export async function deleteCompetitor(competitorId: number) {
+/home/z/my-project/src/app/tools/link-recommender/actions.ts:export async function recommendLinks(
+/home/z/my-project/src/app/tools/migration-parity/actions.ts:export async function runParity(
+/home/z/my-project/src/app/monitor/actions.ts:export async function addMonitoredPage(
+/home/z/my-project/src/app/monitor/actions.ts:export async function deleteMonitoredPage(monitoredPageId: number) {
+/home/z/my-project/src/app/monitor/actions.ts:export async function setMonitorStatus(
+/home/z/my-project/src/app/monitor/actions.ts:export async function checkPageChanges(monitoredPageId: number) {
+/home/z/my-project/src/app/monitor/actions.ts:export async function checkAllMonitoredPages() {
+/home/z/my-project/src/app/tools/bulk-scan/actions.ts:export async function runBulkScan(opts: {
+/home/z/my-project/src/app/tools/rank-where/actions.ts:export async function checkRank(
+/home/z/my-project/src/app/tools/programmatic-seo/actions.ts:export async function runProgram(
+/home/z/my-project/src/app/annotations/actions.ts:export async function addAnnotation(
+/home/z/my-project/src/app/annotations/actions.ts:export async function removeAnnotation(id: number) {
+/home/z/my-project/src/app/annotations/actions.ts:export async function fetchAnnotations(
+/home/z/my-project/src/app/tools/gbp-reply/actions.ts:export async function listReplyLocations(): Promise<
+/home/z/my-project/src/app/tools/gbp-reply/actions.ts:export async function fetchReviewsWithDrafts(
+/home/z/my-project/src/app/tools/gbp-reply/actions.ts:export async function submitReply(
+/home/z/my-project/src/app/tools/soft-404/actions.ts:export async function runSoft404(
+/home/z/my-project/src/app/tools/mobile-friendly/actions.ts:export async function runMobile(
+/home/z/my-project/src/app/clients/import/actions.ts:export async function listImportableProperties(): Promise<ListImportableResult> {
+/home/z/my-project/src/app/clients/import/actions.ts:export async function importSelectedProperties(opts: {
+/home/z/my-project/src/app/tools/ads-funnel/actions.ts:export async function generateAdsFunnel(
+/home/z/my-project/src/app/clients/share-actions.ts:export async function generateShareToken(clientId: number): Promise<void> {
+/home/z/my-project/src/app/clients/share-actions.ts:export async function revokeShareToken(clientId: number): Promise<void> {
+/home/z/my-project/src/app/clients/share-actions.ts:export async function emailPortalLink(input: {
+/home/z/my-project/src/app/tools/crux/actions.ts:export async function runCrux(
+/home/z/my-project/src/app/tools/crux/actions.ts:export async function runOriginSummary(
+/home/z/my-project/src/app/tools/crux/actions.ts:export async function runCruxHistory(
+/home/z/my-project/src/app/tools/headers/actions.ts:export async function inspectHeaders(
+/home/z/my-project/src/app/tools/headers/actions.ts:export async function saveHeadersSnapshot(opts: {
+/home/z/my-project/src/app/clients/actions.ts:export async function fetchClientMetadata(
+/home/z/my-project/src/app/clients/actions.ts:export async function createClient(
+/home/z/my-project/src/app/clients/actions.ts:export async function applyStackTemplates(clientId: number) {
+/home/z/my-project/src/app/clients/actions.ts:export async function applyNicheTemplates(clientId: number) {
+/home/z/my-project/src/app/clients/actions.ts:export async function redetectTechStack(clientId: number) {
+/home/z/my-project/src/app/clients/actions.ts:export async function updateClient(
+/home/z/my-project/src/app/clients/actions.ts:export async function refreshClientMetadata(
+/home/z/my-project/src/app/clients/actions.ts:export async function refreshClientMetadataForm(clientId: number): Promise<void> {
+/home/z/my-project/src/app/clients/actions.ts:export async function quickAddClient(rawUrl: string): Promise<QuickAddResult> {
+/home/z/my-project/src/app/clients/actions.ts:export async function deleteClient(id: number) {
+/home/z/my-project/src/app/tools/content-score/actions.ts:export async function scoreContent(opts: {
+/home/z/my-project/src/app/tools/content-score/actions.ts:export async function saveContentScoreSnapshot(opts: {
+/home/z/my-project/src/app/clients/import-actions.ts:export async function importClientsCsv(
+/home/z/my-project/src/app/tools/plagiarism/actions.ts:export async function checkPlagiarism(input: {
+/home/z/my-project/src/app/tools/sitemap/actions.ts:export async function generateSitemap(
+/home/z/my-project/src/app/tools/branded-split/actions.ts:export async function runSplit(
+/home/z/my-project/src/app/tools/social-preview/actions.ts:export async function runSocial(
+/home/z/my-project/src/app/tools/cannibalization/actions.ts:export async function runCannibalScan(
+/home/z/my-project/src/app/clients/[id]/schedule-actions.ts:export async function saveSchedule(
+/home/z/my-project/src/app/clients/[id]/schedule-actions.ts:export async function deleteSchedule(scheduleId: number, clientId: number) {
+/home/z/my-project/src/app/clients/[id]/schedule-actions.ts:export async function sendReportNow(opts: {
+/home/z/my-project/src/app/tools/content-helpers/actions.ts:export async function getCoverImagePrompts(formData: FormData): Promise<ImagePromptResult> {
+/home/z/my-project/src/app/tools/content-helpers/actions.ts:export async function getCategorySuggestions(
+/home/z/my-project/src/app/tools/schema/actions.ts:export async function generateSchema(opts: {
+/home/z/my-project/src/app/clients/[id]/ai-audit/actions.ts:export async function startAiAudit(
+/home/z/my-project/src/app/clients/[id]/ai-audit/actions.ts:export async function toggleResolved(
+/home/z/my-project/src/app/clients/[id]/ai-audit/actions.ts:export async function saveIssueNotes(
+/home/z/my-project/src/app/tools/wp-hack-scan/actions.ts:export async function runWpHackScan(
+/home/z/my-project/src/app/tools/domain-overview/actions.ts:export async function runDomainOverview(
+/home/z/my-project/src/app/tools/outreach-personalize/actions.ts:export async function runPersonalize(
+/home/z/my-project/src/app/tools/reddit-research/actions.ts:export async function searchReddit(opts: {
+/home/z/my-project/src/app/clients/[id]/onboarding/actions.ts:export async function saveBrandStep(
+/home/z/my-project/src/app/clients/[id]/onboarding/actions.ts:export async function saveTargetingStep(
+/home/z/my-project/src/app/clients/[id]/onboarding/actions.ts:export async function saveSurfacesStep(
+/home/z/my-project/src/app/clients/[id]/onboarding/actions.ts:export async function runKeywordDiscovery(
+/home/z/my-project/src/app/clients/[id]/onboarding/actions.ts:export async function acceptDiscoveredKeywords(
+/home/z/my-project/src/app/clients/[id]/onboarding/actions.ts:export async function generateMonthlyCalendar(
+/home/z/my-project/src/app/clients/[id]/onboarding/actions.ts:export async function skipOnboarding(clientId: number): Promise<void> {
+/home/z/my-project/src/app/clients/[id]/onboarding/actions.ts:export async function getLearnedRulesForClient(
+/home/z/my-project/src/app/clients/[id]/onboarding/actions.ts:export async function getAuditProgress(
+/home/z/my-project/src/app/tools/utm-attribution/actions.ts:export async function runAttribution(
+/home/z/my-project/src/app/tools/robots/actions.ts:export async function checkRobots(
+/home/z/my-project/src/app/tools/robots-history/actions.ts:export async function runSnapshot(
+/home/z/my-project/src/app/tools/robots-history/actions.ts:export async function loadSnapshots(host: string) {
+/home/z/my-project/src/app/clients/[id]/automations/actions.ts:export async function createSchedule(
+/home/z/my-project/src/app/clients/[id]/automations/actions.ts:export async function toggleScheduleEnabled(
+/home/z/my-project/src/app/clients/[id]/automations/actions.ts:export async function deleteSchedule(
+/home/z/my-project/src/app/clients/[id]/automations/actions.ts:export async function runScheduleNow(
+/home/z/my-project/src/app/tools/link-graph/actions.ts:export async function runLinkGraph(
+/home/z/my-project/src/app/clients/[id]/google-actions.ts:export async function fetchGoogleProperties(): Promise<FetchPropertiesResult> {
+/home/z/my-project/src/app/clients/[id]/google-actions.ts:export async function saveGoogleProperties(opts: {
+/home/z/my-project/src/app/tools/content-grader/actions.ts:export async function gradeContent(
+/home/z/my-project/src/app/tools/meta-tag-generator/actions.ts:export async function generateMetaTags(
+/home/z/my-project/src/app/tools/summarizer/actions.ts:export async function runSummarize(
+/home/z/my-project/src/app/tools/keyword-difficulty/actions.ts:export async function estimateDifficulty(
+/home/z/my-project/src/app/tools/schema-validate/actions.ts:export async function runValidate(
+/home/z/my-project/src/app/tools/reputation-abuse-risk/actions.ts:export async function scanForRisk(
+/home/z/my-project/src/app/clients/[id]/queue/actions.ts:export async function approveQueueItem(
+/home/z/my-project/src/app/clients/[id]/queue/actions.ts:export async function approveAndPublishNow(
+/home/z/my-project/src/app/clients/[id]/queue/actions.ts:export async function rejectQueueItem(
+/home/z/my-project/src/app/clients/[id]/queue/actions.ts:export async function deleteQueueItem(
+/home/z/my-project/src/app/tools/pagerank/actions.ts:export async function runPagerank(
+/home/z/my-project/src/app/clients/[id]/wp-actions.ts:export async function saveWpCreds(
+/home/z/my-project/src/app/clients/[id]/wp-actions.ts:export async function disconnectWpBridge(clientId: number): Promise<void> {
+/home/z/my-project/src/app/clients/[id]/wp-actions.ts:export async function pushWpFix(
+/home/z/my-project/src/app/clients/[id]/wp-actions.ts:export async function pushImageAltFix(opts: {
+/home/z/my-project/src/app/tools/news-headline/actions.ts:export async function runHeadline(
+/home/z/my-project/src/app/clients/[id]/per-client-google-actions.ts:export async function disconnectPerClientGoogle(
+/home/z/my-project/src/app/tools/backlink-discovery/actions.ts:export async function runBacklinkDiscovery(
+/home/z/my-project/src/app/tools/bing/actions.ts:export async function saveBingKey(formData: FormData): Promise<void> {
+/home/z/my-project/src/app/tools/bing/actions.ts:export async function clearBingKey(): Promise<void> {
+/home/z/my-project/src/app/tools/bing/actions.ts:export async function fetchBingInsights(
+/home/z/my-project/src/app/tools/bing/actions.ts:export async function submitBingUrls(
+/home/z/my-project/src/app/tools/bing/actions.ts:export async function fetchBingSites(): Promise<
+/home/z/my-project/src/app/tools/auto-link/actions.ts:export async function runAutoLink(
+/home/z/my-project/src/app/tools/ai-robots/actions.ts:export async function runAiRobotsAudit(
+/home/z/my-project/src/app/tasks/actions.ts:export async function setTaskStatus(
+/home/z/my-project/src/app/tasks/actions.ts:export async function deleteTask(taskId: number) {
+/home/z/my-project/src/app/tasks/actions.ts:export async function createTask(
+/home/z/my-project/src/app/tasks/actions.ts:export async function setTaskRecurrence(
+/home/z/my-project/src/app/tasks/actions.ts:export async function logTaskTime(input: {
+/home/z/my-project/src/app/tasks/actions.ts:export async function setTaskEstimate(
+/home/z/my-project/src/app/tasks/actions.ts:export async function bulkSetTaskStatus(
+/home/z/my-project/src/app/tasks/actions.ts:export async function bulkSetTaskPriority(
+/home/z/my-project/src/app/tasks/actions.ts:export async function bulkDeleteTasks(ids: number[]) {
+/home/z/my-project/src/app/tasks/actions.ts:export async function applyPlaybookToClient(input: {
+/home/z/my-project/src/app/tools/aio-passage/actions.ts:export async function analyzePassages(
+/home/z/my-project/src/app/tools/aio-passage/actions.ts:export async function suggestRewrite(
+/home/z/my-project/src/app/tools/aio-passage/actions.ts:export async function analyzeUrl(
+/home/z/my-project/src/app/tools/aio-passage/actions.ts:export async function batchRewrite(
+/home/z/my-project/src/app/tools/security/actions.ts:export async function checkSecurity(
+/home/z/my-project/src/app/broken-links/actions.ts:export async function checkUrl(url: string): Promise<BrokenLinksResult> {
+/home/z/my-project/src/app/tools/link-intersect/actions.ts:export async function runLinkIntersect(
+/home/z/my-project/src/app/tools/screenshot-import/actions.ts:export async function parseScreenshot(input: {
+/home/z/my-project/src/app/tools/code-generator/actions.ts:export async function generateCode(
+/home/z/my-project/src/app/cwv/actions.ts:export async function runCwvScan(opts: {
+/home/z/my-project/src/app/cwv/actions.ts:export async function deleteCwvReport(id: number, clientId: number) {
+/home/z/my-project/src/app/tools/indexnow/actions.ts:export async function submitIndexNow(
+/home/z/my-project/src/app/tools/indexnow/actions.ts:export async function verifyIndexNowKeyFile(
+/home/z/my-project/src/app/tools/migration-map/actions.ts:export async function importToRedirectRules(
+/home/z/my-project/src/app/tools/migration-map/actions.ts:export async function runMapping(
+/home/z/my-project/src/app/tools/ai-schema/actions.ts:export async function runAiSchema(
+/home/z/my-project/src/app/tools/eeat-audit/actions.ts:export async function runEeatAudit(
+/home/z/my-project/src/app/tools/geo-score/actions.ts:export async function runGeoScore(
+/home/z/my-project/src/app/gbp/c/[clientId]/reviews/actions.ts:export async function loadReviewDesk(
+/home/z/my-project/src/app/gbp/c/[clientId]/reviews/actions.ts:export async function listLocationChoices(
+/home/z/my-project/src/app/gbp/c/[clientId]/reviews/actions.ts:export async function chooseLocation(
+/home/z/my-project/src/app/gbp/c/[clientId]/reviews/actions.ts:export async function syncReviews(clientId: number): Promise<SyncResult> {
+/home/z/my-project/src/app/gbp/c/[clientId]/reviews/actions.ts:export async function draftNextReplies(opts: {
+/home/z/my-project/src/app/gbp/c/[clientId]/reviews/actions.ts:export async function saveDraft(opts: {
+/home/z/my-project/src/app/gbp/c/[clientId]/reviews/actions.ts:export async function publishReply(opts: {
+/home/z/my-project/src/app/gbp/c/[clientId]/reviews/actions.ts:export async function publishAllDrafts(
+/home/z/my-project/src/app/gbp/c/[clientId]/playbook-actions.ts:export async function togglePlaybookItem(
+/home/z/my-project/src/app/gbp/c/[clientId]/playbook-actions.ts:export async function getCompletionsForClient(clientId: number): Promise<{
+/home/z/my-project/src/app/digest/actions.ts:export async function sendDigest(
+/home/z/my-project/src/app/digest/actions.ts:export async function setSchedule(
+/home/z/my-project/src/app/digest/actions.ts:export async function loadDigestSettings() {
+/home/z/my-project/src/app/gbp/actions.ts:export async function runGbpScrape(
+/home/z/my-project/src/app/gbp/actions.ts:export async function generateReviewReply(opts: {
+/home/z/my-project/src/app/gbp/actions.ts:export async function loadGbpForClient(
+/home/z/my-project/src/app/gbp/actions.ts:export async function postGbpReply(opts: {
+/home/z/my-project/src/app/gbp/actions.ts:export async function composeGbpPost(opts: {
+/home/z/my-project/src/app/gbp/actions.ts:export async function generateGbpPostIdeas(opts: {
+/home/z/my-project/src/app/gbp/actions.ts:export async function pingGbpLocation(opts: {
+/home/z/my-project/src/app/automations/actions.ts:export async function createAutomation(
+/home/z/my-project/src/app/automations/actions.ts:export async function setAutomationEnabled(id: number, enabled: boolean) {
+/home/z/my-project/src/app/automations/actions.ts:export async function deleteAutomation(id: number) {
+/home/z/my-project/src/app/automations/actions.ts:export async function testWebhook(url: string): Promise<
+/home/z/my-project/src/app/automations/actions.ts:export async function installWorkflowTemplate(input: {
+/home/z/my-project/src/app/portal/[token]/chat-actions.ts:export async function portalChat(
+/home/z/my-project/src/app/agent/autopilot/actions.ts:export async function saveAgentSettings(
+/home/z/my-project/src/app/agent/autopilot/actions.ts:export async function setLevel(level: AutonomyLevel): Promise<AgentSettings> {
+/home/z/my-project/src/app/agent/autopilot/actions.ts:export async function runNow(clientId?: number): Promise<RunNowResult> {
+/home/z/my-project/src/app/agent/autopilot/actions.ts:export async function approveAction(
+/home/z/my-project/src/app/agent/autopilot/actions.ts:export async function rejectAction(
+/home/z/my-project/src/app/agent/autopilot/actions.ts:export async function undoAction(
+/home/z/my-project/src/app/agent/autopilot/actions.ts:export async function undoRun(
+/home/z/my-project/src/app/agent/autopilot/actions.ts:export async function approveAllOfKind(opts: {
+/home/z/my-project/src/app/agent/autopilot/actions.ts:export async function waitingByKind(
+/home/z/my-project/src/app/agent/actions.ts:export async function runAgent(clientId: number): Promise<AgentRunResult> {
+/home/z/my-project/src/app/agent/actions.ts:export async function runAgentExecute(
+/home/z/my-project/src/app/agent/actions.ts:export async function applySuggestion(suggestionId: number) {
+
+[Showing results with pagination = limit: 400]

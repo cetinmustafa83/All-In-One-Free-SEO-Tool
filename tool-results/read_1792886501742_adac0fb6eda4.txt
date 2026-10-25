@@ -1,0 +1,900 @@
+     1→     1→//! Tools wave 2 (COMPUTE) — Task 14.6b.
+     2→     2→//!
+     3→     3→//! Ports the computation half of the `tools/*` server actions that are
+     4→     4→//! provably local (no outbound network, no AI provider) along with their
+     5→     5→//! saveToolRun bookkeeping:
+     6→     6→//!
+     7→     7→//!   utm-attribution  runAttribution — parsePastedTouches + classifyChannel
+     8→     8→//!                                     + first/last/assisted/linear/position
+     9→     9→//!                                     aggregation, entirely over PASTED
+    10→    10→//!                                     text (the full call graph touches no
+    11→    11→//!                                     network and no AI).
+    12→    12→//!   migration-map    runMapping     — buildMigrationMap (slug-token Jaccard
+    13→    13→//!                                     + tail bonus + depth penalty) +
+    14→    14→//!                                     renderRedirectMap (nginx/apache/
+    15→    15→//!                                     nextjs), plus the tool_runs row.
+    16→    16→//!
+    17→    17→//! Triage (Task 14.6b) — the other 10 candidates stay Next-side, honestly:
+    18→    18→//!   meta-tag-generator  callAI → provider-dispatch               (AI)
+    19→    19→//!   social-preview      extractSocialPreviews → fetchHtml        (NET)
+    20→    20→//!   anchor-distribution extractAnchorDistribution → fetchHtml    (NET)
+    21→    21→//!   schema-validate     validateSchemaFromUrl → fetchHtml        (NET)
+    22→    22→//!   ai-robots           auditAiBotRobots → guardedFetch robots.txt (NET)
+    23→    23→//!   link-graph          analyseInternalLinks → fetch robots/sitemaps/pages (NET)
+    24→    24→//!   link-intersect      DuckDuckGo search + fetchPageHtml        (NET)
+    25→    25→//!   link-recommender    callAI + internal-link-graph crawler     (NET+AI)
+    26→    26→//!   cluster             callAI + scanSerp + fetch                (NET+AI)
+    27→    27→//!   content-grader      buildCorpus → scanSerp + per-result fetch (NET)
+    28→    28→//!
+    29→    29→//! Regex parity note (no regex crate): every regex the two ported functions
+    30→    30→//! use is exactly replicable with string ops —
+    31→    31→//!   /\r?\n/            → split('\n') then strip ONE trailing '\r'
+    32→    32→//!   /,|\t/             → per-char split on ',' or '\t' (the regex's run
+    33→    33→//!                         collapse is observationally identical after the
+    34→    34→//!                         same empty/short-token filter)
+    35→    35→//!   /^"|"$/g           → strip_prefix('"') then strip_suffix('"')
+    36→    36→//!   /^(?:a|b|c)$/i     → lowercase + fixed-set membership (ASCII literals)
+    37→    37→//!   /\.(html?|php|aspx?|jsp)$/ → ends-with chain on the already lowercased
+    38→    38→//!                         path (only one alternative can match a tail)
+    39→    39→//!   /[\/\-_~,;:]+/     → per-char split + same filter (see /,|\t/)
+    40→    40→//!   /\/$/              → strip_suffix('/')
+    41→    41→//!   /[.+?$|()[\]\\]/g  → char-in-set escape loop
+    42→    42→//! runMapping's one non-regex dependency — `new URL` for pathname/search —
+    43→    43→//! stays Next-side (verdicts-over-the-wire, the 14.5b/14.6a precedent): the
+    44→    44→//! proxy pre-shapes every URL into {url, pathname, search, ok} with real
+    45→    45→//! WHATWG parsing and this module does everything else, including the
+    46→    46→//! try/catch fallbacks via the ok flag.
+    47→    47→//!
+    48→    48→//! Bookkeeping note: the original actions wrap saveToolRun in
+    49→    49→//! `.catch(() => undefined)` — the runs table is deliberately best-effort
+    50→    50→//! ("losing the answer to protect the bookkeeping is the wrong trade",
+    51→    51→//! tool-findings.ts). So unlike the primary-effect writes elsewhere, a
+    52→    52→//! failed tool_runs insert here is LOGGED (tracing::warn) and the computed
+    53→    53→//! result is still returned — mirroring the original contract instead of
+    54→    54→//! silently dropping the error or 500-ing the user's answer away.
+    55→    55→//!
+    56→    56→//! Math parity: JS Math.round is spec'd as floor(x + ½) → internal::js_round;
+    57→    57→//! string sort `<` is UTF-16 code-unit order → js_str_lt; `(x).toFixed(0)`
+    58→    58→//! is nearest-with-ties-larger on the exact value → js_to_fixed0; JSON
+    59→    59→//! numbers that are whole in JS ("2", not "2.0") go through js_num.
+    60→    60→
+    61→    61→use crate::internal::{js_round, result_json};
+    62→    62→use crate::util::{js_slice, js_string, now_iso};
+    63→    63→use crate::AppState;
+    64→    64→use axum::body::Bytes;
+    65→    65→use axum::extract::State;
+    66→    66→use axum::response::Response;
+    67→    67→use rusqlite::params;
+    68→    68→use serde_json::{json, Value};
+    69→    69→use std::collections::{HashMap, HashSet};
+    70→    70→
+    71→    71→fn body_of(bytes: &[u8]) -> Value {
+    72→    72→    serde_json::from_slice(bytes).unwrap_or(Value::Null)
+    73→    73→}
+    74→    74→
+    75→    75→// ---------------------------------------------------------------------------
+    76→    76→// JS primitives (exact, no regex crate)
+    77→    77→// ---------------------------------------------------------------------------
+    78→    78→
+    79→    79→/// JS String.prototype.trim removes exactly: TAB VT FF SP NBSP, the Zs
+    80→    80→/// category, LS/PS and ZWNBSP (U+FEFF). Rust's trim differs on U+0085 (in)
+    81→    81→/// and U+FEFF (out) — this is the exact JS set.
+    82→    82→fn is_js_ws(c: char) -> bool {
+    83→    83→    matches!(
+    84→    84→        c,
+    85→    85→        '\u{09}' | '\u{0A}' | '\u{0B}' | '\u{0C}' | '\u{0D}' | '\u{20}'
+    86→    86→            | '\u{A0}' | '\u{1680}' | '\u{2000}'..='\u{200A}'
+    87→    87→            | '\u{2028}' | '\u{2029}' | '\u{202F}' | '\u{205F}' | '\u{3000}'
+    88→    88→            | '\u{FEFF}'
+    89→    89→    )
+    90→    90→}
+    91→    91→
+    92→    92→fn js_trim(s: &str) -> &str {
+    93→    93→    s.trim_matches(is_js_ws)
+    94→    94→}
+    95→    95→
+    96→    96→/// JS `s.replace(/^"|"$/g, "")` — one leading and one trailing quote.
+    97→    97→fn strip_edge_quotes(s: &str) -> &str {
+    98→    98→    let a = s.strip_prefix('"').unwrap_or(s);
+    99→    99→    a.strip_suffix('"').unwrap_or(a)
+   100→   100→}
+   101→   101→
+   102→   102→/// JS string `<` — UTF-16 code-unit order (String.prototype comparison).
+   103→   103→fn js_str_lt(a: &str, b: &str) -> bool {
+   104→   104→    let mut ai = a.encode_utf16();
+   105→   105→    let mut bi = b.encode_utf16();
+   106→   106→    loop {
+   107→   107→        match (ai.next(), bi.next()) {
+   108→   108→            (None, None) => return false,
+   109→   109→            (None, Some(_)) => return true,
+   110→   110→            (Some(_), None) => return false,
+   111→   111→            (Some(x), Some(y)) => {
+   112→   112→                if x != y {
+   113→   113→                    return x < y;
+   114→   114→                }
+   115→   115→            }
+   116→   116→        }
+   117→   117→    }
+   118→   118→}
+   119→   119→
+   120→   120→/// Whole doubles serialize the JS way: JSON.stringify(2.0) → "2".
+   121→   121→fn js_num(x: f64) -> Value {
+   122→   122→    if x.is_finite() && x == x.trunc() && x.abs() < 9.007_199_254_740_992e15 {
+   123→   123→        Value::from(x as i64)
+   124→   124→    } else {
+   125→   125→        Value::from(x)
+   126→   126→    }
+   127→   127→}
+   128→   128→
+   129→   129→/// `(x).toFixed(0)` — nearest integer on the exact value, ties to the LARGER
+   130→   130→/// (spec: "If there are two such n, pick the larger n").
+   131→   131→fn js_to_fixed0(x: f64) -> i64 {
+   132→   132→    let fl = x.floor();
+   133→   133→    let frac = x - fl;
+   134→   134→    if frac >= 0.5 {
+   135→   135→        fl as i64 + 1
+   136→   136→    } else {
+   137→   137→        fl as i64
+   138→   138→    }
+   139→   139→}
+   140→   140→
+   141→   141→/// Insertion-ordered map (JS Map iteration order) without new deps.
+   142→   142→struct OrdMap<V> {
+   143→   143→    entries: Vec<(String, V)>,
+   144→   144→    idx: HashMap<String, usize>,
+   145→   145→}
+   146→   146→
+   147→   147→impl<V> OrdMap<V> {
+   148→   148→    fn new() -> Self {
+   149→   149→        OrdMap { entries: Vec::new(), idx: HashMap::new() }
+   150→   150→    }
+   151→   151→    /// Existing value or a freshly-inserted zero value (JS `get ?? init`).
+   152→   152→    fn entry_or_default(&mut self, key: &str, make: impl FnOnce() -> V) -> &mut V {
+   153→   153→        if !self.idx.contains_key(key) {
+   154→   154→            self.idx.insert(key.to_string(), self.entries.len());
+   155→   155→            self.entries.push((key.to_string(), make()));
+   156→   156→        }
+   157→   157→        let i = self.idx[key];
+   158→   158→        &mut self.entries[i].1
+   159→   159→    }
+   160→   160→    fn iter(&self) -> impl Iterator<Item = (&String, &V)> {
+   161→   161→        self.entries.iter().map(|(k, v)| (k, v))
+   162→   162→    }
+   163→   163→}
+   164→   164→
+   165→   165→// ---------------------------------------------------------------------------
+   166→   166→// saveToolRun port (src/lib/tool-runs.ts) — shared by both endpoints
+   167→   167→// ---------------------------------------------------------------------------
+   168→   168→
+   169→   169→struct ToolRunRefs {
+   170→   170→    client_id: Option<i64>,
+   171→   171→    user_id: Option<i64>,
+   172→   172→}
+   173→   173→
+   174→   174→fn refs_of(body: &Value) -> ToolRunRefs {
+   175→   175→    ToolRunRefs {
+   176→   176→        client_id: body.get("clientId").and_then(|v| v.as_i64()),
+   177→   177→        user_id: body.get("userId").and_then(|v| v.as_i64()),
+   178→   178→    }
+   179→   179→}
+   180→   180→
+   181→   181→/// Drizzle toolRuns insert: label.slice(0,200), input/result as JSON text
+   182→   182→/// (mode:"json"), createdAt takes the DDL default (unixepoch).
+   183→   183→fn save_tool_run(
+   184→   184→    state: &AppState,
+   185→   185→    tool_id: &str,
+   186→   186→    label: &str,
+   187→   187→    input: &Value,
+   188→   188→    result: &Value,
+   189→   189→    refs: &ToolRunRefs,
+   190→   190→) -> rusqlite::Result<i64> {
+   191→   191→    let label = js_slice(label, 200);
+   192→   192→    let input_text = serde_json::to_string(input).unwrap_or_else(|_| "null".into());
+   193→   193→    let result_text = serde_json::to_string(result).unwrap_or_else(|_| "null".into());
+   194→   194→    state.db.with_conn(|c| {
+   195→   195→        c.query_row(
+   196→   196→            "INSERT INTO tool_runs (client_id, tool_id, label, input_json, result_json, user_id) \
+   197→   197→             VALUES (?1, ?2, ?3, ?4, ?5, ?6) RETURNING id",
+   198→   198→            params![refs.client_id, tool_id, label, input_text, result_text, refs.user_id],
+   199→   199→            |r| r.get::<_, i64>(0),
+   200→   200→        )
+   201→   201→    })
+   202→   202→}
+   203→   203→
+   204→   204→// ---------------------------------------------------------------------------
+   205→   205→// utm-attribution: runAttribution
+   206→   206→// ---------------------------------------------------------------------------
+   207→   207→
+   208→   208→struct Touch {
+   209→   209→    timestamp: String,
+   210→   210→    source: String,
+   211→   211→    medium: String,
+   212→   212→    user_id: Option<String>,
+   213→   213→}
+   214→   214→
+   215→   215→#[derive(Clone, Copy)]
+   216→   216→struct ChannelStats {
+   217→   217→    first: i64,
+   218→   218→    last: i64,
+   219→   219→    assisted: i64,
+   220→   220→    linear: f64,
+   221→   221→    position: f64,
+   222→   222→    inclusion: i64,
+   223→   223→}
+   224→   224→
+   225→   225→/// raw.split(/\r?\n/), trimmed, empties dropped — exact.
+   226→   226→fn split_lines(raw: &str) -> Vec<String> {
+   227→   227→    raw.split('\n')
+   228→   228→        .map(|l| {
+   229→   229→            let l = l.strip_suffix('\r').unwrap_or(l);
+   230→   230→            js_trim(l).to_string()
+   231→   231→        })
+   232→   232→        .filter(|l| !l.is_empty())
+   233→   233→        .collect()
+   234→   234→}
+   235→   235→
+   236→   236→/// Per-cell transform of parsePastedTouches: `s.trim().replace(/^"|"$/g,"")`
+   237→   237→/// (header cells lowercase first).
+   238→   238→fn cell(line: &str, lowercase: bool) -> String {
+   239→   239→    let c = strip_edge_quotes(js_trim(line));
+   240→   240→    if lowercase {
+   241→   241→        c.to_lowercase()
+   242→   242→    } else {
+   243→   243→        c.to_string()
+   244→   244→    }
+   245→   245→}
+   246→   246→
+   247→   247→/// Split on `,` or `\t` per char; after the token filter downstream this is
+   248→   248→/// observationally identical to the regex's run-collapse split.
+   249→   249→fn split_cols(line: &str) -> Vec<String> {
+   250→   250→    line.split(|c| c == ',' || c == '\t').map(String::from).collect()
+   251→   251→}
+   252→   252→
+   253→   253→fn classify_channel(source: &str, medium: &str) -> String {
+   254→   254→    if source.is_empty() && medium.is_empty() {
+   255→   255→        return "Direct".into();
+   256→   256→    }
+   257→   257→    let src = source.to_lowercase();
+   258→   258→    let med = medium.to_lowercase();
+   259→   259→    if matches!(src.as_str(), "google" | "bing" | "yahoo" | "duckduckgo") {
+   260→   260→        return if med.starts_with("cpc") || med.contains("paid") {
+   261→   261→            "Paid Search".into()
+   262→   262→        } else {
+   263→   263→            "Organic Search".into()
+   264→   264→        };
+   265→   265→    }
+   266→   266→    if matches!(
+   267→   267→        src.as_str(),
+   268→   268→        "facebook" | "instagram" | "tiktok" | "linkedin" | "x" | "twitter"
+   269→   269→            | "reddit" | "pinterest" | "youtube"
+   270→   270→    ) {
+   271→   271→        return if med.contains("paid") {
+   272→   272→            "Paid Social".into()
+   273→   273→        } else {
+   274→   274→            "Social".into()
+   275→   275→        };
+   276→   276→    }
+   277→   277→    // CHANNEL_RULES in order; /^(?:…)$/i is an exact match on the folded
+   278→   278→    // medium. Note paid_social lands in Paid Search (first rule wins).
+   279→   279→    const RULES: [(&[&str], &str); 9] = [
+   280→   280→        (&["cpc", "paid", "ppc", "paid_social", "paidsocial"], "Paid Search"),
+   281→   281→        (&["social", "paid_social", "paidsocial"], "Paid Social"),
+   282→   282→        (&["organic"], "Organic Search"),
+   283→   283→        (&["email", "newsletter"], "Email"),
+   284→   284→        (&["referral"], "Referral"),
+   285→   285→        (&["affiliate"], "Affiliate"),
+   286→   286→        (&["display", "banner"], "Display"),
+   287→   287→        (&["video"], "Video"),
+   288→   288→        (&["none", "(none)", "direct"], "Direct"),
+   289→   289→    ];
+   290→   290→    for (set, channel) in RULES {
+   291→   291→        if set.contains(&med.as_str()) {
+   292→   292→            return channel.into();
+   293→   293→        }
+   294→   294→    }
+   295→   295→    if !medium.is_empty() {
+   296→   296→        return format!("Other ({medium})");
+   297→   297→    }
+   298→   298→    "Direct".into()
+   299→   299→}
+   300→   300→
+   301→   301→/// Port of parsePastedTouches → (touches, conversions in insertion order).
+   302→   302→fn parse_pasted_touches(raw: &str) -> (Vec<Touch>, Vec<String>) {
+   303→   303→    let lines = split_lines(raw);
+   304→   304→    if lines.is_empty() {
+   305→   305→        return (Vec::new(), Vec::new());
+   306→   306→    }
+   307→   307→    let header: Vec<String> =
+   308→   308→        split_cols(&lines[0]).iter().map(|c| cell(c, true)).collect();
+   309→   309→    let has_header = header
+   310→   310→        .iter()
+   311→   311→        .any(|h| h == "timestamp" || h == "source" || h == "medium");
+   312→   312→    let data_lines: &[String] = if has_header { &lines[1..] } else { &lines };
+   313→   313→
+   314→   314→    let idx = |name: &str| header.iter().position(|h| h == name);
+   315→   315→    let mut touches: Vec<Touch> = Vec::new();
+   316→   316→    let mut conversions: Vec<String> = Vec::new();
+   317→   317→    let mut conv_seen: HashSet<String> = HashSet::new();
+   318→   318→
+   319→   319→    for line in data_lines {
+   320→   320→        let cols: Vec<String> =
+   321→   321→            split_cols(line).iter().map(|c| cell(c, false)).collect();
+   322→   322→        let get = |key: &str| -> String {
+   323→   323→            if has_header {
+   324→   324→                if let Some(i) = idx(key) {
+   325→   325→                    return cols.get(i).cloned().unwrap_or_default();
+   326→   326→                }
+   327→   327→            }
+   328→   328→            String::new()
+   329→   329→        };
+   330→   330→        let pick = |primary: String, fb: Option<&String>| -> String {
+   331→   331→            if !primary.is_empty() {
+   332→   332→                primary
+   333→   333→            } else {
+   334→   334→                fb.filter(|f| !f.is_empty()).cloned().unwrap_or_default()
+   335→   335→            }
+   336→   336→        };
+   337→   337→        let source = pick(get("source"), cols.get(1));
+   338→   338→        let medium = pick(get("medium"), cols.get(2));
+   339→   339→        if source.is_empty() && medium.is_empty() {
+   340→   340→            continue;
+   341→   341→        }
+   342→   342→        let user_id: Option<String> = {
+   343→   343→            let a = get("userid");
+   344→   344→            let b = get("user_id");
+   345→   345→            if !a.is_empty() {
+   346→   346→                Some(a)
+   347→   347→            } else if !b.is_empty() {
+   348→   348→                Some(b)
+   349→   349→            } else {
+   350→   350→                cols.first().filter(|f| !f.is_empty()).cloned()
+   351→   351→            }
+   352→   352→        };
+   353→   353→        let timestamp = {
+   354→   354→            let t = get("timestamp");
+   355→   355→            if t.is_empty() { now_iso() } else { t }
+   356→   356→        };
+   357→   357→        touches.push(Touch {
+   358→   358→            timestamp,
+   359→   359→            source: source.clone(),
+   360→   360→            medium: medium.clone(),
+   361→   361→            user_id: user_id.clone(),
+   362→   362→        });
+   363→   363→        if get("isconversion") == "1" || get("is_conversion") == "1" || get("conversion") == "1" {
+   364→   364→            if let Some(u) = &user_id {
+   365→   365→                if conv_seen.insert(u.clone()) {
+   366→   366→                    conversions.push(u.clone());
+   367→   367→                }
+   368→   368→            }
+   369→   369→        }
+   370→   370→    }
+   371→   371→    // No explicit conversions → every user's final touch counts as one.
+   372→   372→    if conversions.is_empty() {
+   373→   373→        for t in &touches {
+   374→   374→            if let Some(u) = &t.user_id {
+   375→   375→                if conv_seen.insert(u.clone()) {
+   376→   376→                    conversions.push(u.clone());
+   377→   377→                }
+   378→   378→            }
+   379→   379→        }
+   380→   380→    }
+   381→   381→    (touches, conversions)
+   382→   382→}
+   383→   383→
+   384→   384→/// POST /api/internal/tools/utm-attribution/run
+   385→   385→pub async fn utm_run(State(state): State<AppState>, bytes: Bytes) -> Response {
+   386→   386→    let body = body_of(&bytes);
+   387→   387→    // The proxy trims with JS semantics already; re-trim for direct callers.
+   388→   388→    let raw = js_trim(&js_string(body.get("touches"))).to_string();
+   389→   389→    if raw.is_empty() {
+   390→   390→        return result_json(json!({ "ok": false, "error": "Paste touch data first." }));
+   391→   391→    }
+   392→   392→    let (touches, conversions) = parse_pasted_touches(&raw);
+   393→   393→    if touches.is_empty() {
+   394→   394→        return result_json(json!({ "ok": false, "error": "Couldn't parse any touches." }));
+   395→   395→    }
+   396→   396→
+   397→   397→    // Group touches by user (insertion order = first appearance).
+   398→   398→    let mut by_user: OrdMap<Vec<usize>> = OrdMap::new();
+   399→   399→    for (i, t) in touches.iter().enumerate() {
+   400→   400→        let u = match &t.user_id {
+   401→   401→            Some(u) => u.clone(),
+   402→   402→            // anon-{Math.random()} only ever needs to be unique per touch —
+   403→   403→            // the id itself never reaches the output.
+   404→   404→            None => format!("anon-{i}"),
+   405→   405→        };
+   406→   406→        by_user.entry_or_default(&u, Vec::new).push(i);
+   407→   407→    }
+   408→   408→    let mut lists: Vec<(String, Vec<usize>)> = by_user
+   409→   409→        .entries
+   410→   410→        .iter()
+   411→   411→        .map(|(k, v)| (k.clone(), v.clone()))
+   412→   412→        .collect();
+   413→   413→    for (_, list) in lists.iter_mut() {
+   414→   414→        // JS comparator is (a.timestamp < b.timestamp ? -1 : 1); the equal
+   415→   415→        // case is mapped to Equal (V8's order for it is unspecified).
+   416→   416→        list.sort_by(|&a, &b| {
+   417→   417→            let ta = &touches[a].timestamp;
+   418→   418→            let tb = &touches[b].timestamp;
+   419→   419→            if js_str_lt(ta, tb) {
+   420→   420→                std::cmp::Ordering::Less
+   421→   421→            } else if ta == tb {
+   422→   422→                std::cmp::Ordering::Equal
+   423→   423→            } else {
+   424→   424→                std::cmp::Ordering::Greater
+   425→   425→            }
+   426→   426→        });
+   427→   427→    }
+   428→   428→
+   429→   429→    let mut channels: OrdMap<ChannelStats> = OrdMap::new();
+   430→   430→    let mk = || ChannelStats {
+   431→   431→        first: 0,
+   432→   432→        last: 0,
+   433→   433→        assisted: 0,
+   434→   434→        linear: 0.0,
+   435→   435→        position: 0.0,
+   436→   436→        inclusion: 0,
+   437→   437→    };
+   438→   438→    let mut paths: Vec<Vec<String>> = Vec::new();
+   439→   439→
+   440→   440→    for (user, list) in &lists {
+   441→   441→        if !conversions.iter().any(|c| c == user) {
+   442→   442→            continue;
+   443→   443→        }
+   444→   444→        let path: Vec<String> = list
+   445→   445→            .iter()
+   446→   446→            .map(|&i| classify_channel(&touches[i].source, &touches[i].medium))
+   447→   447→            .collect();
+   448→   448→        paths.push(path.clone());
+   449→   449→
+   450→   450→        let len = path.len();
+   451→   451→        channels.entry_or_default(&path[0], mk).first += 1;
+   452→   452→        channels.entry_or_default(&path[len - 1], mk).last += 1;
+   453→   453→        if len > 2 {
+   454→   454→            for c in &path[1..len - 1] {
+   455→   455→                channels.entry_or_default(c, mk).assisted += 1;
+   456→   456→            }
+   457→   457→        }
+   458→   458→        for c in &path {
+   459→   459→            channels.entry_or_default(c, mk).linear += 1.0 / len as f64;
+   460→   460→        }
+   461→   461→        if len == 1 {
+   462→   462→            channels.entry_or_default(&path[0], mk).position += 1.0;
+   463→   463→        } else if len == 2 {
+   464→   464→            channels.entry_or_default(&path[0], mk).position += 0.5;
+   465→   465→            channels.entry_or_default(&path[1], mk).position += 0.5;
+   466→   466→        } else {
+   467→   467→            channels.entry_or_default(&path[0], mk).position += 0.4;
+   468→   468→            channels.entry_or_default(&path[len - 1], mk).position += 0.4;
+   469→   469→            let mid_share = 0.2 / (len - 2) as f64;
+   470→   470→            for c in &path[1..len - 1] {
+   471→   471→                channels.entry_or_default(c, mk).position += mid_share;
+   472→   472→            }
+   473→   473→        }
+   474→   474→        let mut distinct: HashSet<&str> = HashSet::new();
+   475→   475→        for c in &path {
+   476→   476→            if distinct.insert(c.as_str()) {
+   477→   477→                channels.entry_or_default(c, mk).inclusion += 1;
+   478→   478→            }
+   479→   479→        }
+   480→   480→    }
+   481→   481→
+   482→   482→    // Round BEFORE the sort, exactly like the map() in front of sort().
+   483→   483→    let mut sorted: Vec<(String, ChannelStats, f64, f64)> = channels
+   484→   484→        .iter()
+   485→   485→        .map(|(name, s)| {
+   486→   486→            (
+   487→   487→                name.clone(),
+   488→   488→                ChannelStats { ..*s },
+   489→   489→                js_round(s.linear * 100.0) / 100.0,
+   490→   490→                js_round(s.position * 100.0) / 100.0,
+   491→   491→            )
+   492→   492→        })
+   493→   493→        .collect();
+   494→   494→    sorted.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
+   495→   495→
+   496→   496→    let mut path_counts: OrdMap<(Vec<String>, i64)> = OrdMap::new();
+   497→   497→    for p in &paths {
+   498→   498→        let key = p.join(" → ");
+   499→   499→        path_counts.entry_or_default(&key, || (p.clone(), 0)).1 += 1;
+   500→   500→    }
+   501→   501→    let mut top: Vec<(&Vec<String>, i64)> =
+   502→   502→        path_counts.iter().map(|(_, (p, c))| (p, *c)).collect();
+   503→   503→    top.sort_by(|a, b| b.1.cmp(&a.1));
+   504→   504→    let top_paths: Vec<Value> = top
+   505→   505→        .into_iter()
+   506→   506→        .take(10)
+   507→   507→        .map(|(p, c)| json!({ "path": p, "count": c }))
+   508→   508→        .collect();
+   509→   509→
+   510→   510→    let total_len: usize = paths.iter().map(|p| p.len()).sum();
+   511→   511→    let avg = if paths.is_empty() {
+   512→   512→        0.0
+   513→   513→    } else {
+   514→   514→        js_round((total_len as f64 / paths.len() as f64) * 10.0) / 10.0
+   515→   515→    };
+   516→   516→
+   517→   517→    let result = json!({
+   518→   518→        "totalTouches": touches.len(),
+   519→   519→        "totalConversions": conversions.len(),
+   520→   520→        "uniqueUsers": lists.len(),
+   521→   521→        "channels": sorted
+   522→   522→            .iter()
+   523→   523→            .map(|(name, s, linear, position)| json!({
+   524→   524→                "channel": name,
+   525→   525→                "firstTouches": s.first,
+   526→   526→                "lastTouches": s.last,
+   527→   527→                "assistedTouches": s.assisted,
+   528→   528→                "linearCredit": js_num(*linear),
+   529→   529→                "positionCredit": js_num(*position),
+   530→   530→                "pathInclusion": s.inclusion,
+   531→   531→            }))
+   532→   532→            .collect::<Vec<_>>(),
+   533→   533→        "topPaths": top_paths,
+   534→   534→        "averagePathLength": js_num(avg),
+   535→   535→    });
+   536→   536→
+   537→   537→    let refs = refs_of(&body);
+   538→   538→    let label = format!("{} conversions · {} users", conversions.len(), lists.len());
+   539→   539→    let input = json!({ "lineCount": raw.split('\n').count() });
+   540→   540→    let saved = json!({ "ok": true, "result": result });
+   541→   541→    if let Err(e) = save_tool_run(&state, "utm-attribution", &label, &input, &saved, &refs) {
+   542→   542→        // Best-effort bookkeeping, exactly like the original's
+   543→   543→        // saveToolRun(...).catch(() => undefined) — the user keeps their
+   544→   544→        // answer; the failure is logged, not silently dropped.
+   545→   545→        tracing::warn!("tool_runs write failed for utm-attribution: {e}");
+   546→   546→    }
+   547→   547→    result_json(saved)
+   548→   548→}
+   549→   549→
+   550→   550→// ---------------------------------------------------------------------------
+   551→   551→// migration-map: runMapping (buildMigrationMap + renderRedirectMap)
+   552→   552→// ---------------------------------------------------------------------------
+   553→   553→
+   554→   554→const STRONG: f64 = 0.85;
+   555→   555→const WEAK: f64 = 0.5;
+   556→   556→
+   557→   557→/// One URL as pre-shaped by the Next proxy: the WHATWG `new URL` semantics
+   558→   558→/// (pathname/search, dot segments, percent-encoding) stay Next-side — the
+   559→   559→/// 14.5b/14.6a verdicts-over-the-wire split. `ok:false` reproduces the
+   560→   560→/// original's try/catch fallbacks (samePath string equality, tokenize over
+   561→   561→/// the raw url, pathOnly returns the raw url).
+   562→   562→struct Shaped {
+   563→   563→    url: String,
+   564→   564→    pathname: String,
+   565→   565→    search: String,
+   566→   566→    ok: bool,
+   567→   567→}
+   568→   568→
+   569→   569→fn shaped_of(v: &Value) -> Shaped {
+   570→   570→    match v {
+   571→   571→        // Tolerate a direct caller sending plain strings: degrade to the
+   572→   572→        // no-parse path (same fallbacks the original used on URL errors).
+   573→   573→        Value::String(s) => Shaped {
+   574→   574→            url: s.clone(),
+   575→   575→            pathname: String::new(),
+   576→   576→            search: String::new(),
+   577→   577→            ok: false,
+   578→   578→        },
+   579→   579→        Value::Object(_) => Shaped {
+   580→   580→            url: js_string(v.get("url")),
+   581→   581→            pathname: js_string(v.get("pathname")),
+   582→   582→            search: js_string(v.get("search")),
+   583→   583→            ok: v.get("ok").and_then(|b| b.as_bool()).unwrap_or(false),
+   584→   584→        },
+   585→   585→        _ => Shaped {
+   586→   586→            url: String::new(),
+   587→   587→            pathname: String::new(),
+   588→   588→            search: String::new(),
+   589→   589→            ok: false,
+   590→   590→        },
+   591→   591→    }
+   592→   592→}
+   593→   593→
+   594→   594→fn shaped_list(v: Option<&Value>) -> Option<Vec<Shaped>> {
+   595→   595→    match v {
+   596→   596→        Some(Value::Array(items)) => Some(items.iter().map(shaped_of).collect()),
+   597→   597→        _ => None,
+   598→   598→    }
+   599→   599→}
+   600→   600→
+   601→   601→/// normalize = trim; dedupe = Set insertion order; filter(Boolean).
+   602→   602→fn dedupe(list: Vec<Shaped>) -> Vec<Shaped> {
+   603→   603→    let mut out: Vec<Shaped> = Vec::new();
+   604→   604→    let mut seen: HashSet<String> = HashSet::new();
+   605→   605→    for mut s in list {
+   606→   606→        s.url = js_trim(&s.url).to_string();
+   607→   607→        if s.url.is_empty() || !seen.insert(s.url.clone()) {
+   608→   608→            continue;
+   609→   609→        }
+   610→   610→        out.push(s);
+   611→   611→    }
+   612→   612→    out
+   613→   613→}
+   614→   614→
+   615→   615→/// ua.pathname.replace(/\/$/, "") — one trailing slash.
+   616→   616→fn strip_trailing_slash(p: &str) -> &str {
+   617→   617→    p.strip_suffix('/').unwrap_or(p)
+   618→   618→}
+   619→   619→
+   620→   620→/// Port of samePath: both URLs must have parsed (ok) for the pathname/search
+   621→   621→/// comparison, else plain string equality (the original's catch arm).
+   622→   622→fn same_path(a: &Shaped, b: &Shaped) -> bool {
+   623→   623→    if a.ok && b.ok {
+   624→   624→        strip_trailing_slash(&a.pathname) == strip_trailing_slash(&b.pathname)
+   625→   625→            && a.search == b.search
+   626→   626→    } else {
+   627→   627→        a.url == b.url
+   628→   628→    }
+   629→   629→}
+   630→   630→
+   631→   631→/// /\.(html?|php|aspx?|jsp)$/ — at most one of these can match a given tail.
+   632→   632→fn strip_extension(path: &str) -> &str {
+   633→   633→    for ext in [".html", ".htm", ".php", ".aspx", ".asp", ".jsp"] {
+   634→   634→        if let Some(base) = path.strip_suffix(ext) {
+   635→   635→            return base;
+   636→   636→        }
+   637→   637→    }
+   638→   638→    path
+   639→   639→}
+   640→   640→
+   641→   641→/// Port of tokenizeUrl — path from the WHATWG pathname (or the raw url when
+   642→   642→/// the URL never parsed), lowercased, extension stripped, split on separator
+   643→   643→/// runs, tokens longer than one char kept.
+   644→   644→fn tokenize_url(s: &Shaped) -> Vec<String> {
+   645→   645→    let path = if s.ok { s.pathname.as_str() } else { s.url.as_str() };
+   646→   646→    let lowered = path.to_lowercase();
+   647→   647→    strip_extension(&lowered)
+   648→   648→        .split(|c| matches!(c, '/' | '-' | '_' | '~' | ',' | ';' | ':'))
+   649→   649→        .filter(|t| t.len() > 1)
+   650→   650→        .map(String::from)
+   651→   651→        .collect()
+   652→   652→}
+   653→   653→
+   654→   654→/// Port of similarity: Jaccard + 0.2 same-tail bonus − depth penalty,
+   655→   655→/// clamped to [0,1]. Same operation order → same f64.
+   656→   656→fn similarity(a: &[String], b: &[String]) -> f64 {
+   657→   657→    if a.is_empty() && b.is_empty() {
+   658→   658→        return 0.0;
+   659→   659→    }
+   660→   660→    let set_b: HashSet<&String> = b.iter().collect();
+   661→   661→    let mut set_a_seen: HashSet<&String> = HashSet::new();
+   662→   662→    let mut inter = 0usize;
+   663→   663→    let mut union: HashSet<&String> = b.iter().collect();
+   664→   664→    for t in a {
+   665→   665→        if set_a_seen.insert(t) {
+   666→   666→            if set_b.contains(t) {
+   667→   667→                inter += 1;
+   668→   668→            }
+   669→   669→            union.insert(t);
+   670→   670→        }
+   671→   671→    }
+   672→   672→    let jaccard = if union.is_empty() {
+   673→   673→        0.0
+   674→   674→    } else {
+   675→   675→        inter as f64 / union.len() as f64
+   676→   676→    };
+   677→   677→    let last_a = a.last().map(String::as_str).unwrap_or("");
+   678→   678→    let last_b = b.last().map(String::as_str).unwrap_or("");
+   679→   679→    let tail_bonus = if !last_a.is_empty() && last_a == last_b { 0.2 } else { 0.0 };
+   680→   680→    let depth_diff =
+   681→   681→        (a.len() as f64 - b.len() as f64).abs() / 1f64.max(a.len().max(b.len()) as f64);
+   682→   682→    let depth_penalty = depth_diff * 0.15;
+   683→   683→    (jaccard + tail_bonus - depth_penalty).clamp(0.0, 1.0)
+   684→   684→}
+   685→   685→
+   686→   686→/// Port of explainScore — shared tokens in setA first-occurrence order.
+   687→   687→fn explain_score(a: &[String], b: &[String], s: f64) -> String {
+   688→   688→    let set_b: HashSet<&String> = b.iter().collect();
+   689→   689→    let mut seen: HashSet<&String> = HashSet::new();
+   690→   690→    let shared: Vec<&str> = a
+   691→   691→        .iter()
+   692→   692→        .filter(|t| set_b.contains(*t) && seen.insert(*t))
+   693→   693→        .map(String::as_str)
+   694→   694→        .collect();
+   695→   695→    let pct = js_to_fixed0(s * 100.0);
+   696→   696→    if shared.is_empty() {
+   697→   697→        format!("Low similarity ({pct}%)")
+   698→   698→    } else {
+   699→   699→        format!(
+   700→   700→            "Shared: {} ({pct}%)",
+   701→   701→            shared.iter().take(4).cloned().collect::<Vec<_>>().join(", ")
+   702→   702→        )
+   703→   703→    }
+   704→   704→}
+   705→   705→
+   706→   706→/// Port of pathOnly: pathname + search, or the raw url when the URL never
+   707→   707→/// parsed.
+   708→   708→fn path_only(s: &Shaped) -> String {
+   709→   709→    if s.ok {
+   710→   710→        format!("{}{}", s.pathname, s.search)
+   711→   711→    } else {
+   712→   712→        s.url.clone()
+   713→   713→    }
+   714→   714→}
+   715→   715→
+   716→   716→/// /[.+?$|()[\]\\]/g → "\\$&"
+   717→   717→fn escape_nginx_path(p: &str) -> String {
+   718→   718→    let mut out = String::with_capacity(p.len() + 8);
+   719→   719→    for c in p.chars() {
+   720→   720→        if matches!(c, '+' | '.' | '?' | '$' | '|' | '(' | ')' | '[' | ']' | '\\') {
+   721→   721→            out.push('\\');
+   722→   722→        }
+   723→   723→        out.push(c);
+   724→   724→    }
+   725→   725→    out
+   726→   726→}
+   727→   727→
+   728→   728→struct MapRow {
+   729→   729→    old_url: String,
+   730→   730→    new_url: Option<String>,
+   731→   731→    confidence: f64,
+   732→   732→    reason: String,
+   733→   733→}
+   734→   734→
+   735→   735→/// POST /api/internal/tools/migration-map/run
+   736→   736→pub async fn migration_run(State(state): State<AppState>, bytes: Bytes) -> Response {
+   737→   737→    let body = body_of(&bytes);
+   738→   738→    let Some(olds) = shaped_list(body.get("olds")) else {
+   739→   739→        return result_json(json!({ "ok": false, "error": "Paste old URLs (one per line)." }));
+   740→   740→    };
+   741→   741→    let Some(news) = shaped_list(body.get("news")) else {
+   742→   742→        return result_json(json!({ "ok": false, "error": "Paste new URLs (one per line)." }));
+   743→   743→    };
+   744→   744→    let olds = dedupe(olds);
+   745→   745→    let news = dedupe(news);
+   746→   746→    if olds.is_empty() {
+   747→   747→        return result_json(json!({ "ok": false, "error": "Paste old URLs (one per line)." }));
+   748→   748→    }
+   749→   749→    if news.is_empty() {
+   750→   750→        return result_json(json!({ "ok": false, "error": "Paste new URLs (one per line)." }));
+   751→   751→    }
+   752→   752→
+   753→   753→    let new_slugs: Vec<(&Shaped, Vec<String>)> =
+   754→   754→        news.iter().map(|n| (n, tokenize_url(n))).collect();
+   755→   755→
+   756→   756→    let mut rows: Vec<MapRow> = Vec::new();
+   757→   757→    for old in &olds {
+   758→   758→        let old_tok = tokenize_url(old);
+   759→   759→
+   760→   760→        // Exact match (path-only)
+   761→   761→        if let Some(hit) = new_slugs.iter().find(|s| same_path(s.0, old)) {
+   762→   762→            rows.push(MapRow {
+   763→   763→                old_url: old.url.clone(),
+   764→   764→                new_url: Some(hit.0.url.clone()),
+   765→   765→                confidence: 1.0,
+   766→   766→                reason: "Exact path match".into(),
+   767→   767→            });
+   768→   768→            continue;
+   769→   769→        }
+   770→   770→
+   771→   771→        // Best fuzzy match — strictly greater keeps the first best on ties.
+   772→   772→        let mut best: Option<(&Shaped, f64, String)> = None;
+   773→   773→        for (cand, tokens) in &new_slugs {
+   774→   774→            let score = similarity(&old_tok, tokens);
+   775→   775→            if best.as_ref().map(|b| score > b.1).unwrap_or(true) {
+   776→   776→                best = Some((cand, score, explain_score(&old_tok, tokens, score)));
+   777→   777→            }
+   778→   778→        }
+   779→   779→        let Some((cand, score, reason)) = best else {
+   780→   780→            rows.push(MapRow {
+   781→   781→                old_url: old.url.clone(),
+   782→   782→                new_url: None,
+   783→   783→                confidence: 0.0,
+   784→   784→                reason: "No new URLs to compare against".into(),
+   785→   785→            });
+   786→   786→            continue;
+   787→   787→        };
+   788→   788→        if score >= STRONG {
+   789→   789→            rows.push(MapRow {
+   790→   790→                old_url: old.url.clone(),
+   791→   791→                new_url: Some(cand.url.clone()),
+   792→   792→                confidence: score,
+   793→   793→                reason,
+   794→   794→            });
+   795→   795→        } else if score >= WEAK {
+   796→   796→            rows.push(MapRow {
+   797→   797→                old_url: old.url.clone(),
+   798→   798→                new_url: Some(cand.url.clone()),
+   799→   799→                confidence: score,
+   800→   800→                reason: format!("{reason} — review"),
+   801→   801→            });
+   802→   802→        } else {
+   803→   803→            rows.push(MapRow {
+   804→   804→                old_url: old.url.clone(),
+   805→   805→                new_url: None,
+   806→   806→                confidence: score,
+   807→   807→                reason: "No confident match — pick a category or 410".into(),
+   808→   808→            });
+   809→   809→        }
+   810→   810→    }
+   811→   811→
+   812→   812→    let matched = rows
+   813→   813→        .iter()
+   814→   814→        .filter(|r| r.new_url.is_some() && r.confidence >= STRONG)
+   815→   815→        .count();
+   816→   816→    let review = rows
+   817→   817→        .iter()
+   818→   818→        .filter(|r| r.new_url.is_some() && r.confidence >= WEAK && r.confidence < STRONG)
+   819→   819→        .count();
+   820→   820→    let total = rows.len();
+   821→   821→    let avg = if total > 0 {
+   822→   822→        rows.iter().fold(0.0_f64, |s, r| s + r.confidence) / total as f64
+   823→   823→    } else {
+   824→   824→        0.0
+   825→   825→    };
+   826→   826→
+   827→   827→    let map_json = json!({
+   828→   828→        "rows": rows
+   829→   829→            .iter()
+   830→   830→            .map(|r| json!({
+   831→   831→                "oldUrl": r.old_url,
+   832→   832→                "newUrl": r.new_url.clone(),
+   833→   833→                "confidence": js_num(r.confidence),
+   834→   834→                "reason": r.reason,
+   835→   835→            }))
+   836→   836→            .collect::<Vec<_>>(),
+   837→   837→        "summary": {
+   838→   838→            "total": total,
+   839→   839→            "matched": matched,
+   840→   840→            "review": review,
+   841→   841→            "avgConfidence": js_num(avg),
+   842→   842→        }
+   843→   843→    });
+   844→   844→
+   845→   845→    // renderRedirectMap
+   846→   846→    let usable: Vec<(&Shaped, &MapRow)> = olds
+   847→   847→        .iter()
+   848→   848→        .zip(rows.iter())
+   849→   849→        .filter(|(_, r)| r.new_url.is_some())
+   850→   850→        .collect();
+   851→   851→    let nginx = usable
+   852→   852→        .iter()
+   853→   853→        .map(|(o, r)| {
+   854→   854→            format!(
+   855→   855→                "rewrite ^{}$ {} permanent;",
+   856→   856→                escape_nginx_path(&path_only(o)),
+   857→   857→                r.new_url.clone().unwrap_or_default()
+   858→   858→            )
+   859→   859→        })
+   860→   860→        .collect::<Vec<_>>()
+   861→   861→        .join("\n");
+   862→   862→    let apache = usable
+   863→   863→        .iter()
+   864→   864→        .map(|(o, r)| {
+   865→   865→            format!("Redirect 301 {} {}", path_only(o), r.new_url.clone().unwrap_or_default())
+   866→   866→        })
+   867→   867→        .collect::<Vec<_>>()
+   868→   868→        .join("\n");
+   869→   869→    let mut next =
+   870→   870→        String::from("module.exports = {\n  async redirects() {\n    return [\n");
+   871→   871→    let next_lines: Vec<String> = usable
+   872→   872→        .iter()
+   873→   873→        .map(|(o, r)| {
+   874→   874→            format!(
+   875→   875→                "      {{ source: {}, destination: {}, permanent: true }},",
+   876→   876→                serde_json::to_string(&path_only(o)).unwrap_or_default(),
+   877→   877→                serde_json::to_string(&r.new_url.clone().unwrap_or_default())
+   878→   878→                    .unwrap_or_default(),
+   879→   879→            )
+   880→   880→        })
+   881→   881→        .collect();
+   882→   882→    next.push_str(&next_lines.join("\n"));
+   883→   883→    next.push_str("\n    ];\n  },\n};");
+   884→   884→    let output_json = json!({ "nginx": nginx, "apache": apache, "nextjs": next });
+   885→   885→
+   886→   886→    let refs = refs_of(&body);
+   887→   887→    let label = format!(
+   888→   888→        "{} → {} URLs · {} matched",
+   889→   889→        olds.len(),
+   890→   890→        news.len(),
+   891→   891→        rows.len()
+   892→   892→    );
+   893→   893→    let input = json!({ "oldCount": olds.len(), "newCount": news.len() });
+   894→   894→    let saved = json!({ "ok": true, "map": map_json, "output": output_json });
+   895→   895→    if let Err(e) = save_tool_run(&state, "migration-map", &label, &input, &saved, &refs) {
+   896→   896→        tracing::warn!("tool_runs write failed for migration-map: {e}");
+   897→   897→    }
+   898→   898→    result_json(saved)
+   899→   899→}
+   900→   900→
