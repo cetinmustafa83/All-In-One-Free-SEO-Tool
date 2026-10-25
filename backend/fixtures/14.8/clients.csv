@@ -1,0 +1,6 @@
+id,name,url,niche,country,city,language,businessType,email,phone,address,gbpUrl,gscProperty,ga4PropertyId,techStack,createdAt
+1,Seed Client,https://seed.test,saas,US,,en,,,,,,,,,2026-10-25T06:26:08.000Z
+9901,"FIX148 ""Quote, Comma"" & Ünïcode 😀 Client","https://fix148-a.test/páth?q=1,2",local,TR,İstanbul,tr,"Kafe & Pastane, Ltd.",fix148@a.test,+90 555 010 20 30,"Bağdat Cd. 123
+Kadıköy	district",https://gbp.test/fix148a,sc-domain:fix148a.test,148-148-148,"WordPress
+Gutenberg|GA4, ""GTM""|=leading equals in stack",2024-05-06T07:08:09.000Z
+9902,FIX148 =Hyperlink +Plus -Minus @At,https://fix148-b.test,,US,,en,,,,,,,,,1970-01-01T00:00:00.000Z

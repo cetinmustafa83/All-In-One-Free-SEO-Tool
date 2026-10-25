@@ -1,0 +1,6 @@
+id,clientName,clientUrl,kind,status,score,issuesCount,startedAt,completedAt,targetUrl
+9902,"FIX148 ""Quote, Comma"" & Ünïcode 😀 Client","https://fix148-a.test/páth?q=1,2",ai_full,running,,0,,,"https://fix148.test/""q"",x
+=y"
+1,Seed Client,https://seed.test,ai_full,failed,,0,2026-10-25T06:26:29.000Z,2026-10-25T06:26:29.000Z,https://seed.test
+9903,FIX148 =Hyperlink +Plus -Minus @At,https://fix148-b.test,crawler,queued,12.5,3,1969-12-31T00:00:00.000Z,2100-01-01T00:00:00.000Z,https://fix148.test/real
+9901,Seed Client,https://seed.test,crawler,completed,88,7,2000-02-29T00:00:00.000Z,2023-11-14T22:13:20.000Z,

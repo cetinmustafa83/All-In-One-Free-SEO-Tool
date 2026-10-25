@@ -1,59 +1,14 @@
-import { desc, eq } from "drizzle-orm";
-import { db } from "@/db/client";
-import { backlinks, clients } from "@/db/schema";
-import { csvResponse } from "@/lib/csv-export";
-import { exportScope } from "@/lib/client-scope";
+import { exportCsvProxy } from "@/lib/export-proxy";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Backlinks CSV export — since 14.8a a thin proxy over the Rust backend's
+ * POST /api/internal/exports/backlinks (byte-for-byte port of the original
+ * drizzle query + csvResponse, verified against backend/fixtures/14.8/).
+ * User resolution and ?clientId/?client normalization live in
+ * src/lib/export-proxy.ts.
+ */
 export async function GET(req: Request) {
-  const scope = await exportScope(backlinks.clientId, req);
-  const rows = await db
-    .select({
-      id: backlinks.id,
-      clientName: clients.name,
-      sourceUrl: backlinks.sourceUrl,
-      sourceDomain: backlinks.sourceDomain,
-      targetUrl: backlinks.targetUrl,
-      anchorText: backlinks.anchorText,
-      domainAuthority: backlinks.domainAuthority,
-      status: backlinks.status,
-      source: backlinks.source,
-      notes: backlinks.notes,
-      createdAt: backlinks.createdAt,
-    })
-    .from(backlinks)
-    .leftJoin(clients, eq(backlinks.clientId, clients.id))
-    .where(scope)
-    .orderBy(desc(backlinks.createdAt));
-
-  return csvResponse(
-    "backlinks.csv",
-    [
-      "id",
-      "clientName",
-      "sourceUrl",
-      "sourceDomain",
-      "targetUrl",
-      "anchorText",
-      "domainAuthority",
-      "status",
-      "source",
-      "notes",
-      "createdAt",
-    ],
-    rows.map((r) => [
-      r.id,
-      r.clientName ?? "",
-      r.sourceUrl,
-      r.sourceDomain,
-      r.targetUrl ?? "",
-      r.anchorText ?? "",
-      r.domainAuthority ?? "",
-      r.status,
-      r.source,
-      r.notes ?? "",
-      r.createdAt,
-    ]),
-  );
+  return exportCsvProxy(req, "/api/internal/exports/backlinks");
 }

@@ -38,17 +38,25 @@
 //! their exact drizzle syntax, rows come back as positional arrays and
 //! drizzle core maps them as before. SELECT-only, two-layer guard, in
 //! query.rs.
+//!
+//! 14.8a scope: CSV exports wave 1 — the four /api/internal/exports/*
+//! endpoints (clients, competitors, audits, backlinks) byte-for-byte ports
+//! of the src/app/*/export.csv/route.ts downloads (csv-export.ts serializer
+//! + client-scope.ts exportScope port), with the Next routes turned into
+//! thin proxies. In exports.rs + client_scope.rs.
 
 mod audits;
 mod auth;
 mod authweb;
 mod backlinks;
 mod client_templates;
+mod client_scope;
 mod clients;
 mod config;
 mod db;
 mod errlog;
 mod error;
+mod exports;
 mod internal;
 mod keywords;
 mod misc;
@@ -213,6 +221,17 @@ async fn main() {
         )
         // ---- 14.7a: query gateway (drizzle sqlite-proxy read path) ----
         .route("/api/internal/query", post(query::run))
+        // ---- 14.8a: CSV exports wave 1 (clients/competitors/audits/backlinks) ----
+        .route("/api/internal/exports/clients", post(exports::clients))
+        .route(
+            "/api/internal/exports/competitors",
+            post(exports::competitors),
+        )
+        .route("/api/internal/exports/audits", post(exports::audits))
+        .route(
+            "/api/internal/exports/backlinks",
+            post(exports::backlinks),
+        )
         .route(
             "/api/internal/tools/migration-map/run",
             post(tools_compute::migration_run),

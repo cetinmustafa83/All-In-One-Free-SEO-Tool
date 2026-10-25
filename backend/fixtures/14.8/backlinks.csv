@@ -1,0 +1,5 @@
+id,clientName,sourceUrl,sourceDomain,targetUrl,anchorText,domainAuthority,status,source,notes,createdAt
+9902,"FIX148 ""Quote, Comma"" & Ünïcode 😀 Client",https://fix148.test/b,fix148.test,,+90 phone-style anchor,,lost,discovered,"multi
+line, with ""quotes"" 😀 and trailing comma,",2023-11-14T22:16:41.000Z
+9901,Seed Client,"https://fix148.test/a,(""q"")",fix148.test,@handle leading at,"best ""seo, tools""",91,active,manual,keep =and -dashes,2023-11-14T22:16:40.000Z
+9903,FIX148 =Hyperlink +Plus -Minus @At,-dash-leading-source,fix148.test,https://fix148.test/c,,0,disavow,ahrefs_wmt,,2000-02-29T00:01:00.000Z

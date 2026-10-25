@@ -8,7 +8,7 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 TOKEN="${SEO_INTERNAL_TOKEN:-$(cat "$ROOT/.seo-internal-token" 2>/dev/null || cat "$ROOT/data/.seo-internal-token" 2>/dev/null)}"
 B="http://127.0.0.1:3100"
 AUTH=(-H "X-Internal-Token: $TOKEN" -H "Content-Type: application/json")
-CID=$(node -e "const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');const r=db.prepare('SELECT id FROM clients LIMIT 1').get();console.log(r?r.id:'')" 2>/dev/null)
+CID=$(node -e "const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');const r=db.prepare('SELECT id FROM clients ORDER BY id LIMIT 1').get();console.log(r?r.id:'')" 2>/dev/null)
 pass=0; fail=0
 chk() { # name expected actual
   if [ "$2" = "$3" ]; then pass=$((pass+1)); echo "PASS $1"; else fail=$((fail+1)); echo "FAIL $1 (expected=$2 got=$3)"; fi
@@ -348,6 +348,103 @@ chk "query-400-empty-sql" 400 "$(curl -s -o /dev/null -w '%{http_code}' -X POST 
 # 43. prepare failure → 500 ok:false (bare sqlite message, db_error_response envelope)
 Q4=$(curl -s -w '|%{http_code}' -X POST "${AUTH[@]}" -d '{"sql":"SELECT * FROM missing_table_xyz"}' $B/api/internal/query)
 echo "$Q4" | grep -q '|500$' && echo "$Q4" | grep -q '"ok":false,"error":"no such table' && chk "query-500-missing-table" y y || chk "query-500-missing-table" y n
+
+# ---- 14.8a: CSV exports (backend/src/exports.rs + client_scope.rs) ----
+# Golden-fixture protocol: seed-14.8.ts re-creates the deterministic FIX148
+# rows under fixed ids (9901+) and removes the wall-clock rows the earlier
+# sections of THIS run leave behind (Smoke Client/smoke-qa clients,
+# smoke-ahrefs backlinks), so each endpoint's output must byte-match the
+# fixture captured from the ORIGINAL Next implementation before the port
+# (backend/fixtures/14.8/*.csv).
+
+# 44. token middleware covers the exports family
+chk "exports-401-clients" 401 "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' $B/api/internal/exports/clients)"
+chk "exports-401-backlinks" 401 "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' $B/api/internal/exports/backlinks)"
+
+# 45. re-seed (idempotent: DELETE marker rows by id/prefix, INSERT same ids)
+(cd "$ROOT" && bun run backend/tools/seed-14.8.ts) > /dev/null 2>&1
+
+# 46. envelope contract + byte-compare vs golden fixtures (4 endpoints)
+for r in clients competitors audits backlinks; do
+  curl -s -X POST "${AUTH[@]}" -d '{}' "$B/api/internal/exports/$r" | FIX="$ROOT/backend/fixtures/14.8/$r.csv" R="$r" python3 -c "
+import json,sys,os
+d=json.load(sys.stdin)
+assert d['ok'] is True, d
+assert d['filename']==os.environ['R']+'.csv', d['filename']
+assert d['contentType']=='text/csv; charset=utf-8', d['contentType']
+assert d['disposition']=='attachment; filename=\"%s.csv\"' % os.environ['R'], d['disposition']
+open('/tmp/14.8-'+os.environ['R']+'.csv','w').write(d['csv'])
+" 2>/dev/null
+  if [ -f "/tmp/14.8-$r.csv" ] && cmp -s "/tmp/14.8-$r.csv" "$ROOT/backend/fixtures/14.8/$r.csv"; then
+    chk "export-fixture-$r" y y
+  else
+    chk "export-fixture-$r" y n
+  fi
+  rm -f "/tmp/14.8-$r.csv"
+done
+
+# 47. client scope port (visibleClientIds/exportScope semantics).
+# Temp users are created and deleted inside this block — while they exist
+# the Next process must NOT be asked to render gated pages (its
+# accountsEnabled() cache would flip for the process lifetime).
+SCOPE_ENV=$(node -e "
+const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');
+db.pragma('journal_mode = WAL');
+db.prepare('DELETE FROM client_members WHERE user_id BETWEEN 9801 AND 9803').run();
+db.prepare('DELETE FROM users WHERE id BETWEEN 9801 AND 9803').run();
+const u=db.prepare('INSERT INTO users (id, email, password_hash, role, active, created_at) VALUES (?,?,?,?,1,1700000300)');
+u.run(9801,'fix148-smoke-empty@test.local','scrypt:1:aa:bb','member');
+u.run(9802,'fix148-smoke-assigned@test.local','scrypt:1:aa:bb','member');
+u.run(9803,'fix148-smoke-owner@test.local','scrypt:1:aa:bb','owner');
+db.prepare('INSERT INTO client_members (user_id, client_id, created_at) VALUES (9802, 1, 1700000300)').run();
+" 2>/dev/null)
+# header WITHOUT trailing newline (csv lines join "\n", no trailing byte)
+printf '%s' "$(head -n 1 "$ROOT/backend/fixtures/14.8/clients.csv")" > /tmp/14.8-clients-header.csv
+# 47a. member with NO assignments → IN(-1) → header-only CSV
+curl -s -X POST "${AUTH[@]}" -d '{"userId":9801}' "$B/api/internal/exports/clients" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+open('/tmp/14.8-scope-empty.csv','w').write(d['csv'])
+" 2>/dev/null
+cmp -s /tmp/14.8-scope-empty.csv /tmp/14.8-clients-header.csv && chk "exports-scope-empty-in-minus-1" y y || chk "exports-scope-empty-in-minus-1" y n
+# 47b. member assigned client 1 sees exactly the clientId=1 slice (IN(ids))
+curl -s -X POST "${AUTH[@]}" -d '{"userId":9802}' "$B/api/internal/exports/audits" | python3 -c "
+import json,sys
+open('/tmp/14.8-scope-member.csv','w').write(json.load(sys.stdin)['csv'])
+" 2>/dev/null
+curl -s -X POST "${AUTH[@]}" -d '{"clientId":1}' "$B/api/internal/exports/audits" | python3 -c "
+import json,sys
+open('/tmp/14.8-scope-c1.csv','w').write(json.load(sys.stdin)['csv'])
+" 2>/dev/null
+cmp -s /tmp/14.8-scope-member.csv /tmp/14.8-scope-c1.csv && chk "exports-scope-member-in-ids" y y || chk "exports-scope-member-in-ids" y n
+# 47c. owner → unrestricted, byte-identical to the anonymous (no userId) call
+curl -s -X POST "${AUTH[@]}" -d '{"userId":9803}' "$B/api/internal/exports/clients" | python3 -c "
+import json,sys
+open('/tmp/14.8-scope-owner.csv','w').write(json.load(sys.stdin)['csv'])
+" 2>/dev/null
+curl -s -X POST "${AUTH[@]}" -d '{}' "$B/api/internal/exports/clients" | python3 -c "
+import json,sys
+open('/tmp/14.8-scope-anon.csv','w').write(json.load(sys.stdin)['csv'])
+" 2>/dev/null
+cmp -s /tmp/14.8-scope-owner.csv /tmp/14.8-scope-anon.csv && chk "exports-scope-owner-unrestricted" y y || chk "exports-scope-owner-unrestricted" y n
+# 47d. direct-caller sentinel: clientId -1 (proxy's normalization of any
+# unparseable raw param) → always-false filter → header-only
+curl -s -X POST "${AUTH[@]}" -d '{"clientId":-1}' "$B/api/internal/exports/clients" | python3 -c "
+import json,sys
+open('/tmp/14.8-scope-sentinel.csv','w').write(json.load(sys.stdin)['csv'])
+" 2>/dev/null
+cmp -s /tmp/14.8-scope-sentinel.csv /tmp/14.8-clients-header.csv && chk "exports-sentinel-header-only" y y || chk "exports-sentinel-header-only" y n
+node -e "
+const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');
+db.prepare('DELETE FROM client_members WHERE user_id BETWEEN 9801 AND 9803').run();
+db.prepare('DELETE FROM users WHERE id BETWEEN 9801 AND 9803').run();
+console.log(db.prepare('SELECT COUNT(*) n FROM users').get().n);
+" > /tmp/14.8-users-left.txt 2>/dev/null
+[ "$(cat /tmp/14.8-users-left.txt 2>/dev/null)" = "0" ] && chk "exports-scope-users-cleaned" y y || chk "exports-scope-users-cleaned" y n
+rm -f /tmp/14.8-scope-*.csv /tmp/14.8-clients-header.csv /tmp/14.8-users-left.txt
+
+# 48. disallowed writes on the query gateway still 403 (14.8 didn't touch it)
+chk "exports-query-gateway-403-still" 403 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "${AUTH[@]}" -d '{"sql":"INSERT INTO clients (name, url) VALUES (''x'',''y'')"}' $B/api/internal/query)"
 
 echo "----"
 echo "PASS=$pass FAIL=$fail"
