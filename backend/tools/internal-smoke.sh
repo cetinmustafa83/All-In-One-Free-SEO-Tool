@@ -211,6 +211,86 @@ SG=$(node -e "const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.
 SDX=$(curl -s -X POST "${AUTH[@]}" -d '{"key":"bing.api_key"}' $B/api/internal/tools/settings/delete)
 echo "$SDX" | grep -q '"ok":true' && chk "settings-delete-idempotent" y y || chk "settings-delete-idempotent" y n
 
+# ---- 14.6b: tools wave 2 (COMPUTE tool actions, backend/src/tools_compute.rs) ----
+
+# 29. token middleware covers the compute family (401 without X-Internal-Token)
+chk "compute-401-utm" 401 "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' $B/api/internal/tools/utm-attribution/run)"
+chk "compute-401-map" 401 "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' $B/api/internal/tools/migration-map/run)"
+
+# 30. utm-attribution golden path — REAL pasted CSV, outputs hand-traced from
+# the original TypeScript action (channels[3]=Direct before Email: the
+# last-touch insertion precedes the assisted loop in the source).
+UTM_FIX='timestamp,source,medium,campaign,userId,isConversion\r\n2024-01-01T00:00:00.000Z,google,cpc,Brand,u1,1\r\n2024-01-02T00:00:00.000Z,google,organic,Brand,u1,\r\n2024-01-03T00:00:00.000Z,"facebook",paid_social,Spring,u2,1\r\n2024-01-04T00:00:00.000Z,newsletter,email,Launch,u2,\r\n2024-01-05T00:00:00.000Z,,(none),Direct,u2,\r\n'
+UTM=$(python3 -c "
+import json,urllib.request
+req=urllib.request.Request('$B/api/internal/tools/utm-attribution/run',data=json.dumps({'touches':'$UTM_FIX'}).encode(),headers={'X-Internal-Token':'$TOKEN','Content-Type':'application/json'})
+print(urllib.request.urlopen(req).read().decode())
+")
+echo "$UTM" | python3 -c '
+import json,sys
+d=json.load(sys.stdin)
+assert d["ok"] is True, d
+r=d["result"]
+assert (r["totalTouches"],r["totalConversions"],r["uniqueUsers"])==(5,2,2), r
+names=[c["channel"] for c in r["channels"]]
+assert names==["Paid Search","Organic Search","Paid Social","Direct","Email"], names
+assert r["channels"][0]["linearCredit"]==0.5 and r["channels"][0]["positionCredit"]==0.5 and r["channels"][0]["pathInclusion"]==1
+assert r["channels"][3]["linearCredit"]==0.33 and r["channels"][3]["positionCredit"]==0.4
+assert r["channels"][4]["assistedTouches"]==1 and r["channels"][4]["positionCredit"]==0.2
+assert r["topPaths"][0]=={"path":["Paid Search","Organic Search"],"count":1}, r["topPaths"]
+assert r["averagePathLength"]==2.5
+' 2>/dev/null && chk "utm-golden" y y || chk "utm-golden" y n
+
+# 31. utm validation parity (200 {ok:false} envelopes, direct-caller defense)
+UV=$(curl -s -X POST "${AUTH[@]}" -d '{"touches":""}' $B/api/internal/tools/utm-attribution/run)
+echo "$UV" | grep -q '"error":"Paste touch data first."' && chk "utm-empty" y y || chk "utm-empty" y n
+UV2=$(curl -s -X POST "${AUTH[@]}" -d '{"touches":"just-one-cell"}' $B/api/internal/tools/utm-attribution/run)
+echo "$UV2" | grep -q '"error":"Couldn'"'"'t parse any touches."' && chk "utm-unparsable" y y || chk "utm-unparsable" y n
+
+# 32. utm tool_runs write (saveToolRun port: label, input.lineCount, result)
+UTMDB=$(node -e "const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');const r=db.prepare(\"SELECT tool_id t, label l, input_json i, result_json r FROM tool_runs WHERE tool_id='utm-attribution' ORDER BY id DESC LIMIT 1\").get();console.log(r?r.t+'|'+r.l+'|'+r.i:'')" 2>/dev/null)
+[ "$UTMDB" = "utm-attribution|2 conversions · 2 users|{\"lineCount\":6}" ] && chk "utm-tool-run-db" y y || chk "utm-tool-run-db" y n
+echo "$UTMDB" | grep -q '|{"lineCount":6}$' && echo "$UTM" | grep -q '"totalTouches":5' && chk "utm-tool-run-result" y y || chk "utm-tool-run-result" y n
+
+# 33. migration-map golden path — REAL URL lists, expected values verified
+# against buildMigrationMap/renderRedirectMap (parity harness 3/3 identical).
+MAPR=$(python3 -c "
+import json,urllib.request
+def shape(u):
+    return {'url':u,'pathname':u,'search':'','ok':True}
+olds=['/old-blog/my-post.html','/blog/my-post','/contact','/legacy-page','/products/red-shoes']
+news=['/blog/my-post','/contact-us','/products/red-shoes-sneakers','/about']
+req=urllib.request.Request('$B/api/internal/tools/migration-map/run',data=json.dumps({'olds':[shape(u) for u in olds],'news':[shape(u) for u in news]}).encode(),headers={'X-Internal-Token':'$TOKEN','Content-Type':'application/json'})
+print(urllib.request.urlopen(req).read().decode())
+")
+echo "$MAPR" | python3 -c '
+import json,sys
+d=json.load(sys.stdin)
+assert d["ok"] is True, d
+m=d["map"]
+assert m["summary"]=={"total":5,"matched":2,"review":1,"avgConfidence":0.61}, m["summary"]
+r=m["rows"]
+assert r[0]["newUrl"]=="/blog/my-post" and r[0]["confidence"]==0.9125 and r[0]["reason"]=="Shared: blog, my, post (91%)", r[0]
+assert r[1]["confidence"]==1 and r[1]["reason"]=="Exact path match", r[1]
+assert r[2]["newUrl"] is None and r[2]["confidence"]==0.425 and r[2]["reason"]=="No confident match — pick a category or 410", r[2]
+assert r[4]["newUrl"]=="/products/red-shoes-sneakers" and r[4]["confidence"]==0.7125 and r[4]["reason"]=="Shared: products, red, shoes (71%) — review", r[4]
+o=d["output"]
+assert o["nginx"].split("\n")[0]=="rewrite ^/old-blog/my-post\\.html$ /blog/my-post permanent;", o["nginx"]
+assert o["apache"].split("\n")[0]=="Redirect 301 /old-blog/my-post.html /blog/my-post", o["apache"]
+assert "{ source: \"/blog/my-post\", destination: \"/blog/my-post\", permanent: true }," in o["nextjs"]
+assert o["nextjs"].startswith("module.exports = {") and o["nextjs"].endswith("};")
+' 2>/dev/null && chk "migration-golden" y y || chk "migration-golden" y n
+# 34. migration validation parity (missing/empty lists, 200 {ok:false})
+MV1=$(curl -s -X POST "${AUTH[@]}" -d '{}' $B/api/internal/tools/migration-map/run)
+echo "$MV1" | grep -q '"error":"Paste old URLs (one per line)."' && chk "migration-no-olds" y y || chk "migration-no-olds" y n
+MV2=$(curl -s -X POST "${AUTH[@]}" -d '{"olds":[{"url":"/a","pathname":"/a","search":"","ok":true}],"news":[]}' $B/api/internal/tools/migration-map/run)
+echo "$MV2" | grep -q '"error":"Paste new URLs (one per line)."' && chk "migration-no-news" y y || chk "migration-no-news" y n
+
+# 35. migration tool_runs write (label "N → M URLs · K matched", input counts)
+MAPDB=$(node -e "const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');const r=db.prepare(\"SELECT tool_id t, label l, input_json i FROM tool_runs WHERE tool_id='migration-map' ORDER BY id DESC LIMIT 1\").get();console.log(r?r.t+'|'+r.l+'|'+r.i:'')" 2>/dev/null)
+[ "$MAPDB" = "migration-map|5 → 4 URLs · 5 matched|{\"oldCount\":5,\"newCount\":4}" ] && chk "migration-tool-run-db" y y || chk "migration-tool-run-db" y n
+echo "$MAPR" | grep -q '"matched":2' && chk "migration-tool-run-result" y y || chk "migration-tool-run-result" y n
+
 echo "----"
 echo "PASS=$pass FAIL=$fail"
 [ $fail -eq 0 ]

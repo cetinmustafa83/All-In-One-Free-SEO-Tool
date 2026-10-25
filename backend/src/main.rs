@@ -27,6 +27,11 @@
 //! (redirects + 404 log, uptime targets, person-schema tool-run,
 //! migration-map import, serp snapshot delete, robots snapshot list,
 //! settings set/delete for the bing/youtube API keys) in tools_basic.rs.
+//!
+//! 14.6b scope: tools wave 2 — the COMPUTE half of the provably-local
+//! `tools/*` actions (utm-attribution runAttribution over pasted touch
+//! data, migration-map runMapping fuzzy mapper + renderers) plus their
+//! saveToolRun bookkeeping, in tools_compute.rs.
 
 mod audits;
 mod auth;
@@ -47,6 +52,7 @@ mod ratelimit;
 mod session;
 mod tasks;
 mod tools_basic;
+mod tools_compute;
 mod util;
 mod v1;
 
@@ -192,6 +198,15 @@ async fn main() {
         .route(
             "/api/internal/tools/settings/delete",
             post(tools_basic::settings_delete),
+        )
+        // ---- 14.6b: tools wave 2 (compute tool actions) ----
+        .route(
+            "/api/internal/tools/utm-attribution/run",
+            post(tools_compute::utm_run),
+        )
+        .route(
+            "/api/internal/tools/migration-map/run",
+            post(tools_compute::migration_run),
         )
         .route_layer(axum::middleware::from_fn_with_state(
             state.clone(),
