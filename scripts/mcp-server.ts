@@ -29,7 +29,7 @@
  * error rather than a useful failure, so all diagnostics go to stderr.
  */
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { createMcpServer } from "../src/lib/mcp/server";
+import { createMcpServer } from "../frontend/src/lib/mcp/server";
 
 async function main() {
   await createMcpServer("stdio (Claude Desktop / Cursor)").connect(

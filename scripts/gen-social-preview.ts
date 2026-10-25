@@ -11,7 +11,7 @@
  */
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { generateOgImage } from "../src/lib/og-image";
+import { generateOgImage } from "../frontend/src/lib/og-image";
 
 const OUT_PATH = join(process.cwd(), "docs", "social-preview.png");
 

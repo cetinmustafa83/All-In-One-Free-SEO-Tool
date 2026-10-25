@@ -172,9 +172,9 @@ async function main() {
 
   section("With real data");
 
-  const { db } = await import("../src/db/client");
+  const { db } = await import("../frontend/src/db/client");
   const { clients, audits, auditIssues, keywords, keywordRankings } = await import(
-    "../src/db/schema"
+    "../frontend/src/db/schema"
   );
 
   const [client] = await db
@@ -295,7 +295,7 @@ async function main() {
 
   section("Citation landscape — who gets cited instead of you");
 
-  const { aiVisibilityChecks } = await import("../src/db/schema");
+  const { aiVisibilityChecks } = await import("../frontend/src/db/schema");
   await db.insert(aiVisibilityChecks).values([
     // Grounded: the model searched. These count.
     {
@@ -368,7 +368,7 @@ async function main() {
   // subscription instead of buying an API key: this install has no model
   // of its own, so the agent decides WHAT to change and the caller
   // writes the words.
-  const { agentActions: aa } = await import("../src/db/schema");
+  const { agentActions: aa } = await import("../frontend/src/db/schema");
   const [proposal] = await db
     .insert(aa)
     .values({

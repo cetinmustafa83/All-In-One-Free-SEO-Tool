@@ -20,10 +20,10 @@
  */
 
 import { inArray } from "drizzle-orm";
-import { db } from "../src/db/client";
-import { graderLeads } from "../src/db/schema";
-import { gradeForVisitor } from "../src/app/embed/grader/actions";
-import { __resetRateLimit, ipPrefix } from "../src/lib/grader-public";
+import { db } from "../frontend/src/db/client";
+import { graderLeads } from "../frontend/src/db/schema";
+import { gradeForVisitor } from "../frontend/src/app/embed/grader/actions";
+import { __resetRateLimit, ipPrefix } from "../frontend/src/lib/grader-public";
 
 let pass = 0;
 let fail = 0;

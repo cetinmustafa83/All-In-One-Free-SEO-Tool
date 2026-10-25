@@ -32,9 +32,9 @@
  *     pnpm test:fixtures
  */
 
-import { runAudit, type AuditFinding } from "../src/lib/audit";
-import { AUDIT_FINDING_TYPES } from "../src/lib/audit-finding-types";
-import type { AuditFindingType } from "../src/lib/audit-finding-types";
+import { runAudit, type AuditFinding } from "../frontend/src/lib/audit";
+import { AUDIT_FINDING_TYPES } from "../frontend/src/lib/audit-finding-types";
+import type { AuditFindingType } from "../frontend/src/lib/audit-finding-types";
 
 
 import { FIXTURES, SITE_EXPECTATIONS } from "../fixtures/pages";

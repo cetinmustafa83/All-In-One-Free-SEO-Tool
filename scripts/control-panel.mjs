@@ -128,7 +128,7 @@ function dataDirPath() {
 }
 
 function dbFilePath() {
-  return process.env.SEO_DB_PATH ?? join(ROOT, "data.db");
+  return process.env.SEO_DB_PATH ?? join(ROOT, "db", "data.db");
 }
 
 /**
@@ -279,7 +279,7 @@ async function appIsResponding() {
 }
 
 async function readState() {
-  const dbPath = process.env.SEO_DB_PATH ?? join(ROOT, "data.db");
+  const dbPath = process.env.SEO_DB_PATH ?? join(ROOT, "db", "data.db");
   const hasData = existsSync(dbPath);
 
   let version = "unknown";

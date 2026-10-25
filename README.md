@@ -136,7 +136,7 @@ file to click. If you delete the icon, double-click `SEO Tool.cmd`
 
 The commands above are the whole thing — the tool runs at
 `localhost:3000` and your data never leaves the machine. A single
-`data.db` file holds everything; backing up means copying the folder.
+`db/data.db` file holds everything; backing up means copying the folder.
 
 Two things worth knowing:
 
@@ -554,7 +554,7 @@ The app is **two processes and one file**:
   `http://127.0.0.1:3100` in your `.env` to enable it, or leave it unset for
   Next-only mode. See `docs/architecture-split-plan.md` for the full porting
   plan and its parity evidence.
-- **Both processes open the same `data.db`** (WAL mode) — there is no second
+- **Both processes open the same `db/data.db`** (WAL mode) — there is no second
   database. The Rust internal token lives in the shared data dir; Next reads
   it to authenticate server-action calls.
 - Still in Next by design: PDF/report generation, screenshots and the
@@ -627,7 +627,7 @@ Yes. Install [Ollama](https://ollama.com/) for local AI (Llama 3.2 / Phi-3 / Mis
 <details>
 <summary><strong>How is data stored?</strong></summary>
 
-A single `data.db` SQLite file in your install folder. API keys and OAuth tokens are encrypted at rest with AES-256-GCM. Backup = copy the folder. Migrate machines = copy the folder.
+A single `db/data.db` SQLite file in your install folder. API keys and OAuth tokens are encrypted at rest with AES-256-GCM. Backup = copy the folder. Migrate machines = copy the folder.
 </details>
 
 <details>

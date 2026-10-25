@@ -18,9 +18,9 @@
  */
 
 import { desc, eq } from "drizzle-orm";
-import { db } from "../src/db/client";
-import { auditIssues, audits, clients } from "../src/db/schema";
-import { runAudit } from "../src/lib/audit";
+import { db } from "../frontend/src/db/client";
+import { auditIssues, audits, clients } from "../frontend/src/db/schema";
+import { runAudit } from "../frontend/src/lib/audit";
 
 let pass = 0;
 let fail = 0;

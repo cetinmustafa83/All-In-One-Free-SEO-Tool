@@ -169,7 +169,7 @@ if (pkgBefore !== pkgAfter) {
 }
 
 // 4. Apply migrations
-const migrateScript = path.join(cwd, "scripts", "migrate.cjs");
+const migrateScript = path.join(cwd, "db", "migrate.cjs");
 if (fs.existsSync(migrateScript)) {
   step("Apply database migrations", () => {
     const out = run("node", [migrateScript], { timeout: 120_000 });

@@ -17,7 +17,7 @@
  *   READ ME FIRST.txt
  *   _system/                   <- the entire project, out of the way
  *       _system-scripts/       <- what the launchers run
- *       bin/  src/  scripts/  package.json ...
+ *       bin/  frontend/  db/  scripts/  package.json ...
  *
  * The launchers are the only things at the top. Everything that would
  * make someone hesitate is one folder down, named so it reads as
@@ -79,16 +79,11 @@ const SHIP_TOP_LEVEL = new Set([
   "package.json",
   "pnpm-lock.yaml",
   "pnpm-workspace.yaml",
-  "next.config.ts",
-  "tsconfig.json",
-  "postcss.config.mjs",
-  "components.json",
   "drizzle.config.ts",
-  ".env.example",
-  "src",
-  "public",
   "bin",
   "scripts",
+  "db",
+  "frontend",
   // Documented install path, and the app's own docs link to these
   "Dockerfile",
   "docker-compose.yml",
@@ -119,7 +114,7 @@ const DROP = [
   // 4.2 MB of drizzle-kit snapshots. scripts/migrate.cjs reads only the
   // .sql files — checked, it filters on endsWith(".sql") — so these are
   // needed to *generate* a migration and never to *apply* one.
-  /^src\/db\/migrations\/meta\//,
+  /^db\/migrations\/meta\//,
   // 1 MB of README images. GitHub serves them from the repo; a local
   // copy of the README is not why anyone downloaded this.
   /^docs\/screenshots\//,

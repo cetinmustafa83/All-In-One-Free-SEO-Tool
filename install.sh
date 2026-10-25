@@ -435,7 +435,7 @@ MSG
   fi
 
   say "Applying database migrations"
-  if ! node scripts/migrate.cjs 2>&1; then
+  if ! node db/migrate.cjs 2>&1; then
     die "$(cat <<MSG
 Database migrations failed.
 

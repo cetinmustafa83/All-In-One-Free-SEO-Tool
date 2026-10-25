@@ -17,13 +17,13 @@
  */
 
 import { and, desc, eq } from "drizzle-orm";
-import { db } from "../src/db/client";
-import { agentActions, agentRuns, clients } from "../src/db/schema";
-import { getAgentSettings } from "../src/lib/agent/autonomy";
-import { willAutoApply } from "../src/lib/agent/autonomy-levels";
-import { detectCapabilities } from "../src/lib/agent/capabilities";
-import { planForClient } from "../src/lib/agent/planner";
-import { runAgentForClient } from "../src/lib/agent/run";
+import { db } from "../frontend/src/db/client";
+import { agentActions, agentRuns, clients } from "../frontend/src/db/schema";
+import { getAgentSettings } from "../frontend/src/lib/agent/autonomy";
+import { willAutoApply } from "../frontend/src/lib/agent/autonomy-levels";
+import { detectCapabilities } from "../frontend/src/lib/agent/capabilities";
+import { planForClient } from "../frontend/src/lib/agent/planner";
+import { runAgentForClient } from "../frontend/src/lib/agent/run";
 
 let pass = 0;
 let fail = 0;

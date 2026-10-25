@@ -27,7 +27,7 @@ import { readdirSync, readFileSync, existsSync } from "node:fs";
 import path from "node:path";
 
 const ROOT = process.cwd();
-const TOOLS_DIR = path.join(ROOT, "src/app/tools");
+const TOOLS_DIR = path.join(ROOT, "frontend/src/app/tools");
 
 const c = {
   red: (s: string) => `\x1b[31m${s}\x1b[0m`,
@@ -192,8 +192,8 @@ function main() {
     .sort();
 
   // Everything the client rail and the tools hub link to.
-  const rail = read(path.join(ROOT, "src/app/clients/[id]/client-tools-launcher.tsx"));
-  const hub = read(path.join(ROOT, "src/app/tools/tools-grid.tsx"));
+  const rail = read(path.join(ROOT, "frontend/src/app/clients/[id]/client-tools-launcher.tsx"));
+  const hub = read(path.join(ROOT, "frontend/src/app/tools/tools-grid.tsx"));
   const linked = new Set(
     [...`${rail}\n${hub}`.matchAll(/\/tools\/([a-z0-9-]+)/g)].map((m) => m[1]),
   );

@@ -28,7 +28,7 @@ impl Config {
             .ok()
             .and_then(|p| p.parse().ok())
             .unwrap_or(3100);
-        let db_path = std::env::var("DATABASE_PATH").unwrap_or_else(|_| "../data.db".into());
+        let db_path = std::env::var("DATABASE_PATH").unwrap_or_else(|_| "../db/data.db".into());
         let trusted_proxy = std::env::var("TRUSTED_PROXY").as_deref() == Ok("1");
         let app_password = std::env::var("APP_PASSWORD").unwrap_or_default();
         let app_password_set = !app_password.is_empty();

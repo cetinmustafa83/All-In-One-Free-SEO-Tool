@@ -8,7 +8,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 // The registered list, not a number typed here. This asserted "12 tools"
 // while 22 were registered — a check that only fails once somebody adds
 // a tool is a check that reports the wrong thing for months.
-import { MCP_TOOL_LIST, READ_ONLY_TOOLS } from "../src/lib/mcp/server";
+import { MCP_TOOL_LIST, READ_ONLY_TOOLS } from "../frontend/src/lib/mcp/server";
 
 const URL_ = process.env.MCP_URL ?? "http://localhost:63140/api/mcp";
 const TOKEN = process.argv[2] ?? "";

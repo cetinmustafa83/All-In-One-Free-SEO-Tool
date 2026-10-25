@@ -52,7 +52,7 @@ type ClickOutcome =
   | { kind: "threw"; message: string };
 
 async function clickRunAudit(clientId: number): Promise<ClickOutcome> {
-  const { runAuditForClient } = await import("../src/app/audits/actions");
+  const { runAuditForClient } = await import("../frontend/src/app/audits/actions");
   try {
     await runAuditForClient(clientId);
     return { kind: "returned" };
@@ -79,8 +79,8 @@ async function main() {
     stdio: "pipe",
   });
 
-  const { db } = await import("../src/db/client");
-  const { clients, audits } = await import("../src/db/schema");
+  const { db } = await import("../frontend/src/db/client");
+  const { clients, audits } = await import("../frontend/src/db/schema");
   const { eq, desc } = await import("drizzle-orm");
 
   const seed = async (name: string, runningAgeMs: number | null) => {

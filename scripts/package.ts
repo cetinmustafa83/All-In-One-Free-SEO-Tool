@@ -100,7 +100,7 @@ for /l %%p in (3000,1,3010) do (
 set "URL=http://localhost:%PORT%"
 
 REM SQLite db lives next to the .bat
-set "SEO_DB_PATH=%ROOT%data.db"
+set "SEO_DB_PATH=%ROOT%db\\data.db"
 set "HOSTNAME=127.0.0.1"
 
 echo.
@@ -131,7 +131,7 @@ done
 
 URL="http://localhost:$PORT"
 export PORT
-export SEO_DB_PATH="$(pwd)/data.db"
+export SEO_DB_PATH="$(pwd)/db/data.db"
 export HOSTNAME="127.0.0.1"
 
 echo

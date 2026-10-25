@@ -6,7 +6,7 @@ export default defineConfig({
     // Pure-logic tests only. Anything that opens the SQLite handle or
     // launches Chromium belongs in a separate (future) e2e project —
     // `pnpm test` has to stay fast enough to run on every commit.
-    include: ["src/**/*.test.ts"],
+    include: ["frontend/src/**/*.test.ts"],
     environment: "node",
     // Points every worker at a throwaway database before any test file
     // is imported. Several of these tests import a module that opens
@@ -16,6 +16,6 @@ export default defineConfig({
     setupFiles: ["./vitest.setup.ts"],
   },
   resolve: {
-    alias: { "@": path.resolve(__dirname, "./src") },
+    alias: { "@": path.resolve(__dirname, "./frontend/src") },
   },
 });

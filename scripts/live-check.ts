@@ -19,9 +19,9 @@
  * the app's transpiled modules fail to resolve under that loader.
  */
 
-import { runAudit } from "../src/lib/audit";
-import { guardUrl } from "../src/lib/url-guard";
-import { fetchRobotsPolicy, isAllowed } from "../src/lib/robots-policy";
+import { runAudit } from "../frontend/src/lib/audit";
+import { guardUrl } from "../frontend/src/lib/url-guard";
+import { fetchRobotsPolicy, isAllowed } from "../frontend/src/lib/robots-policy";
 
 const AI = process.argv.includes("--ai");
 const RANK = process.argv.includes("--rank");
@@ -127,7 +127,7 @@ async function audit() {
 
 async function rank() {
   section("Rank tracking — live SERP (slow, launches a browser)");
-  const { checkRank } = await import("../src/lib/rank-checker");
+  const { checkRank } = await import("../frontend/src/lib/rank-checker");
   const r = await checkRank("wikipedia", "wikipedia.org", { device: "desktop" });
   console.log(`         engine=${r.engine} scanned=${r.resultsScanned} pos=${r.position}`);
   if (r.error) {
@@ -147,8 +147,8 @@ async function rank() {
 
 async function ai() {
   section("AI provider — live call through the real dispatch path");
-  const { callAIResult } = await import("../src/lib/ai-call");
-  const { getActiveProvider } = await import("../src/lib/api-keys");
+  const { callAIResult } = await import("../frontend/src/lib/ai-call");
+  const { getActiveProvider } = await import("../frontend/src/lib/api-keys");
 
   const provider = await getActiveProvider();
 

@@ -30,7 +30,7 @@ const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 
 const ROOT = path.join(__dirname, "..");
-const NEXT_DIR = path.join(ROOT, ".next");
+const NEXT_DIR = path.join(ROOT, "frontend", ".next");
 const STAMP = path.join(NEXT_DIR, "SEO_TOOL_VERSION");
 
 function version() {
@@ -42,19 +42,19 @@ function version() {
 }
 
 function removeStaleMiddleware() {
-  const proxy = path.join(ROOT, "src", "proxy.ts");
-  const middleware = path.join(ROOT, "src", "middleware.ts");
+  const proxy = path.join(ROOT, "frontend", "src", "proxy.ts");
+  const middleware = path.join(ROOT, "frontend", "src", "middleware.ts");
   if (!fs.existsSync(proxy) || !fs.existsSync(middleware)) return;
   // Only our own old auth gate — never a file someone wrote themselves.
   const text = fs.readFileSync(middleware, "utf8");
   if (!text.includes("stb_auth") || !text.includes("PUBLIC_PATHS")) {
     console.warn(
-      "[ensure-build] src/middleware.ts and src/proxy.ts both exist; Next will refuse to build. Remove one.",
+      "[ensure-build] frontend/src/middleware.ts and proxy.ts both exist; Next will refuse to build. Remove one.",
     );
     return;
   }
   fs.unlinkSync(middleware);
-  console.log("[ensure-build] Removed src/middleware.ts (renamed to src/proxy.ts in v0.7.0).");
+  console.log("[ensure-build] Removed frontend/src/middleware.ts (renamed to proxy.ts in v0.7.0).");
 }
 
 function stamp() {
@@ -84,7 +84,7 @@ function main() {
     `[ensure-build] The production build is from ${have ? `v${have}` : "an earlier version"}; the code is v${want}. Rebuilding (1-2 minutes, once)...`,
   );
   const nextBin = path.join(ROOT, "node_modules", "next", "dist", "bin", "next");
-  const r = spawnSync(process.execPath, [nextBin, "build"], {
+  const r = spawnSync(process.execPath, [nextBin, "build", "frontend"], {
     cwd: ROOT,
     stdio: "inherit",
     env: process.env,

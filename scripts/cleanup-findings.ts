@@ -49,7 +49,7 @@ import {
 } from "@/lib/seo-calendar";
 
 const APPLY = process.argv.includes("--apply");
-const dbPath = process.env.SEO_DB_PATH || path.join(process.cwd(), "data.db");
+const dbPath = process.env.SEO_DB_PATH || path.join(process.cwd(), "db", "data.db");
 const sqlite = new Database(dbPath);
 sqlite.pragma("foreign_keys = ON");
 

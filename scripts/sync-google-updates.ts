@@ -21,7 +21,7 @@ import {
   RANKING_HISTORY_URL,
   STATUS_ORIGIN,
   type RankingUpdate,
-} from "../src/lib/google-status";
+} from "../frontend/src/lib/google-status";
 
 async function get(url: string): Promise<string> {
   const res = await fetch(url);
@@ -55,7 +55,7 @@ async function main() {
 
   updates.sort((a, b) => b.date.localeCompare(a.date) || a.name.localeCompare(b.name));
   writeFileSync(
-    "src/lib/google-ranking-updates.json",
+    "frontend/src/lib/google-ranking-updates.json",
     JSON.stringify(
       {
         source: RANKING_HISTORY_URL,

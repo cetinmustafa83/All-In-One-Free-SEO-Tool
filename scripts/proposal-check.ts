@@ -12,11 +12,11 @@
  */
 
 import { and, desc, eq } from "drizzle-orm";
-import { db } from "../src/db/client";
-import { auditIssues, audits, clients, proposals } from "../src/db/schema";
-import { buildProposal } from "../src/app/proposals/actions";
-import { generateProposalPdf } from "../src/lib/proposal-pdf";
-import { deriveScope } from "../src/lib/proposal-scope";
+import { db } from "../frontend/src/db/client";
+import { auditIssues, audits, clients, proposals } from "../frontend/src/db/schema";
+import { buildProposal } from "../frontend/src/app/proposals/actions";
+import { generateProposalPdf } from "../frontend/src/lib/proposal-pdf";
+import { deriveScope } from "../frontend/src/lib/proposal-scope";
 
 let pass = 0;
 let fail = 0;

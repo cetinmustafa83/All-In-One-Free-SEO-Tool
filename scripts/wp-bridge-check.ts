@@ -38,8 +38,8 @@ import {
   setPostSeo,
   findPostIdByUrl,
   type WpCreds,
-} from "../src/lib/wp-bridge";
-import { hasPluginVersion } from "../src/lib/agent/capabilities";
+} from "../frontend/src/lib/wp-bridge";
+import { hasPluginVersion } from "../frontend/src/lib/agent/capabilities";
 
 /**
  * Point this at a REAL WordPress instead of the stand-in:

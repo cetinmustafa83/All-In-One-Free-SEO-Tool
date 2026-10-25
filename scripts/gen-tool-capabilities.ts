@@ -18,14 +18,14 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { deriveToolCapabilities } from "../src/lib/tool-capabilities.derive";
+import { deriveToolCapabilities } from "../frontend/src/lib/tool-capabilities.derive";
 
 export type ToolCopy = { title: string; description: string };
 
 /** Pull { href, title, description } out of the tools-grid source. */
 export function readToolCopy(root = process.cwd()): Map<string, ToolCopy> {
   const src = fs.readFileSync(
-    path.join(root, "src/app/tools/tools-grid.tsx"),
+    path.join(root, "frontend/src/app/tools/tools-grid.tsx"),
     "utf8",
   );
   const out = new Map<string, ToolCopy>();
@@ -130,7 +130,7 @@ ${rows}
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const dest = path.resolve(
     process.cwd(),
-    "src/lib/tool-capabilities.generated.ts",
+    "frontend/src/lib/tool-capabilities.generated.ts",
   );
   fs.writeFileSync(dest, renderCapabilities(), "utf8");
   console.log(`wrote ${dest}`);

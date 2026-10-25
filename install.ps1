@@ -563,7 +563,7 @@ else {
     Say "Applying database migrations"
     # `2>&1` merges stderr into stdout so transcript captures it.
     # Without this, migration errors silently vanish from the log.
-    & node scripts/migrate.cjs 2>&1 | ForEach-Object { Write-Host $_ }
+    & node db/migrate.cjs 2>&1 | ForEach-Object { Write-Host $_ }
     if ($LASTEXITCODE -ne 0) {
         DieMulti @(
             "Database migrations failed (exit $LASTEXITCODE).",

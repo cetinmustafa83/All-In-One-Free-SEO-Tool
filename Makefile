@@ -22,7 +22,7 @@ help:
 	@echo "  everyday"
 	@echo "    make install     pnpm install + cargo fetch (both toolchains)"
 	@echo "    make dev         start backend (:3100) + next dev (:3000)"
-	@echo "    make migrate     apply SQLite migrations (scripts/migrate.cjs)"
+	@echo "    make migrate     apply SQLite migrations (db/migrate.cjs)"
 	@echo ""
 	@echo "  verify"
 	@echo "    make check       cargo check (Rust, the fast gate)"
@@ -113,4 +113,4 @@ release:
 	pnpm build:release
 
 clean:
-	rm -rf .next backend/target
+	rm -rf frontend/.next backend/target

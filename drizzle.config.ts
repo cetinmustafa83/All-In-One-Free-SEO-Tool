@@ -1,11 +1,14 @@
 import { defineConfig } from "drizzle-kit";
 
+// Schema and the generated SQL live apart since the frontend/backend/db
+// split: schema is frontend app code (imported everywhere via @/db/schema),
+// migrations are database artifacts owned by db/migrate.cjs.
 export default defineConfig({
-  schema: "./src/db/schema.ts",
-  out: "./src/db/migrations",
+  schema: "./frontend/src/db/schema.ts",
+  out: "./db/migrations",
   dialect: "sqlite",
   dbCredentials: {
-    url: "./data.db",
+    url: "./db/data.db",
   },
   verbose: true,
   strict: true,

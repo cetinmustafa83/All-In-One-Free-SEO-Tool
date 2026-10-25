@@ -120,9 +120,9 @@ line(
   fs.existsSync(envLocal) ? "ok" : "warn",
 );
 
-const nextBuild = path.join(installRoot, ".next", "BUILD_ID");
+const nextBuild = path.join(installRoot, "frontend", ".next", "BUILD_ID");
 line(
-  ".next/BUILD_ID",
+  "frontend/.next/BUILD_ID",
   fs.existsSync(nextBuild) ? "present (production-ready)" : "absent (will run dev mode)",
   fs.existsSync(nextBuild) ? "ok" : "warn",
 );
@@ -148,7 +148,7 @@ if (savedPid) {
 
 // ====================== Database ======================
 header("Database");
-const dbPath = process.env.SEO_DB_PATH || path.join(installRoot, "data.db");
+const dbPath = process.env.SEO_DB_PATH || path.join(installRoot, "db", "data.db");
 const dbExists = fs.existsSync(dbPath);
 line("data.db", dbExists ? dbPath : "missing", dbExists ? "ok" : "fail");
 

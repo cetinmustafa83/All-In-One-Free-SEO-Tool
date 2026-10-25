@@ -17,13 +17,13 @@
  */
 
 import { desc, eq, inArray } from "drizzle-orm";
-import { db } from "../src/db/client";
-import { clients, reportArchives, reportBatches } from "../src/db/schema";
+import { db } from "../frontend/src/db/client";
+import { clients, reportArchives, reportBatches } from "../frontend/src/db/schema";
 import {
   getBatchProgress,
   reviewQueue,
   startReportBatch,
-} from "../src/lib/report-batch";
+} from "../frontend/src/lib/report-batch";
 
 let pass = 0;
 let fail = 0;

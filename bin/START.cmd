@@ -7,7 +7,7 @@ REM  (or whichever port the installer picked).
 REM ============================================================
 REM
 REM Modes:
-REM   - If .next\BUILD_ID exists -> production mode (fast, ~2s)
+REM   - If frontend\.next\BUILD_ID exists -> production mode (fast, ~2s)
 REM   - Otherwise                -> dev mode (slower first paint, 30-60s)
 REM     Run `pnpm build` once to switch to production mode.
 REM
@@ -20,7 +20,7 @@ REM                 (REQUIRES setting APP_PASSWORD in .env.local first)
 
 setlocal EnableDelayedExpansion
 REM This launcher lives in bin/ — all runtime state (.dev-server.pid,
-REM .seo-port, data.db, .next, node_modules) is at the install root,
+REM .seo-port, db/data.db, frontend/.next, node_modules) at the install root,
 REM one level up. cd there so relative paths resolve correctly.
 cd /d "%~dp0\.."
 
@@ -67,7 +67,7 @@ REM     pnpm install progress in real time. Takes 3-8 min total on
 REM     first run; thereafter every step is a no-op.
 set "FIRST_RUN_BOOTSTRAP=0"
 if not exist "node_modules" set "FIRST_RUN_BOOTSTRAP=1"
-if not exist ".next\BUILD_ID" set "FIRST_RUN_BOOTSTRAP=1"
+if not exist "frontend\.next\BUILD_ID" set "FIRST_RUN_BOOTSTRAP=1"
 
 if "!FIRST_RUN_BOOTSTRAP!"=="1" (
   echo.
@@ -109,7 +109,7 @@ if not exist "node_modules" (
   call !PM! rebuild >nul 2>&1
 )
 
-if not exist ".next\BUILD_ID" (
+if not exist "frontend\.next\BUILD_ID" (
   ^> ".install-progress" echo 2^|Building production bundle ^(1-2 min^)
   echo.
   echo [2/3] Building production bundle...
@@ -227,7 +227,7 @@ if %errorlevel%==0 (
 
 REM ---- 4. Pick mode. Production if a build exists, dev otherwise.
 set "RUN_CMD=dev"
-if exist ".next\BUILD_ID" if not "%SEO_FORCE_DEV%"=="1" set "RUN_CMD=start:daily"
+if exist "frontend\.next\BUILD_ID" if not "%SEO_FORCE_DEV%"=="1" set "RUN_CMD=start:daily"
 
 REM ---- 5. Write a small batch shim and launch it under PowerShell's
 REM Start-Process so the window stays hidden and paths with spaces work.

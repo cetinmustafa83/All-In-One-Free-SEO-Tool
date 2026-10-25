@@ -27,7 +27,7 @@ import { join, relative, sep } from "node:path";
 
 const BASE = process.argv[2] ?? "http://localhost:3000";
 const DB_PATH = process.argv[3] ?? null;
-const APP_DIR = "src/app";
+const APP_DIR = "frontend/src/app";
 
 /** Routes that are expected not to return 200 to an anonymous GET. */
 const EXPECT_NON_200 = new Set([

@@ -46,6 +46,6 @@ process.env.SEO_DATA_DIR = dir;
 // keeps it CJS-only, which is why it survives in the minimal image.
 execFileSync(
   process.execPath,
-  [path.join(__dirname, "scripts", "migrate.cjs")],
+  [path.join(__dirname, "db", "migrate.cjs")],
   { env: { ...process.env, SEO_DB_PATH: dbPath }, stdio: "pipe" },
 );

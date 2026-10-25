@@ -17,7 +17,7 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
-const pub = path.join(root, "public");
+const pub = path.join(root, "frontend/public");
 const svgPath = path.join(pub, "icon.svg");
 
 async function renderSvg(size) {
@@ -78,11 +78,11 @@ async function main() {
   console.log("Rendering favicon.ico (32px)…");
   const png32 = await renderSvg(32);
   await fs.writeFile(
-    path.join(root, "src", "app", "favicon.ico"),
+    path.join(root, "frontend", "src", "app", "favicon.ico"),
     pngToIco(png32, 32),
   );
 
-  console.log("\nDone. Icons written to /public + src/app/favicon.ico");
+  console.log("\nDone. Icons written to frontend/public + frontend/src/app/favicon.ico");
 }
 
 main().catch((err) => {

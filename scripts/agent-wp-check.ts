@@ -166,9 +166,9 @@ async function main() {
 
   section("Seeding a client with a CMS connected");
 
-  const { db } = await import("../src/db/client");
+  const { db } = await import("../frontend/src/db/client");
   const { clients, audits, auditIssues, agentActions } = await import(
-    "../src/db/schema"
+    "../frontend/src/db/schema"
   );
   const { eq } = await import("drizzle-orm");
 
@@ -223,7 +223,7 @@ async function main() {
 
   section("Capability detection — against a live plugin");
 
-  const { detectCapabilities } = await import("../src/lib/agent/capabilities");
+  const { detectCapabilities } = await import("../frontend/src/lib/agent/capabilities");
   const caps = await detectCapabilities(client.id);
   info(
     Object.entries(caps.byId)
@@ -256,7 +256,7 @@ async function main() {
   process.env.OLLAMA_URL = `http://localhost:${AI_BAD_PORT}`;
   await wpGet("/reset");
 
-  const { setAgentSettings } = await import("../src/lib/agent/autonomy");
+  const { setAgentSettings } = await import("../frontend/src/lib/agent/autonomy");
   const raised = await setAgentSettings({ level: "apply_safe" });
   if (raised.level === "apply_safe") {
     info(
@@ -268,7 +268,7 @@ async function main() {
   }
 
   const titleBefore = (await wpGet("/post/101/seo")).title;
-  const { runAgentForClient } = await import("../src/lib/agent/run");
+  const { runAgentForClient } = await import("../frontend/src/lib/agent/run");
   const badRun = await runAgentForClient({
     clientId: client.id,
     trigger: "manual",
@@ -507,7 +507,7 @@ async function main() {
 
   section("Undo — through the agent, not the bridge");
 
-  const { revertAction } = await import("../src/lib/agent/executor");
+  const { revertAction } = await import("../frontend/src/lib/agent/executor");
   let reverted = 0;
   const revertFailed: string[] = [];
   for (const a of applied) {

@@ -7,7 +7,7 @@
 # ============================================================
 #
 # Modes:
-#   - If .next/BUILD_ID exists -> production mode (fast, ~2s)
+#   - If frontend/.next/BUILD_ID exists -> production mode (fast, ~2s)
 #   - Otherwise                -> dev mode (slower first paint, 30-60s)
 #     Run `pnpm build` once to switch to production mode.
 #
@@ -20,7 +20,7 @@
 
 set -e
 # This launcher lives in bin/; runtime state (.dev-server.pid,
-# .seo-port, data.db, .next, node_modules) is at the install root.
+# .seo-port, db/data.db, frontend/.next, node_modules) at the install root.
 cd "$(dirname "$0")/.."
 
 # ---- 1. Resolve PORT
@@ -50,7 +50,7 @@ fi
 # machine just works. ~5 min total on first run; no-op thereafter.
 FIRST_RUN_BOOTSTRAP=0
 [ ! -d "node_modules" ] && FIRST_RUN_BOOTSTRAP=1
-[ ! -f ".next/BUILD_ID" ] && FIRST_RUN_BOOTSTRAP=1
+[ ! -f "frontend/.next/BUILD_ID" ] && FIRST_RUN_BOOTSTRAP=1
 
 if [ "$FIRST_RUN_BOOTSTRAP" = "1" ]; then
   echo ""
@@ -81,7 +81,7 @@ if [ ! -d "node_modules" ]; then
   $PM rebuild >/dev/null 2>&1 || true
 fi
 
-if [ ! -f ".next/BUILD_ID" ]; then
+if [ ! -f "frontend/.next/BUILD_ID" ]; then
   echo ""
   echo "[2/3] Building production bundle..."
   echo "      (1-2 min; makes daily boot ~3s instead of ~30s)"
@@ -251,7 +251,7 @@ else
   fi
   if [ -n "$BACKEND_BIN" ]; then
     echo "Starting Rust backend on :$BACKEND_PORT..."
-    PORT="$BACKEND_PORT" DATABASE_PATH="$PWD/data.db" \
+    PORT="$BACKEND_PORT" DATABASE_PATH="$PWD/db/data.db" SEO_DB_PATH="$PWD/db/data.db" \
       nohup "$BACKEND_BIN" > backend.log 2>&1 &
     echo $! > .seo-backend.pid
     for i in $(seq 1 30); do backend_healthy && break; sleep 1; done
@@ -270,7 +270,7 @@ fi
 
 # ---- 5. Pick mode
 RUN_CMD="dev"
-if [ -f ".next/BUILD_ID" ] && [ "$SEO_FORCE_DEV" != "1" ]; then
+if [ -f "frontend/.next/BUILD_ID" ] && [ "$SEO_FORCE_DEV" != "1" ]; then
   RUN_CMD="start:daily"
 fi
 

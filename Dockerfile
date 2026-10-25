@@ -130,10 +130,10 @@ RUN mkdir -p /data && chown -R pwuser:pwuser /data
 # Non-root user (Playwright image already provides 'pwuser')
 USER pwuser
 
-COPY --from=build --chown=pwuser:pwuser /app/.next/standalone ./
-COPY --from=build --chown=pwuser:pwuser /app/.next/static ./.next/static
-COPY --from=build --chown=pwuser:pwuser /app/public ./public
-COPY --from=build --chown=pwuser:pwuser /app/src/db/migrations ./src/db/migrations
+COPY --from=build --chown=pwuser:pwuser /app/frontend/.next/standalone ./
+COPY --from=build --chown=pwuser:pwuser /app/frontend/.next/static ./.next/static
+COPY --from=build --chown=pwuser:pwuser /app/frontend/public ./public
+COPY --from=build --chown=pwuser:pwuser /app/db ./db
 COPY --from=build --chown=pwuser:pwuser /app/scripts ./scripts
 COPY --from=build --chown=pwuser:pwuser /app/drizzle.config.ts ./drizzle.config.ts
 COPY --from=build --chown=pwuser:pwuser /app/package.json ./package.json
@@ -178,7 +178,7 @@ DATABASE_PATH=\"$SEO_DB_PATH\" \
 SEO_DATA_DIR=\"$SEO_DATA_DIR\" \
 ./backend/seo-backend > /data/backend.log 2>&1 & \
 BACKEND_PID=$!; \
-node scripts/migrate.cjs && API_BACKEND_URL="${API_BACKEND_URL:-http://127.0.0.1:3100}" node server.js & \
+node db/migrate.cjs && API_BACKEND_URL="${API_BACKEND_URL:-http://127.0.0.1:3100}" node server.js & \
 NODE_PID=$!; \
 trap 'kill $BACKEND_PID $NODE_PID 2>/dev/null' INT TERM; \
 wait $NODE_PID; \
