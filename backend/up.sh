@@ -8,6 +8,12 @@ PID_FILE="backend-dev.pid"
 LOG_FILE="backend-dev.log"
 export PORT="${PORT:-3100}"
 export DATABASE_PATH="${DATABASE_PATH:-../data.db}"
+# Forwarded when the caller sets it (CI scratch-DB steps, e2e runner):
+# the token file .seo-internal-token lands in the SAME data dir the Next
+# side resolves, or callBackend can't authenticate to us.
+if [ -n "${SEO_DATA_DIR:-}" ]; then
+  export SEO_DATA_DIR
+fi
 
 case "${1:-up}" in
   up)

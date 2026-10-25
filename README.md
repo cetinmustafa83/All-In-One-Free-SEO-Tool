@@ -518,7 +518,8 @@ See [ROADMAP.md](docs/ROADMAP.md) for the full v2 + v3 roadmap (~30 items). Comm
 ## 🛠️ Tech stack
 
 - **Next.js 16** (App Router) + **React 19** + **TypeScript** strict
-- **SQLite** (better-sqlite3) + **Drizzle ORM** — one file, no Postgres required
+- **Rust** (axum + rusqlite) — the API backend; see *Architecture* below
+- **SQLite** (better-sqlite3 + rusqlite, same file) + **Drizzle ORM** — no Postgres required
 - **Playwright** (headless Chromium) — rank checking, SERP scraping, GBP scraping
 - **Tailwind 4** + **motion** library + **shadcn**-style components
 - **Satori** + **resvg-js** for OG-image generation (no headless Chrome)
@@ -526,6 +527,52 @@ See [ROADMAP.md](docs/ROADMAP.md) for the full v2 + v3 roadmap (~30 items). Comm
 - Optional: **Ollama** for local AI, **Browserless** for remote Chromium
 
 Runs on a $5/month VPS (1 GB RAM) for solo / small-agency use. See [`docs/HOSTING.md`](docs/HOSTING.md) for Hetzner / Railway / Hostinger guides.
+
+---
+
+## 🏗️ Architecture
+
+The app is **two processes and one file**:
+
+```
+┌────────────────────┐   /api/* (proxy)   ┌─────────────────────┐
+│  Next.js frontend  │ ─────────────────▶ │  Rust backend       │
+│  :3000             │   API_BACKEND_URL  │  (axum) :3100       │
+│  pages, server     │                    │  /api/v1, /api/auth,│
+│  actions, PDF      │                    │  exports, internal  │
+└─────────┬──────────┘                    └──────────┬──────────┘
+          │          ┌────────────────────┐          │
+          └──────────│  SQLite data.db    │◀─────────┘
+                     │  (WAL, shared)     │  both stacks, one file
+                     └────────────────────┘
+```
+
+- The **Rust backend owns the ported API surface** (`/api/v1/*`, `/api/auth/*`,
+  exports, and the internal endpoints the frontend's server actions call).
+  The Next side proxies every `/api/*` path it doesn't implement itself to
+  `API_BACKEND_URL` (default `http://127.0.0.1:3100`) — set that variable to
+  `http://127.0.0.1:3100` in your `.env` to enable it, or leave it unset for
+  Next-only mode. See `docs/architecture-split-plan.md` for the full porting
+  plan and its parity evidence.
+- **Both processes open the same `data.db`** (WAL mode) — there is no second
+  database. The Rust internal token lives in the shared data dir; Next reads
+  it to authenticate server-action calls.
+- Still in Next by design: PDF/report generation, screenshots and the
+  Playwright-dependent features (native deps), plus the desktop launchers.
+
+**Everyday commands** (all wrapped by the [`Makefile`](Makefile)):
+
+```bash
+make dev          # backend :3100 + next dev :3000
+make check        # cargo check (Rust)
+make smoke        # 142-assert backend suite incl. byte-exact CSV fixtures
+make parity       # Next-vs-Rust response parity probes
+make compose-up   # docker compose up -d --build (image runs BOTH processes)
+```
+
+Docker users don't need to change anything: the image builds the Rust backend
+in its own stage and starts both processes — `docker compose up` behaves
+exactly as before, and the container healthcheck probes the full round trip.
 
 ---
 

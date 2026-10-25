@@ -14,6 +14,10 @@ data.db-*
 coverage
 dist
 out
+# Rust build artifacts — GBs, and the backend stage builds from source.
+backend/target
+backend/backend-dev.log
+backend/backend-dev.pid
 .env.local
 .env.development
 .env.test

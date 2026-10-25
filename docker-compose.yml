@@ -64,8 +64,28 @@ services:
       # ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       # PERPLEXITY_API_KEY: ${PERPLEXITY_API_KEY:-}
       # OLLAMA_URL: http://ollama:11434
+      # Optional: point the Next container at a SEPARATELY-DEPLOYED Rust
+      # backend instead of the in-container one the image starts. Leave
+      # unset for the normal single-container run — the entrypoint starts
+      # ./backend/seo-backend on 127.0.0.1:3100 itself and the frontend
+      # proxies /api/* to it (phase 14.9 cutover). Only set this if you
+      # are running the backend as its own container, in which case also
+      # note the backend needs the SAME volume (it owns .seo-internal-token
+      # and the SQLite file).
+      # API_BACKEND_URL: http://seo-backend:3100
     volumes:
       - seo-data:/data
+    healthcheck:
+      # Probes THROUGH the frontend: with the 14.9 cutover
+      # /api/v1/health round-trips the rewrite → Rust → SQLite, so a green
+      # check means both processes are alive and the DB is readable. node
+      # 22 ships fetch, so no extra tooling needed. start_period covers
+      # the migration + first boot window.
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
   # Optional sidecar — local LLM for fully offline AI features.
   # Uncomment + run `docker compose up ollama` to use.

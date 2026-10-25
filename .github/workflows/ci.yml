@@ -42,6 +42,35 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      # ---- Rust backend (phase 14 split) ----
+      #
+      # Since 14.9 the ported /api surface is served by the Rust process
+      # through the Next rewrite, so most server-backed steps below need
+      # it running. Build it once here (debug profile — the smoke suite
+      # and every scratch-DB step use it), then keep it on :3201 for the
+      # whole job. 3201, not the dev-default 3100: the auth-flow step
+      # starts the NEXT app on :3100 and the two must not fight over it.
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend
+      - name: Build Rust backend (debug)
+        working-directory: backend
+        run: cargo build --locked
+
+      # Every step that runs a scratch DB restarts the backend onto that
+      # DB via backend/tools/ci-up.sh — see the script's header for why
+      # the two stacks must never point at different files.
+      - name: Point the app at the Rust backend
+        run: |
+          echo "API_BACKEND_URL=http://127.0.0.1:3201" >> "$GITHUB_ENV"
+          echo "SEO_BACKEND_URL=http://127.0.0.1:3201" >> "$GITHUB_ENV"
+
+      - name: Start Rust backend (default DB)
+        run: |
+          node scripts/migrate.cjs
+          bash backend/tools/ci-up.sh "$PWD/data.db" 3201
+
       - name: Typecheck
         run: pnpm typecheck
 
@@ -111,6 +140,30 @@ jobs:
         env:
           SEO_DB_PATH: ${{ runner.temp }}/ci.db
 
+      # The 142-assert internal smoke suite: the strongest backend gate
+      # there is — endpoint contracts, the SELECT-only query gateway's
+      # readonly guard, FK/error envelopes, and byte-exact golden-fixture
+      # comparisons for every CSV export ported in 14.8. Needs the backend
+      # on its expected dev port (:3100) and a Next server on :3000 for
+      # the proxy byte-compares; both point at the same default data.db.
+      - name: Install bun (smoke seed runner)
+        uses: oven-sh/setup-bun@v2
+      - name: Backend smoke suite
+        run: |
+          bash backend/tools/ci-up.sh "$PWD/data.db" 3100
+          API_BACKEND_URL=http://127.0.0.1:3100 SEO_BACKEND_URL=http://127.0.0.1:3100 \
+            PORT=3000 HOSTNAME=127.0.0.1 nohup pnpm start > /tmp/next-smoke.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -fsS http://localhost:3000/api/v1/health >/dev/null 2>&1 && break
+            sleep 1
+          done
+          bash backend/tools/internal-smoke.sh
+          status=$?
+          kill %1 2>/dev/null || true
+          # Leave the job's standing backend on :3201 for later steps.
+          bash backend/tools/ci-up.sh "$PWD/data.db" 3201
+          exit $status
+
       # E2E covers what unit tests structurally can't: whether a page
       # actually renders in a browser. /tasks was importing a dependency
       # that wasn't installed for months, and no amount of server-side
@@ -145,6 +198,7 @@ jobs:
           export SEO_DB_PATH="${{ runner.temp }}/sweep.db"
           export SEO_DATA_DIR="${{ runner.temp }}"
           node scripts/migrate.cjs
+          bash backend/tools/ci-up.sh "$SEO_DB_PATH" 3201
           PORT=3200 pnpm start &
           server=$!
           for i in $(seq 1 60); do
@@ -172,6 +226,7 @@ jobs:
           export SEO_DB_PATH="${{ runner.temp }}/agent.db"
           export SEO_DATA_DIR="${{ runner.temp }}"
           node scripts/migrate.cjs
+          bash backend/tools/ci-up.sh "$SEO_DB_PATH" 3201
           # Seed a client AND an audit with findings.
           #
           # Without these the script hits its "No clients — add one and
@@ -208,6 +263,7 @@ jobs:
           export SEO_DB_PATH="${{ runner.temp }}/proposal.db"
           export SEO_DATA_DIR="${{ runner.temp }}"
           node scripts/migrate.cjs
+          bash backend/tools/ci-up.sh "$SEO_DB_PATH" 3201
           node -e "
             const D=require('better-sqlite3');
             const db=new D(process.env.SEO_DB_PATH);
@@ -282,6 +338,7 @@ jobs:
           export SEO_DB_PATH="${{ runner.temp }}/mcp-http.db"
           export SEO_DATA_DIR="${{ runner.temp }}"
           node scripts/migrate.cjs
+          bash backend/tools/ci-up.sh "$SEO_DB_PATH" 3201
           TOKENS=$(node -e 'const D=require("better-sqlite3");const c=require("crypto");const db=new D(process.env.SEO_DB_PATH);const put=db.prepare("INSERT OR REPLACE INTO workspace_settings (key, value, updated_at) VALUES (?, ?, ?)");const now=Math.floor(Date.now()/1000);const full=c.randomBytes(24).toString("hex");const ro=c.randomBytes(24).toString("hex");put.run("mcp.access_token", JSON.stringify(full), now);put.run("mcp.readonly_token", JSON.stringify(ro), now);process.stdout.write(full+" "+ro);')
           set -- $TOKENS
           TOKEN=$1
@@ -356,6 +413,7 @@ jobs:
           export SEO_DB_PATH="${{ runner.temp }}/grader.db"
           export SEO_DATA_DIR="${{ runner.temp }}"
           node scripts/migrate.cjs
+          bash backend/tools/ci-up.sh "$SEO_DB_PATH" 3201
           pnpm exec tsx scripts/grader-ssrf-check.ts
 
       # Crawls example.com, so it needs the network. Kept here rather
@@ -367,6 +425,7 @@ jobs:
           export SEO_DB_PATH="${{ runner.temp }}/audit.db"
           export SEO_DATA_DIR="${{ runner.temp }}"
           node scripts/migrate.cjs
+          bash backend/tools/ci-up.sh "$SEO_DB_PATH" 3201
           node -e "
             const D=require('better-sqlite3');
             const db=new D(process.env.SEO_DB_PATH);
@@ -388,6 +447,7 @@ jobs:
           export SEO_DB_PATH="${{ runner.temp }}/reports.db"
           export SEO_DATA_DIR="${{ runner.temp }}"
           node scripts/migrate.cjs
+          bash backend/tools/ci-up.sh "$SEO_DB_PATH" 3201
           node -e "
             const D=require('better-sqlite3');
             const db=new D(process.env.SEO_DB_PATH);
@@ -412,6 +472,7 @@ jobs:
           export SEO_DB_PATH="${{ runner.temp }}/auth.db"
           export SEO_DATA_DIR="${{ runner.temp }}"
           node scripts/migrate.cjs
+          bash backend/tools/ci-up.sh "$SEO_DB_PATH" 3201
           PORT=3100 pnpm start &
           server=$!
           for i in $(seq 1 60); do
@@ -432,6 +493,32 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 7
+
+  # Compile gate for the Rust half of the split
+  # (docs/architecture-split-plan.md, phase 14). Separate from the build
+  # job because its failure mode is unrelated — a type error in
+  # backend/src has nothing to do with pnpm, and the build job shouldn't
+  # have to wait on a Rust toolchain install to report one. The build job
+  # already cargo-builds the backend; this job is the fast, dedicated
+  # signal. --locked for the same reason the Node side uses
+  # --frozen-lockfile: a Cargo.lock that disagrees with Cargo.toml must
+  # fail here, not on somebody's machine.
+  rust:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend
+
+      - name: cargo check --locked
+        working-directory: backend
+        run: cargo check --locked
 
   # Separate job, because the failure it catches has nothing to do with
   # the one above.

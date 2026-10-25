@@ -41,7 +41,13 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: `node scripts/migrate.cjs && npx next start -p ${PORT}`,
+    // The backend starts in the SAME command chain: since the 14.9
+    // cutover the readiness gate below — /api/v1/health — is served by
+    // the Rust process through the Next rewrite, so a webServer that
+    // only started Next would never become healthy on a fresh clone.
+    // e2e-backend.cjs resolves a binary (release → debug → cargo build),
+    // spawns it on :3201 against THIS suite's throwaway db, and exits.
+    command: `node scripts/migrate.cjs && node scripts/e2e-backend.cjs && npx next start -p ${PORT}`,
     url: `${BASE_URL}/api/v1/health`,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
@@ -50,6 +56,11 @@ export default defineConfig({
       SEO_DB_PATH: ".e2e/e2e.db",
       SEO_DATA_DIR: ".e2e",
       SEO_DISABLE_SCHEDULER: "1",
+      // Both halves of the cutover: the frontend's rewrite target and
+      // the server-side callBackend base. The db path matches the one
+      // e2e-backend.cjs was given — one file, two stacks.
+      API_BACKEND_URL: "http://127.0.0.1:3201",
+      SEO_BACKEND_URL: "http://127.0.0.1:3201",
     },
   },
 });

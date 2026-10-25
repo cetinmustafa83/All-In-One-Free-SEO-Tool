@@ -199,6 +199,75 @@ if [ -f ".dev-server.pid" ]; then
   fi
 fi
 
+# ---- 4b. Start the Rust backend (:3100 by default) ----
+#
+# Since the phase-14 split (docs/architecture-split-plan.md) the ported
+# /api surface — auth, the v1 public API, exports, the internal action
+# endpoints — is served by this process and Next proxies /api/* to it
+# (the 14.9 cutover). Without it nearly every page 502s: the RSC pages
+# read through the backend's query gateway. So the backend is as much a
+# part of "starting the app" as Next itself.
+#
+# Resolution order:
+#   1. already healthy on the port (re-run after STOP missed it),
+#   2. prebuilt platform binary shipped in the ZIP (backend/bin/),
+#   3. cargo-built release binary (backend/target/release/),
+#   4. build from source when a cargo toolchain is present,
+#   5. otherwise: loud warning, degraded start (UI boots, /api 404s).
+BACKEND_PORT="${SEO_BACKEND_PORT:-3100}"
+export API_BACKEND_URL="${API_BACKEND_URL:-http://127.0.0.1:$BACKEND_PORT}"
+export SEO_BACKEND_URL="${SEO_BACKEND_URL:-$API_BACKEND_URL}"
+
+backend_healthy() {
+  curl -fsS --max-time 1 "http://127.0.0.1:$BACKEND_PORT/health" >/dev/null 2>&1
+}
+
+if backend_healthy; then
+  echo "Rust backend already running on :$BACKEND_PORT."
+else
+  BACKEND_BIN=""
+  # Normalize to the naming build-release-zip.mjs uses
+  # (process.platform-process.arch: linux-x64, darwin-arm64, ...).
+  case "$(uname -s)" in
+    Linux) OS=linux ;;
+    Darwin) OS=darwin ;;
+    *) OS="$(uname -s | tr '[:upper:]' '[:lower:]')" ;;
+  esac
+  case "$(uname -m)" in
+    x86_64) ARCH=x64 ;;
+    aarch64 | arm64) ARCH=arm64 ;;
+    *) ARCH="$(uname -m)" ;;
+  esac
+  for cand in \
+    "backend/bin/seo-backend-$OS-$ARCH" \
+    "backend/bin/seo-backend" \
+    "backend/target/release/seo-backend"; do
+    if [ -x "$cand" ]; then BACKEND_BIN="$cand"; break; fi
+  done
+  if [ -z "$BACKEND_BIN" ] && command -v cargo >/dev/null 2>&1; then
+    echo "Building the Rust backend from source (first run only, a few minutes)..."
+    (cd backend && cargo build --release --locked) || true
+    [ -x backend/target/release/seo-backend ] && BACKEND_BIN="backend/target/release/seo-backend"
+  fi
+  if [ -n "$BACKEND_BIN" ]; then
+    echo "Starting Rust backend on :$BACKEND_PORT..."
+    PORT="$BACKEND_PORT" DATABASE_PATH="$PWD/data.db" \
+      nohup "$BACKEND_BIN" > backend.log 2>&1 &
+    echo $! > .seo-backend.pid
+    for i in $(seq 1 30); do backend_healthy && break; sleep 1; done
+    if ! backend_healthy; then
+      echo "WARNING: Rust backend did not become healthy on :$BACKEND_PORT."
+      echo "         /api calls will fail — see backend.log for the cause."
+    fi
+  else
+    echo "WARNING: no Rust backend binary found and no cargo toolchain installed."
+    echo "         The UI will start, but /api endpoints (sign-in, data reads,"
+    echo "         exports) will not respond. Fix either way:"
+    echo "           - install Rust: https://rustup.rs  (then re-run this launcher)"
+    echo "           - or re-download a ZIP built with a backend binary included"
+  fi
+fi
+
 # ---- 5. Pick mode
 RUN_CMD="dev"
 if [ -f ".next/BUILD_ID" ] && [ "$SEO_FORCE_DEV" != "1" ]; then

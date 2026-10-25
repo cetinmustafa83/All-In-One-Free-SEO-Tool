@@ -58,6 +58,32 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # there is nothing for that check to usefully do here.
 RUN pnpm config set verify-deps-before-run false && pnpm build
 
+# ---- backend stage: the Rust (axum) service ----
+#
+# Phase 14.9 retired the ported /api route handlers from Next (fallback
+# rewrite to API_BACKEND_URL), so an image without the backend serves
+# nothing on /api — the two processes are ONE deploy unit now. Built in
+# its own stage: different toolchain, cached independently of the Node
+# layers, and the dependency-compile trick below means a source-only
+# change recompiles just the final crate (~seconds), not the tree.
+#
+# Plain `rust:1` (Debian full), not -slim: rusqlite's `bundled` feature
+# compiles SQLite from C, which needs a working cc. Pinning = the same
+# reasoning as the pnpm pin — floating major Rust versions is how
+# "built fine yesterday" happens.
+FROM rust:1 AS backend-build
+WORKDIR /build
+COPY backend/Cargo.toml backend/Cargo.lock ./
+
+# Compile dependencies against a stub main so the dep tree caches.
+RUN mkdir -p src && echo "fn main() {}" > src/main.rs \
+ && cargo build --release --locked
+
+COPY backend/src ./src
+# Real main replaces the stub; cargo's fingerprint sees the change and
+# recompiles only the final crate on top of the cached deps.
+RUN cargo build --release --locked
+
 # ---- runtime stage ----
 FROM mcr.microsoft.com/playwright:v1.56.0-noble AS runner
 WORKDIR /app
@@ -111,6 +137,7 @@ COPY --from=build --chown=pwuser:pwuser /app/src/db/migrations ./src/db/migratio
 COPY --from=build --chown=pwuser:pwuser /app/scripts ./scripts
 COPY --from=build --chown=pwuser:pwuser /app/drizzle.config.ts ./drizzle.config.ts
 COPY --from=build --chown=pwuser:pwuser /app/package.json ./package.json
+COPY --from=backend-build --chown=pwuser:pwuser /build/target/release/seo-backend ./backend/seo-backend
 
 EXPOSE 3000
 
@@ -145,4 +172,14 @@ if [ -z \"$APP_PASSWORD\" ] && [ \"$SEO_ALLOW_NO_PASSWORD\" != \"1\" ]; then \
   echo '' >&2; \
   exit 1; \
 fi; \
-node scripts/migrate.cjs && node server.js"]
+echo 'Starting Rust backend on 127.0.0.1:3100...'; \
+PORT=3100 \
+DATABASE_PATH=\"$SEO_DB_PATH\" \
+SEO_DATA_DIR=\"$SEO_DATA_DIR\" \
+./backend/seo-backend > /data/backend.log 2>&1 & \
+BACKEND_PID=$!; \
+node scripts/migrate.cjs && API_BACKEND_URL="${API_BACKEND_URL:-http://127.0.0.1:3100}" node server.js & \
+NODE_PID=$!; \
+trap 'kill $BACKEND_PID $NODE_PID 2>/dev/null' INT TERM; \
+wait $NODE_PID; \
+kill $BACKEND_PID 2>/dev/null"]

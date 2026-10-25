@@ -92,9 +92,14 @@ const SHIP_TOP_LEVEL = new Set([
   // Documented install path, and the app's own docs link to these
   "Dockerfile",
   "docker-compose.yml",
+  "Makefile",
   "docs",
   "README.md",
   "LICENSE",
+  // The Rust backend (phase-14 split): served /api is this process now.
+  // Sources always ship; a prebuilt binary is added below when one was
+  // built on the packaging machine.
+  "backend",
   // Things the app tells people to use. The client screen literally
   // says "wordpress-plugin/seo-tool-bridge.php", so shipping the app
   // without it points at a file that is not there.
@@ -130,6 +135,12 @@ const DROP = [
   /^scripts\/(audit-fixtures|mcp-check|mcp-http-check|wp-bridge-check|gen-social-preview|gen-tool-capabilities|report-batch-check|first-run-check|route-sweep|build-release-zip|migrate-watch)\./,
   // Superseded by the launchers at the top of this zip.
   /^install\.(ps1|sh)$/,
+  // Rust build artifacts and backend dev harness — sources ship, these
+  // never do. target/ is GBs; tools/ is the CI/smoke harness; fixtures/
+  // are byte-compare inputs for that harness.
+  /^backend\/(target|tools|fixtures)\//,
+  /^backend\/backend-dev\.(log|pid)$/,
+  /^backend\/\.seo-internal-token$/,
 ];
 
 function shouldShip(path) {
@@ -198,6 +209,37 @@ function main() {
     cpSync(join(templates, "_system-scripts"), join(system, "_system-scripts"), {
       recursive: true,
     });
+
+    // Prebuilt Rust backend, when the packaging machine has one.
+    //
+    // START.sh looks for backend/bin/seo-backend-<os>-<arch> before it
+    // would try cargo, so a ZIP that carries the binary needs no Rust
+    // toolchain on the user's machine. The build machine can only make
+    // its OWN platform (cross-compiling needs an extra toolchain per
+    // target — a deliberate non-goal here), so this is added when it
+    // exists and skipped loudly when it doesn't; the launcher's warning
+    // covers the rest.
+    const releaseBin = join(
+      ROOT,
+      "backend",
+      "target",
+      "release",
+      "seo-backend",
+    );
+    if (existsSync(releaseBin)) {
+      const platform = `${process.platform}-${process.arch}`;
+      const binDir = join(system, "backend", "bin");
+      mkdirSync(binDir, { recursive: true });
+      const to = join(binDir, `seo-backend-${platform}`);
+      cpSync(releaseBin, to, { mode: 0o755 });
+      say(`Including prebuilt backend binary: seo-backend-${platform}`);
+    } else {
+      say(
+        "No prebuilt backend binary (backend/target/release/seo-backend) — " +
+          "the ZIP will need Rust installed on the user's machine, or run " +
+          `cargo build --release first (target: ${process.platform}-${process.arch})`,
+      );
+    }
 
     mkdirSync(dirname(OUT), { recursive: true });
     rmSync(OUT, { force: true });

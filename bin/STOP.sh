@@ -57,6 +57,30 @@ fi
 # ---- 3. Cleanup the dev-server shim file too
 rm -f .dev-server.cmd
 
+# ---- 4. Stop the Rust backend (phase-14 split: it runs alongside Next).
+# Same graceful-then-force pattern as the Next process above; its pid
+# lives in .seo-backend.pid, written by START.sh section 4b.
+if [ -f ".seo-backend.pid" ]; then
+  BE_PID="$(cat .seo-backend.pid 2>/dev/null || true)"
+  if [ -n "$BE_PID" ] && kill -0 "$BE_PID" 2>/dev/null; then
+    kill -TERM "$BE_PID" 2>/dev/null || true
+    for i in 1 2 3 4 5; do
+      if ! kill -0 "$BE_PID" 2>/dev/null; then
+        echo "Stopped Rust backend process $BE_PID."
+        STOPPED=1
+        break
+      fi
+      sleep 1
+    done
+    if kill -0 "$BE_PID" 2>/dev/null; then
+      kill -9 "$BE_PID" 2>/dev/null || true
+      echo "Stopped Rust backend process $BE_PID (forced)."
+      STOPPED=1
+    fi
+  fi
+  rm -f .seo-backend.pid
+fi
+
 echo ""
 if [ "$STOPPED" = "1" ]; then
   echo "SEO Tool is stopped."
