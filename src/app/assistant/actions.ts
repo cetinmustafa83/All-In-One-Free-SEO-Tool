@@ -1,7 +1,7 @@
 "use server";
 
 import { desc, eq, ne, count } from "drizzle-orm";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { callGemini as sharedCallGemini } from "@/lib/providers/gemini";
 import { callAnthropic as sharedCallAnthropic } from "@/lib/providers/anthropic";
 import { callOpenAICompat as sharedCallOpenAICompat } from "@/lib/providers/openai-compat";

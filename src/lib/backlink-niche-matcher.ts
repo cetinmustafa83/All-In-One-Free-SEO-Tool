@@ -12,7 +12,7 @@
  */
 
 import { and, desc } from "drizzle-orm";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { seoResources, type SeoResource } from "@/db/schema";
 import { callAI } from "./ai-call";
 import { deriveDifficulty, type Difficulty } from "./backlink-difficulty";

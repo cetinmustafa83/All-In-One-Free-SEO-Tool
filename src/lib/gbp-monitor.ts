@@ -33,7 +33,7 @@
  */
 
 import { isNotNull } from "drizzle-orm";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { clients } from "@/db/schema";
 import {
   GbpScopeMissingError,

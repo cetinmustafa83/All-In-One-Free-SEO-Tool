@@ -10,7 +10,7 @@
 
 import PDFDocument from "pdfkit";
 import { and, asc, desc, eq, gte } from "drizzle-orm";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import {
   audits,
   backlinks,

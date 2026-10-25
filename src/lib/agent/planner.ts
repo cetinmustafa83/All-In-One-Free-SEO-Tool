@@ -27,7 +27,7 @@
  */
 
 import { and, desc, eq, gt, inArray } from "drizzle-orm";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { agentActions, auditIssues, audits, clients } from "@/db/schema";
 import type { AgentSettings } from "./autonomy";
 import { has, type ClientCapabilities } from "./capabilities";

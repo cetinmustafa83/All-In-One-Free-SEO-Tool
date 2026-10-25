@@ -33,7 +33,7 @@
  */
 
 import { and, desc, eq, isNotNull } from "drizzle-orm";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { agentActions } from "@/db/schema";
 
 /** What the worker knows how to rewrite. */

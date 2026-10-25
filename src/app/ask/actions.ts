@@ -1,7 +1,7 @@
 "use server";
 
 import { count, desc, eq } from "drizzle-orm";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import {
   audits,
   clients,

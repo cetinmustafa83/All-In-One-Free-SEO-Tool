@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import PDFDocument from "pdfkit";
 import { eq } from "drizzle-orm";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { clients, invoices } from "@/db/schema";
 import { getSetting } from "@/lib/settings-store";
 import { guardClientDocument } from "@/lib/admin-auth";

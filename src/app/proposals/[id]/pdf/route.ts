@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { splitSurfaces, surfacesFor } from "@/lib/engagement-surfaces";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { proposals } from "@/db/schema";
 import { canSeeClient, currentUser } from "@/lib/auth";
 import { generateProposalPdf } from "@/lib/proposal-pdf";

@@ -1,7 +1,7 @@
 "use server";
 
 import { eq, desc, and, ne, gte } from "drizzle-orm";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import {
   audits,
   auditIssues,

@@ -31,7 +31,7 @@
  */
 
 import { and, eq, desc, gte } from "drizzle-orm";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { aiVisibilityChecks, competitors, keywords, clients } from "@/db/schema";
 import { callAI } from "./ai-call";
 import type { ExecSummaryDataPoint } from "./ai-summary";

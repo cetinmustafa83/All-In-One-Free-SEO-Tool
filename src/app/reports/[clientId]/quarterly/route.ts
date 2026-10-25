@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { clients } from "@/db/schema";
 import { generateQuarterlyStrategyPdf } from "@/lib/quarterly-strategy";
 import { canAccessClient } from "@/lib/client-scope";

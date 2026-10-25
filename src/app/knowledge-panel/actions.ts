@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { desc, eq } from "drizzle-orm";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { clients, knowledgePanelSnapshots } from "@/db/schema";
 import {
   captureAndStore,

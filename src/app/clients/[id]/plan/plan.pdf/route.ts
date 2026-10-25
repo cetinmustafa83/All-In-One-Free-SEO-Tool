@@ -1,5 +1,5 @@
 import { and, asc, desc, eq } from "drizzle-orm";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { audits, clients, tasks } from "@/db/schema";
 import { generatePlanPdf } from "@/lib/plan-pdf";
 import { canAccessClient } from "@/lib/client-scope";

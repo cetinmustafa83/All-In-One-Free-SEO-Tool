@@ -8,7 +8,7 @@
  * page) so users see ticks update as they complete each step.
  */
 
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { audits, clients, reportArchives } from "@/db/schema";
 import { count, eq, ne } from "drizzle-orm";
 import { getAiAvailability } from "./ai-availability";

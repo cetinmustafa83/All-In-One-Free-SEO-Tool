@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { readFile } from "node:fs/promises";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { serpScreenshots } from "@/db/schema";
 
 export const dynamic = "force-dynamic";

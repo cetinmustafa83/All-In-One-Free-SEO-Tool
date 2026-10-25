@@ -12,7 +12,7 @@ import { promisify } from "node:util";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { gt, count } from "drizzle-orm";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import {
   aiSuggestions,
   newsItems,

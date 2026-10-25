@@ -6,7 +6,7 @@
  */
 
 import { and, desc, eq, gte } from "drizzle-orm";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { brandMentions, clients } from "@/db/schema";
 import { sendMail, getSmtpConfig } from "./mailer";
 import { getSetting, setSetting } from "./settings-store";

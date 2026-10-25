@@ -1,6 +1,6 @@
 import PDFDocument from "pdfkit";
 import { eq, desc, and, gte } from "drizzle-orm";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import {
   aiSuggestions,
   audits,

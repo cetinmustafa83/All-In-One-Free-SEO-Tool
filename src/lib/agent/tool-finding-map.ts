@@ -30,7 +30,7 @@
  */
 
 import { and, desc, eq, gte, inArray } from "drizzle-orm";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { toolFindings, toolRuns } from "@/db/schema";
 import {
   isPlannableFindingType,

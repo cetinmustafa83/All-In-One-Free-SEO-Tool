@@ -1,7 +1,7 @@
 "use server";
 
 import { eq, desc, and } from "drizzle-orm";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { audits, auditIssues, clients, tasks } from "@/db/schema";
 import { generateExecSummary, type ExecSummaryDataPoint } from "@/lib/ai-summary";
 import {

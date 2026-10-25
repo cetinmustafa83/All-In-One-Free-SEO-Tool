@@ -26,7 +26,7 @@
  */
 
 import { and, eq, inArray } from "drizzle-orm";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { agentActions } from "@/db/schema";
 import { SITE_WIDE_KINDS } from "./planner";
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { shortLinks } from "@/db/schema";
 import { buildDestinationUrl, recordClick } from "@/lib/short-links";
 
