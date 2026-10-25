@@ -1,0 +1,6 @@
+id,client,client_url,page_url,page_label,field,severity,old_value,new_value,detected_at
+9953,"FIX148 ""Quote, Comma"" & Ünïcode 😀 Client","https://fix148-a.test/páth?q=1,2",https://fix148b.test/page2,,description,warning,old	desc,"new, desc",2023-11-14T22:26:42.000Z
+9952,Seed Client,https://seed.test,"https://fix148b.test/page,1","FIX148 Page, ""P""",content,,,,2023-11-14T22:26:41.000Z
+9951,Seed Client,https://seed.test,"https://fix148b.test/page,1","FIX148 Page, ""P""",title,critical,"Old, ""value""","New
+value =x",2023-11-14T22:26:40.000Z
+9954,"FIX148 ""Quote, Comma"" & Ünïcode 😀 Client","https://fix148-a.test/páth?q=1,2",https://fix148b.test/page2,,status,info,200,"404, gone",2000-02-29T00:00:00.000Z

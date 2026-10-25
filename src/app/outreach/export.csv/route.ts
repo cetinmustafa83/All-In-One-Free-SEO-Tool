@@ -1,56 +1,14 @@
-import { desc, eq } from "drizzle-orm";
-import { db } from "@/db/client";
-import { clients, outreachContacts } from "@/db/schema";
-import { csvResponse } from "@/lib/csv-export";
-import { exportScope } from "@/lib/client-scope";
+import { exportCsvProxy } from "@/lib/export-proxy";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Outreach CSV export — since 14.8b a thin proxy over the Rust backend's
+ * POST /api/internal/exports/outreach (byte-for-byte port of the original
+ * drizzle query + csvResponse, verified against backend/fixtures/14.8/).
+ * User resolution and ?clientId/?client normalization live in
+ * src/lib/export-proxy.ts.
+ */
 export async function GET(req: Request) {
-  const scope = await exportScope(outreachContacts.clientId, req);
-  const rows = await db
-    .select({
-      id: outreachContacts.id,
-      name: outreachContacts.name,
-      email: outreachContacts.email,
-      website: outreachContacts.website,
-      status: outreachContacts.status,
-      notes: outreachContacts.notes,
-      lastContactedAt: outreachContacts.lastContactedAt,
-      createdAt: outreachContacts.createdAt,
-      clientName: clients.name,
-      clientUrl: clients.url,
-    })
-    .from(outreachContacts)
-    .leftJoin(clients, eq(outreachContacts.clientId, clients.id))
-    .where(scope)
-    .orderBy(desc(outreachContacts.createdAt));
-
-  return csvResponse(
-    "outreach.csv",
-    [
-      "id",
-      "client",
-      "client_url",
-      "name",
-      "email",
-      "website",
-      "status",
-      "notes",
-      "last_contacted_at",
-      "created_at",
-    ],
-    rows.map((r) => [
-      r.id,
-      r.clientName,
-      r.clientUrl,
-      r.name,
-      r.email,
-      r.website,
-      r.status,
-      r.notes,
-      r.lastContactedAt,
-      r.createdAt,
-    ]),
-  );
+  return exportCsvProxy(req, "/api/internal/exports/outreach");
 }

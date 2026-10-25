@@ -232,6 +232,22 @@ async fn main() {
             "/api/internal/exports/backlinks",
             post(exports::backlinks),
         )
+        // ---- 14.8b: CSV exports wave 2 (tasks/outreach/reports/monitor/keywords/disavow) ----
+        .route("/api/internal/exports/tasks", post(exports::tasks))
+        .route(
+            "/api/internal/exports/outreach",
+            post(exports::outreach),
+        )
+        .route("/api/internal/exports/reports", post(exports::reports))
+        .route("/api/internal/exports/monitor", post(exports::monitor))
+        .route(
+            "/api/internal/exports/keywords",
+            post(exports::keywords),
+        )
+        .route(
+            "/api/internal/exports/disavow",
+            post(exports::disavow),
+        )
         .route(
             "/api/internal/tools/migration-map/run",
             post(tools_compute::migration_run),

@@ -1,56 +1,16 @@
-import { desc, eq } from "drizzle-orm";
-import { db } from "@/db/client";
-import { reportArchives, clients } from "@/db/schema";
-import { csvResponse } from "@/lib/csv-export";
-import { exportScope } from "@/lib/client-scope";
+import { exportCsvProxy } from "@/lib/export-proxy";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Report-archives CSV export — since 14.8b a thin proxy over the Rust
+ * backend's POST /api/internal/exports/reports (byte-for-byte port of the
+ * original drizzle query + csvResponse, verified against
+ * backend/fixtures/14.8/; the pinned cell renders "true"/"false" strings
+ * and pdfBytes carries the byte COUNT, never the pdfBase64 payload).
+ * User resolution and ?clientId/?client normalization live in
+ * src/lib/export-proxy.ts.
+ */
 export async function GET(req: Request) {
-  const scope = await exportScope(reportArchives.clientId, req);
-  const rows = await db
-    .select({
-      id: reportArchives.id,
-      clientName: clients.name,
-      title: reportArchives.title,
-      template: reportArchives.template,
-      periodStart: reportArchives.periodStart,
-      periodEnd: reportArchives.periodEnd,
-      execSummary: reportArchives.execSummary,
-      pdfBytes: reportArchives.pdfBytes,
-      pinned: reportArchives.pinned,
-      createdAt: reportArchives.createdAt,
-    })
-    .from(reportArchives)
-    .leftJoin(clients, eq(reportArchives.clientId, clients.id))
-    .where(scope)
-    .orderBy(desc(reportArchives.createdAt));
-
-  return csvResponse(
-    "reports.csv",
-    [
-      "id",
-      "clientName",
-      "title",
-      "template",
-      "periodStart",
-      "periodEnd",
-      "execSummary",
-      "pdfBytes",
-      "pinned",
-      "createdAt",
-    ],
-    rows.map((r) => [
-      r.id,
-      r.clientName ?? "",
-      r.title,
-      r.template ?? "",
-      r.periodStart ?? "",
-      r.periodEnd ?? "",
-      r.execSummary ?? "",
-      r.pdfBytes ?? "",
-      r.pinned ? "true" : "false",
-      r.createdAt,
-    ]),
-  );
+  return exportCsvProxy(req, "/api/internal/exports/reports");
 }

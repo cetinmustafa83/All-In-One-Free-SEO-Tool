@@ -1,0 +1,5 @@
+id,clientName,title,template,periodStart,periodEnd,execSummary,pdfBytes,pinned,createdAt
+9933,FIX148 =Hyperlink +Plus -Minus @At,"FIX148 Zero Bytes, pinned",annual,1969-12-31T00:00:00.000Z,2100-01-01T00:00:00.000Z,,0,true,2023-11-14T22:23:22.000Z
+9932,"FIX148 ""Quote, Comma"" & Ünïcode 😀 Client",FIX148 Null Report,,,,,,false,2023-11-14T22:23:21.000Z
+9931,Seed Client,"FIX148 Report, ""R"" 😀",monthly,2023-11-14T22:13:20.000Z,2023-11-14T22:30:00.000Z,"exec =lead
+""quoted"", comma",12345,true,2023-11-14T22:23:20.000Z

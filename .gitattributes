@@ -21,3 +21,9 @@
 
 *.sh       text eol=lf
 *.command  text eol=lf
+
+# Task 14.8b: golden export fixtures are compared BYTE-for-BYTE against
+# live route output. Git would otherwise normalize the CRLFs embedded in
+# some fixture cells to LF on next touch, silently breaking parity after a
+# fresh checkout. -text = never normalize, never eol-rewrite these files.
+backend/fixtures/** -text

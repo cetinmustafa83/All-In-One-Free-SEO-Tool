@@ -1,60 +1,15 @@
-import { desc, eq } from "drizzle-orm";
-import { db } from "@/db/client";
-import { clients, monitoredPages, pageChanges } from "@/db/schema";
-import { csvResponse } from "@/lib/csv-export";
-import { exportScope } from "@/lib/client-scope";
+import { exportCsvProxy } from "@/lib/export-proxy";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Page-monitor CSV export — since 14.8b a thin proxy over the Rust backend's
+ * POST /api/internal/exports/monitor (byte-for-byte port of the original
+ * drizzle INNER JOIN monitored_pages + LEFT JOIN clients query + csvResponse,
+ * filename page-changes.csv, verified against backend/fixtures/14.8/).
+ * User resolution and ?clientId/?client normalization live in
+ * src/lib/export-proxy.ts.
+ */
 export async function GET(req: Request) {
-  const scope = await exportScope(monitoredPages.clientId, req);
-  const rows = await db
-    .select({
-      id: pageChanges.id,
-      field: pageChanges.field,
-      severity: pageChanges.severity,
-      oldValue: pageChanges.oldValue,
-      newValue: pageChanges.newValue,
-      detectedAt: pageChanges.detectedAt,
-      url: monitoredPages.url,
-      label: monitoredPages.label,
-      clientName: clients.name,
-      clientUrl: clients.url,
-    })
-    .from(pageChanges)
-    .innerJoin(
-      monitoredPages,
-      eq(pageChanges.monitoredPageId, monitoredPages.id),
-    )
-    .leftJoin(clients, eq(monitoredPages.clientId, clients.id))
-    .where(scope)
-    .orderBy(desc(pageChanges.detectedAt));
-
-  return csvResponse(
-    "page-changes.csv",
-    [
-      "id",
-      "client",
-      "client_url",
-      "page_url",
-      "page_label",
-      "field",
-      "severity",
-      "old_value",
-      "new_value",
-      "detected_at",
-    ],
-    rows.map((r) => [
-      r.id,
-      r.clientName,
-      r.clientUrl,
-      r.url,
-      r.label,
-      r.field,
-      r.severity,
-      r.oldValue,
-      r.newValue,
-      r.detectedAt,
-    ]),
-  );
+  return exportCsvProxy(req, "/api/internal/exports/monitor");
 }

@@ -243,6 +243,154 @@ fn csv_envelope(filename: &'static str, csv: String) -> Response {
     }))
 }
 
+/// Generalized envelope (14.8b): same shape, caller-supplied filename and
+/// content type (the disavow.txt route serves text/plain; the keywords
+/// route's filename carries the current UTC date). The body key stays
+/// "csv" for envelope uniformity — documented quirk, the disavow body is
+/// not CSV.
+fn envelope(filename: &str, content_type: &str, body: String) -> Response {
+    result_json(json!({
+        "ok": true,
+        "filename": filename,
+        "contentType": content_type,
+        "disposition": format!("attachment; filename=\"{filename}\""),
+        "csv": body,
+    }))
+}
+
+// ---------------------------------------------------------------------------
+// Bespoke keywords serializer (byte-for-byte port of the csvEscape local to
+// src/app/keywords/export.csv/route.ts)
+// ---------------------------------------------------------------------------
+
+/// The keywords route declares its OWN csvEscape instead of importing the
+/// canonical one: trigger class /[",\n]/ — NO \r (a lone CR cell passes
+/// through unquoted, unlike csv_escape above) and no Date branch (the
+/// route pre-renders timestamps to ISO strings itself).
+pub fn csv_escape_bespoke(s: &str) -> String {
+    if s.bytes().any(|b| matches!(b, b'"' | b',' | b'\n')) {
+        let mut out = String::with_capacity(s.len() + 2);
+        out.push('"');
+        for c in s.chars() {
+            if c == '"' {
+                out.push_str("\"\"");
+            } else {
+                out.push(c);
+            }
+        }
+        out.push('"');
+        out
+    } else {
+        s.to_string()
+    }
+}
+
+/// Serialize keywords rows: the route builds `const csvLines =
+/// [header.join(",")]` — the header is joined RAW, no csvEscape pass
+/// (unlike csvResponse which escapes headers; same bytes for these literal
+/// headers, but the mechanism is mirrored exactly).
+fn render_bespoke(header: &[&str], rows: Vec<Vec<String>>) -> String {
+    let mut lines = Vec::with_capacity(rows.len() + 1);
+    lines.push(header.join(","));
+    for row in rows {
+        lines.push(
+            row.iter()
+                .map(|c| csv_escape_bespoke(c))
+                .collect::<Vec<_>>()
+                .join(","),
+        );
+    }
+    lines.join("\n")
+}
+
+/// JS Date semantics on an owned ranking cell: `None` marks a value whose
+/// `Date.toISOString()` would throw ("Invalid time value") — deferred to
+/// render time because the TS fold stores Date objects and only VISIBLE
+/// keywords ever render their winning row's checkedAt.
+enum Epoch {
+    Iso(String),
+    Invalid,
+}
+
+fn epoch_cell(v: ValueRef<'_>) -> Epoch {
+    match v {
+        ValueRef::Null => Epoch::Iso(String::new()), // notNull column; drizzle null → ""
+        ValueRef::Integer(i) => i
+            .checked_mul(1000)
+            .and_then(iso_from_ms)
+            .map(Epoch::Iso)
+            .unwrap_or(Epoch::Invalid),
+        ValueRef::Real(f) => iso_from_ms(real_to_ms(f)).map_or(Epoch::Invalid, Epoch::Iso),
+        // TEXT in a timestamp column: `value * 1000` → NaN → Invalid Date →
+        // toISOString() throws RangeError at render.
+        ValueRef::Text(_) | ValueRef::Blob(_) => Epoch::Invalid,
+    }
+}
+
+/// Current UTC civil date, `new Date().toISOString().split("T")[0]` —
+/// reuses the 14.8a epoch→ISO helper and takes the date-only part.
+fn utc_today() -> String {
+    let ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0);
+    match iso_from_ms(ms) {
+        Some(iso) => iso.split('T').next().unwrap_or("").to_string(),
+        None => String::new(),
+    }
+}
+
+/// Pragmatic mirror of JS `a.localeCompare(b)` (default locale) for the
+/// backlinks disavow domain sort — validated pairwise against Node's ICU on
+/// a 370-string [A-Za-z0-9.-] corpus (139k ordered pairs, 0 mismatches):
+///   1. primary: case-FOLD (ICU compares letters case-insensitively —
+///      "a".localeCompare("B") === -1);
+///   2. tertiary, per char: LOWERCASE before UPPERCASE (ICU root collation
+///      orders "b" < "B"; the corpus test proves it);
+///   3. original bytes (stable-sort tiebreak; JS sort is stable since
+///      ES2019, Rust sort_by is stable — insertion order kept on 0).
+/// Documented deviation: full ICU collation for NON-ASCII (é/ß/İ….) and for
+/// exotic punctuation (ICU ranks '_' before '-' before '.', unlike ASCII
+/// byte order) is NOT mirrored — realistic hostnames are ASCII with only
+/// letters/digits/dots/hyphens (IDN lives in URLs as punycode), where the
+/// mirror is exact. No ICU dependency is acceptable here; recorded honestly.
+fn locale_cmp(a: &str, b: &str) -> std::cmp::Ordering {
+    let (fa, fb) = (a.to_lowercase(), b.to_lowercase());
+    if fa != fb {
+        return fa.cmp(&fb);
+    }
+    for (ca, cb) in a.chars().zip(b.chars()) {
+        let (ra, rb) = (u8::from(ca.is_uppercase()), u8::from(cb.is_uppercase()));
+        if ra != rb {
+            return ra.cmp(&rb);
+        }
+    }
+    a.cmp(&b)
+}
+
+/// JS Number(value) for the reports pinned cell: drizzle's boolean column
+/// maps driver values with `Number(value) === 1`, then the route does
+/// `r.pinned ? "true" : "false"`.
+fn js_number(v: ValueRef<'_>) -> f64 {
+    match v {
+        ValueRef::Null => 0.0, // Number(null) === 0
+        ValueRef::Integer(i) => i as f64,
+        ValueRef::Real(f) => f,
+        ValueRef::Text(t) => std::str::from_utf8(t)
+            .ok()
+            .and_then(|s| {
+                let s = s.trim(); // Number() trims whitespace
+                if s.is_empty() {
+                    Some(0.0)
+                } else {
+                    s.parse::<f64>().ok()
+                }
+            })
+            .unwrap_or(f64::NAN),
+        ValueRef::Blob(_) => 0.0, // Number(Uint8Array) === 0
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Scope → WHERE clause (exportScope port)
 // ---------------------------------------------------------------------------
@@ -257,12 +405,15 @@ struct Scope {
 /// (`= id` for a positive integer, `IN (-1)` otherwise) AND the visibility
 /// filter (`IN (ids)` / empty-assignment `IN (-1)` / nothing at all).
 /// `column` is table-qualified exactly like drizzle's generated SQL.
-fn build_scope(
+/// Returns the bare conditions so callers that AND extra terms (disavow's
+/// `eq(backlinks.status, "disavow")`) can compose them in the same order
+/// drizzle's `and()` produces.
+fn build_scope_conds(
     db: &crate::db::Db,
     column: &str,
     user_id: Option<i64>,
     client_id: Option<i64>,
-) -> Scope {
+) -> (Vec<String>, Vec<Sqv>) {
     let mut conds: Vec<String> = Vec::new();
     let mut params: Vec<Sqv> = Vec::new();
     if let Some(id) = client_id {
@@ -285,6 +436,16 @@ fn build_scope(
             params.extend(ids.into_iter().map(Sqv::Integer));
         }
     }
+    (conds, params)
+}
+
+fn build_scope(
+    db: &crate::db::Db,
+    column: &str,
+    user_id: Option<i64>,
+    client_id: Option<i64>,
+) -> Scope {
+    let (conds, params) = build_scope_conds(db, column, user_id, client_id);
     let where_sql = if conds.is_empty() {
         String::new()
     } else {
@@ -557,4 +718,544 @@ pub async fn backlinks(State(state): State<AppState>, bytes: Bytes) -> Response 
         Ok(rows) => csv_envelope("backlinks.csv", render(HEADER, rows)),
         Err(msg) => db_fail(&msg),
     }
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/internal/exports/tasks — 14.8b (src/app/tasks/export.csv/route.ts)
+// ---------------------------------------------------------------------------
+
+pub async fn tasks(State(state): State<AppState>, bytes: Bytes) -> Response {
+    let body: Value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
+    let (user_id, client_id) = body_ids(&body);
+    const HEADER: &[&str] = &[
+        "id",
+        "client",
+        "client_url",
+        "title",
+        "why_it_matters",
+        "priority",
+        "status",
+        "due_date",
+        "recurring",
+        "estimated_minutes",
+        "actual_minutes",
+        "created_at",
+        "updated_at",
+    ];
+    let scope = build_scope(&state.db, "tasks.client_id", user_id, client_id);
+    let sql = format!(
+        "SELECT tasks.id, clients.name, clients.url, tasks.title, \
+         tasks.why_it_matters, tasks.priority, tasks.status, tasks.due_date, \
+         tasks.recurring_interval, tasks.estimated_minutes, \
+         tasks.actual_minutes, tasks.created_at, tasks.updated_at \
+         FROM tasks LEFT JOIN clients ON tasks.client_id = clients.id{} \
+         ORDER BY tasks.created_at DESC",
+        scope.where_sql
+    );
+    let params = scope.params.clone();
+    let rows = run_export(&state.db, &sql, &params, |r| {
+        let g =
+            |i: usize| -> Result<String, String> {
+                Ok(cell(r.get_ref(i).map_err(|e| e.to_string())?))
+            };
+        // dueDate is a nullable timestamp column: Date → toISOString, null → ""
+        let invalid = || "Invalid time value".to_string();
+        let due = iso_cell(r.get_ref(7).map_err(|e| e.to_string())?)
+            .map_err(|_| invalid())?;
+        let created = iso_cell(r.get_ref(11).map_err(|e| e.to_string())?)
+            .map_err(|_| invalid())?;
+        let updated = iso_cell(r.get_ref(12).map_err(|e| e.to_string())?)
+            .map_err(|_| invalid())?;
+        Ok(vec![
+            g(0)?,
+            g(1)?, // clientName ?? "" — csvEscape(null) → ""
+            g(2)?, // clientUrl ?? ""
+            g(3)?, // title
+            g(4)?, // whyItMatters
+            g(5)?, // priority
+            g(6)?, // status
+            due,
+            g(8)?, // recurringInterval
+            g(9)?, // estimatedMinutes
+            g(10)?, // actualMinutes
+            created,
+            updated,
+        ])
+    });
+    match rows {
+        Ok(rows) => csv_envelope("tasks.csv", render(HEADER, rows)),
+        Err(msg) => db_fail(&msg),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/internal/exports/outreach — 14.8b
+// (src/app/outreach/export.csv/route.ts)
+// ---------------------------------------------------------------------------
+
+pub async fn outreach(State(state): State<AppState>, bytes: Bytes) -> Response {
+    let body: Value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
+    let (user_id, client_id) = body_ids(&body);
+    const HEADER: &[&str] = &[
+        "id",
+        "client",
+        "client_url",
+        "name",
+        "email",
+        "website",
+        "status",
+        "notes",
+        "last_contacted_at",
+        "created_at",
+    ];
+    let scope = build_scope(&state.db, "outreach_contacts.client_id", user_id, client_id);
+    let sql = format!(
+        "SELECT outreach_contacts.id, clients.name, clients.url, \
+         outreach_contacts.name, outreach_contacts.email, \
+         outreach_contacts.website, outreach_contacts.status, \
+         outreach_contacts.notes, outreach_contacts.last_contacted_at, \
+         outreach_contacts.created_at \
+         FROM outreach_contacts LEFT JOIN clients ON outreach_contacts.client_id = clients.id{} \
+         ORDER BY outreach_contacts.created_at DESC",
+        scope.where_sql
+    );
+    let params = scope.params.clone();
+    let rows = run_export(&state.db, &sql, &params, |r| {
+        let g =
+            |i: usize| -> Result<String, String> {
+                Ok(cell(r.get_ref(i).map_err(|e| e.to_string())?))
+            };
+        let invalid = || "Invalid time value".to_string();
+        let last = iso_cell(r.get_ref(8).map_err(|e| e.to_string())?)
+            .map_err(|_| invalid())?;
+        let created = iso_cell(r.get_ref(9).map_err(|e| e.to_string())?)
+            .map_err(|_| invalid())?;
+        Ok(vec![
+            g(0)?,
+            g(1)?, // clientName
+            g(2)?, // clientUrl
+            g(3)?, // name
+            g(4)?, // email
+            g(5)?, // website
+            g(6)?, // status
+            g(7)?, // notes
+            last,
+            created,
+        ])
+    });
+    match rows {
+        Ok(rows) => csv_envelope("outreach.csv", render(HEADER, rows)),
+        Err(msg) => db_fail(&msg),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/internal/exports/reports — 14.8b
+// (src/app/reports/export.csv/route.ts — pinned → "true"/"false" strings,
+// pdfBytes cell count NOT the pdfBase64 payload)
+// ---------------------------------------------------------------------------
+
+pub async fn reports(State(state): State<AppState>, bytes: Bytes) -> Response {
+    let body: Value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
+    let (user_id, client_id) = body_ids(&body);
+    const HEADER: &[&str] = &[
+        "id",
+        "clientName",
+        "title",
+        "template",
+        "periodStart",
+        "periodEnd",
+        "execSummary",
+        "pdfBytes",
+        "pinned",
+        "createdAt",
+    ];
+    let scope = build_scope(&state.db, "report_archives.client_id", user_id, client_id);
+    let sql = format!(
+        "SELECT report_archives.id, clients.name, report_archives.title, \
+         report_archives.template, report_archives.period_start, \
+         report_archives.period_end, report_archives.exec_summary, \
+         report_archives.pdf_bytes, report_archives.pinned, \
+         report_archives.created_at \
+         FROM report_archives LEFT JOIN clients ON report_archives.client_id = clients.id{} \
+         ORDER BY report_archives.created_at DESC",
+        scope.where_sql
+    );
+    let params = scope.params.clone();
+    let rows = run_export(&state.db, &sql, &params, |r| {
+        let g =
+            |i: usize| -> Result<String, String> {
+                Ok(cell(r.get_ref(i).map_err(|e| e.to_string())?))
+            };
+        let invalid = || "Invalid time value".to_string();
+        let start = iso_cell(r.get_ref(4).map_err(|e| e.to_string())?)
+            .map_err(|_| invalid())?;
+        let end = iso_cell(r.get_ref(5).map_err(|e| e.to_string())?)
+            .map_err(|_| invalid())?;
+        let created = iso_cell(r.get_ref(9).map_err(|e| e.to_string())?)
+            .map_err(|_| invalid())?;
+        // drizzle SQLiteBoolean.mapFromDriverValue: Number(value) === 1,
+        // then `r.pinned ? "true" : "false"` — never empty, even on NULL.
+        let pinned = if js_number(r.get_ref(8).map_err(|e| e.to_string())?) == 1.0 {
+            "true"
+        } else {
+            "false"
+        };
+        Ok(vec![
+            g(0)?,
+            g(1)?, // clientName ?? ""
+            g(2)?, // title
+            g(3)?, // template ?? ""
+            start,
+            end,
+            g(6)?, // execSummary ?? ""
+            g(7)?, // pdfBytes ?? ""
+            pinned.to_string(),
+            created,
+        ])
+    });
+    match rows {
+        Ok(rows) => csv_envelope("reports.csv", render(HEADER, rows)),
+        Err(msg) => db_fail(&msg),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/internal/exports/monitor — 14.8b
+// (src/app/monitor/export.csv/route.ts — filename page-changes.csv,
+// INNER JOIN monitored_pages + LEFT JOIN clients)
+// ---------------------------------------------------------------------------
+
+pub async fn monitor(State(state): State<AppState>, bytes: Bytes) -> Response {
+    let body: Value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
+    let (user_id, client_id) = body_ids(&body);
+    const HEADER: &[&str] = &[
+        "id",
+        "client",
+        "client_url",
+        "page_url",
+        "page_label",
+        "field",
+        "severity",
+        "old_value",
+        "new_value",
+        "detected_at",
+    ];
+    let scope = build_scope(&state.db, "monitored_pages.client_id", user_id, client_id);
+    let sql = format!(
+        "SELECT page_changes.id, clients.name, clients.url, monitored_pages.url, \
+         monitored_pages.label, page_changes.field, page_changes.severity, \
+         page_changes.old_value, page_changes.new_value, page_changes.detected_at \
+         FROM page_changes \
+         INNER JOIN monitored_pages ON page_changes.monitored_page_id = monitored_pages.id \
+         LEFT JOIN clients ON monitored_pages.client_id = clients.id{} \
+         ORDER BY page_changes.detected_at DESC",
+        scope.where_sql
+    );
+    let params = scope.params.clone();
+    let rows = run_export(&state.db, &sql, &params, |r| {
+        let g =
+            |i: usize| -> Result<String, String> {
+                Ok(cell(r.get_ref(i).map_err(|e| e.to_string())?))
+            };
+        let detected = iso_cell(r.get_ref(9).map_err(|e| e.to_string())?)
+            .map_err(|_| "Invalid time value".to_string())?;
+        Ok(vec![
+            g(0)?,
+            g(1)?, // clientName
+            g(2)?, // clientUrl
+            g(3)?, // url
+            g(4)?, // label
+            g(5)?, // field
+            g(6)?, // severity
+            g(7)?, // oldValue
+            g(8)?, // newValue
+            detected,
+        ])
+    });
+    match rows {
+        Ok(rows) => csv_envelope("page-changes.csv", render(HEADER, rows)),
+        Err(msg) => db_fail(&msg),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/internal/exports/keywords — 14.8b
+// (src/app/keywords/export.csv/route.ts — BESPOKE local csvEscape, LEFT JOIN
+// clients, full keyword_rankings scan folded to the latest row per keyword,
+// filename keywords-<UTC date>.csv)
+// ---------------------------------------------------------------------------
+
+/// A ranking row as stored in the fold map (owned — ValueRef borrows the
+/// row). position/url are pre-rendered with csvEscape's String(value)
+/// semantics (cannot fail); checkedAt keeps JS-Date semantics because only
+/// the WINNING row of a VISIBLE keyword ever reaches toISOString().
+struct Latest {
+    position: String,
+    url: String,
+    checked: Epoch,
+}
+
+pub async fn keywords(State(state): State<AppState>, bytes: Bytes) -> Response {
+    let body: Value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
+    let (user_id, client_id) = body_ids(&body);
+    const HEADER: &[&str] = &[
+        "client",
+        "client_url",
+        "query",
+        "country",
+        "device",
+        "latest_position",
+        "ranking_url",
+        "last_checked",
+        "added",
+    ];
+    let scope = build_scope(&state.db, "keywords.client_id", user_id, client_id);
+    let sql = format!(
+        "SELECT keywords.id, keywords.query, keywords.country, keywords.device, \
+         clients.name, clients.url, keywords.created_at \
+         FROM keywords LEFT JOIN clients ON keywords.client_id = clients.id{} \
+         ORDER BY keywords.created_at DESC",
+        scope.where_sql
+    );
+    let params = scope.params.clone();
+    let kw_rows = run_export(&state.db, &sql, &params, |r| {
+        Ok(vec![
+            cell(r.get_ref(0).map_err(|e| e.to_string())?),
+            cell(r.get_ref(1).map_err(|e| e.to_string())?),
+            cell(r.get_ref(2).map_err(|e| e.to_string())?),
+            cell(r.get_ref(3).map_err(|e| e.to_string())?),
+            cell(r.get_ref(4).map_err(|e| e.to_string())?), // clientName ?? ""
+            cell(r.get_ref(5).map_err(|e| e.to_string())?), // clientUrl ?? ""
+            match r.get_ref(6).map_err(|e| e.to_string())? {
+                // createdAt is notNull; render at fold exit like iso_cell would.
+                ValueRef::Integer(i) => i
+                    .checked_mul(1000)
+                    .and_then(iso_from_ms)
+                    .ok_or_else(|| "Invalid time value".to_string())?,
+                ValueRef::Real(f) => iso_from_ms(real_to_ms(f))
+                    .ok_or_else(|| "Invalid time value".to_string())?,
+                ValueRef::Null => String::new(),
+                // TEXT in a timestamp column: `value * 1000` → NaN → the
+                // route's r.createdAt.toISOString() throws RangeError → 500.
+                _ => return Err("Invalid time value".to_string()),
+            },
+        ])
+    });
+    let kw_rows = match kw_rows {
+        Ok(rows) => rows,
+        Err(msg) => return db_fail(&msg),
+    };
+
+    // Full keyword_rankings scan (NO scope filter — the TS route queries the
+    // whole table) ordered by checked_at ASC; fold into a map keeping the
+    // LAST row per keyword — exactly `latest.set(r.keywordId, {...})` in an
+    // ascending scan (Map.set overwrite; the winner is the last scan row,
+    // so equal checked_at resolves to scan order, identically on both
+    // stacks because the engine and statement shape are the same).
+    let fold: Result<std::collections::HashMap<i64, Latest>, String> = state
+        .db
+        .with_conn(|c| {
+            Ok((|| -> Result<std::collections::HashMap<i64, Latest>, String> {
+            let mut stmt = c
+                .prepare(
+                    "SELECT keyword_id, position, url, checked_at FROM keyword_rankings                      ORDER BY keyword_rankings.checked_at",
+                )
+                .map_err(|e| e.to_string())?;
+            let mut q = stmt.query([]).map_err(|e| e.to_string())?;
+            let mut map: std::collections::HashMap<i64, Latest> = std::collections::HashMap::new();
+            while let Some(r) = q.next().map_err(|e| e.to_string())? {
+                let kid: i64 = r.get(0).map_err(|e| e.to_string())?;
+                map.insert(
+                    kid,
+                    Latest {
+                        position: cell(r.get_ref(1).map_err(|e| e.to_string())?),
+                        url: cell(r.get_ref(2).map_err(|e| e.to_string())?),
+                        checked: epoch_cell(r.get_ref(3).map_err(|e| e.to_string())?),
+                    },
+                );
+            }
+            Ok(map)
+            })())
+        })
+        .map_err(|e| e.to_string())
+        .flatten();
+    let latest = match fold {
+        Ok(map) => map,
+        Err(msg) => return db_fail(&msg),
+    };
+
+    let mut rows: Vec<Vec<String>> = Vec::with_capacity(kw_rows.len());
+    for k in &kw_rows {
+        let kid: i64 = match k[0].parse() {
+            Ok(v) => v,
+            Err(_) => return db_fail("bad keyword id"),
+        };
+        let lp = latest.get(&kid);
+        let invalid = || "Invalid time value".to_string();
+        // lp?.checkedAt?.toISOString() ?? "" — the fold value exists but the
+        // winning row's checkedAt is what renders (its own toISOString).
+        let checked = match lp.map(|l| &l.checked) {
+            None => String::new(), // no ranking rows at all → undefined → ""
+            Some(Epoch::Iso(s)) => s.clone(),
+            Some(Epoch::Invalid) => return db_fail(&invalid()),
+        };
+        rows.push(vec![
+            k[4].clone(), // clientName ?? ""
+            k[5].clone(), // clientUrl ?? ""
+            k[1].clone(), // query
+            k[2].clone(), // country
+            k[3].clone(), // device
+            lp.map(|l| l.position.clone()).unwrap_or_default(), // ?? ""
+            lp.map(|l| l.url.clone()).unwrap_or_default(),      // ?? ""
+            checked,
+            k[6].clone(), // createdAt.toISOString()
+        ]);
+    }
+
+    let filename = format!("keywords-{}.csv", utc_today());
+    csv_envelope_dyn(filename, render_bespoke(HEADER, rows))
+}
+
+fn csv_envelope_dyn(filename: String, csv: String) -> Response {
+    result_json(json!({
+        "ok": true,
+        "filename": filename,
+        "contentType": "text/csv; charset=utf-8",
+        "disposition": format!("attachment; filename=\"{filename}\""),
+        "csv": csv,
+    }))
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/internal/exports/disavow — 14.8b
+// (src/app/backlinks/disavow.txt/route.ts — text/plain disavow file:
+// status='disavow' backlinks grouped by source_domain, localeCompare-sorted
+// domain blocks, first-link notes inlined with newlines collapsed)
+// ---------------------------------------------------------------------------
+
+pub async fn disavow(State(state): State<AppState>, bytes: Bytes) -> Response {
+    let body: Value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
+    let (user_id, client_id) = body_ids(&body);
+    // The FILENAME is raw-query-string semantics (`?clientId=` truthiness +
+    // `replace(/[^0-9]/g, "")` — "?clientId=abc" yields disavow-client-.txt),
+    // so the proxy computes it in TypeScript where that regex IS the
+    // semantics, and the body carries it. Default = the no-param branch.
+    let filename = body
+        .get("filename")
+        .and_then(Value::as_str)
+        .unwrap_or("disavow-all.txt")
+        .to_string();
+
+    // drizzle `and(eq(backlinks.status, "disavow"), scope)` — the scope term
+    // is only present when the filter/visibility produced a condition.
+    let (mut conds, mut params) = build_scope_conds(&state.db, "backlinks.client_id", user_id, client_id);
+    conds.insert(0, "backlinks.status = 'disavow'".to_string());
+    let sql = format!(
+        "SELECT backlinks.source_domain, backlinks.notes \
+         FROM backlinks LEFT JOIN clients ON backlinks.client_id = clients.id WHERE {}",
+        conds.join(" AND ")
+    );
+    // No ORDER BY — the TS route scans without one; both stacks therefore
+    // observe the engine's natural rowid scan order, which is what the
+    // grouping (first-link notes) and the stable sort tie on.
+    let scanned: Result<Vec<(Option<String>, Option<String>)>, String> = state
+        .db
+        .with_conn(|c| {
+            Ok((|| -> Result<Vec<(Option<String>, Option<String>)>, String> {
+            let mut stmt = c.prepare(&sql).map_err(|e| e.to_string())?;
+            let mut q = stmt
+                .query(rusqlite::params_from_iter(params.drain(..)))
+                .map_err(|e| e.to_string())?;
+            let mut out = Vec::new();
+            while let Some(r) = q.next().map_err(|e| e.to_string())? {
+                let domain: Option<String> = r.get(0).map_err(|e| e.to_string())?;
+                let notes: Option<String> = r.get(1).map_err(|e| e.to_string())?;
+                out.push((domain, notes));
+            }
+            Ok(out)
+            })())
+        })
+        .map_err(|e| e.to_string())
+        .flatten();
+    let rows = match scanned {
+        Ok(rows) => rows,
+        Err(msg) => return db_fail(&msg),
+    };
+
+    // Group by domain preserving first-encounter order. The Map key is the
+    // string sourceDomain — a NULL sourceDomain makes `a.localeCompare(b)`
+    // throw TypeError on the sort comparator in TS (null has no method),
+    // surfaced here as the same 500.
+    let mut domains: Vec<(Option<String>, String)> = Vec::new(); // (key, first link's notes)
+    for (domain, notes) in &rows {
+        if domains.iter().any(|(k, _)| k == domain) {
+            continue; // later links only append to links[] — links[0] never changes
+        }
+        domains.push((domain.clone(), notes.clone().unwrap_or_default()));
+    }
+    if domains.iter().any(|(k, _)| k.is_none()) {
+        return db_fail("Cannot read properties of null (reading 'localeCompare')");
+    }
+
+    // Sort domains alphabetically — JS localeCompare semantics (locale_cmp).
+    let mut sorted = domains;
+    sorted.sort_by(|(a, _), (b, _)| {
+        let (sa, sb) = (
+            a.as_deref().unwrap_or(""),
+            b.as_deref().unwrap_or(""),
+        );
+        locale_cmp(sa, sb)
+    });
+
+    let mut lines: Vec<String> = vec![
+        "# Google Disavow file generated by SEO tool".to_string(),
+        format!("# Generated: {}", iso_from_ms(now_ms()).unwrap_or_default()),
+        format!("# {} entries across {} domains", rows.len(), sorted.len()),
+        "#".to_string(),
+        "# Submit at: https://search.google.com/search-console/disavow-links-tool".to_string(),
+        "# Only use this if you've identified clearly spammy/manipulative links.".to_string(),
+        "# Most modern sites should NOT submit a disavow file unless under manual action.".to_string(),
+        String::new(),
+    ];
+    for (domain, first_notes) in &sorted {
+        // links[0]?.notes truthiness: null and "" both skip the note line.
+        // `notes.replace(/[\r\n]+/g, " ")` collapses each RUN to one space.
+        let notes = first_notes.as_str();
+        if !notes.is_empty() {
+            lines.push(format!("# {}", collapse_newlines(notes)));
+        }
+        lines.push(format!("domain:{}", domain.as_deref().unwrap_or("null")));
+        lines.push(String::new());
+    }
+
+    envelope(&filename, "text/plain; charset=utf-8", lines.join("\n"))
+}
+
+/// `now_ms` for the `# Generated:` line — JS new Date().toISOString() of the
+/// wall clock (fixture compares normalize this line; the format must match:
+/// 24-char UTC ISO-8601).
+fn now_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
+}
+
+/// JS `s.replace(/[\r\n]+/g, " ")` — each maximal run of CR/LF → one space.
+fn collapse_newlines(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut in_run = false;
+    for c in s.chars() {
+        if c == '\r' || c == '\n' {
+            if !in_run {
+                out.push(' ');
+                in_run = true;
+            }
+        } else {
+            in_run = false;
+            out.push(c);
+        }
+    }
+    out
 }

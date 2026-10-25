@@ -1,0 +1,5 @@
+id,client,client_url,name,email,website,status,notes,last_contacted_at,created_at
+9923,"FIX148 ""Quote, Comma"" & Ünïcode 😀 Client","https://fix148-a.test/páth?q=1,2",FIX148 REAL fractional,fix148b@c.test,,replied,tab	here,2024-05-06T07:08:09.500Z,2023-11-14T22:21:42.000Z
+9922,FIX148 =Hyperlink +Plus -Minus @At,https://fix148-b.test,FIX148 Null Columns,,,prospect,,,2023-11-14T22:21:41.000Z
+9921,Seed Client,https://seed.test,"FIX148 Contact, ""C"" name",fix148b@a.test,"https://fix148b.test/x,y",contacted,"line1
+line2 ""q"", end =lead",2023-11-14T22:21:40.000Z,2023-11-14T22:21:40.000Z

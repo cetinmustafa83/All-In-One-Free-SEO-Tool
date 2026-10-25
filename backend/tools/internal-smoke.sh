@@ -446,6 +446,132 @@ rm -f /tmp/14.8-scope-*.csv /tmp/14.8-clients-header.csv /tmp/14.8-users-left.tx
 # 48. disallowed writes on the query gateway still 403 (14.8 didn't touch it)
 chk "exports-query-gateway-403-still" 403 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "${AUTH[@]}" -d '{"sql":"INSERT INTO clients (name, url) VALUES (''x'',''y'')"}' $B/api/internal/query)"
 
+# ---- 14.8b: CSV exports wave 2 (tasks/outreach/reports/monitor/keywords/disavow) ----
+# Same golden-fixture protocol as 14.8a: seed-14.8.ts's FIX148B wave
+# (tasks 9911+, outreach 9921+, reports 9931+, pages 9941+/changes 9951+,
+# keywords 9961+/rankings 9971+, disavow backlinks 9981+) is deterministic
+# and the fixtures were captured from the ORIGINAL Next implementations
+# BEFORE the swap. The disavow body embeds a wall-clock `# Generated:` line
+# on BOTH sides — the compare normalizes that one line (format parity is
+# asserted separately via the 24-char ISO shape).
+
+# 49. token middleware covers the wave-2 exports family
+chk "exports-401-tasks" 401 "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' $B/api/internal/exports/tasks)"
+chk "exports-401-disavow" 401 "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' $B/api/internal/exports/disavow)"
+
+# 50. re-seed (idempotent FIX148 + FIX148B waves; also removes this run's
+# wall-clock "smoke task" from section 3 so tasks.csv stays deterministic)
+(cd "$ROOT" && bun run backend/tools/seed-14.8.ts) > /dev/null 2>&1
+
+# 51. envelope contract + byte-compare vs golden fixtures (4 plain CSV routes;
+# monitor's envelope filename is page-changes.csv — fixture file monitor.csv)
+for r in tasks outreach reports monitor; do
+  case "$r" in monitor) FNAME=page-changes.csv ;; *) FNAME="$r.csv" ;; esac
+  curl -s -X POST "${AUTH[@]}" -d '{}' "$B/api/internal/exports/$r" | FIX="$ROOT/backend/fixtures/14.8/$r.csv" R="$r" FNAME="$FNAME" python3 -c "
+import json,sys,os
+d=json.load(sys.stdin)
+assert d['ok'] is True, d
+assert d['filename']==os.environ['FNAME'], d['filename']
+assert d['contentType']=='text/csv; charset=utf-8', d['contentType']
+assert d['disposition']=='attachment; filename=\"%s\"' % os.environ['FNAME'], d['disposition']
+open('/tmp/14.8b-'+os.environ['R']+'.csv','w').write(d['csv'])
+" 2>/dev/null
+  if [ -f "/tmp/14.8b-$r.csv" ] && cmp -s "/tmp/14.8b-$r.csv" "$ROOT/backend/fixtures/14.8/$r.csv"; then
+    chk "export-fixture-$r" y y
+  else
+    chk "export-fixture-$r" y n
+  fi
+done
+
+# 52. keywords: envelope (filename carries the CURRENT UTC date) + byte-compare
+KWDATE=$(date -u +%F)
+curl -s -X POST "${AUTH[@]}" -d '{}' "$B/api/internal/exports/keywords" | KWDATE="$KWDATE" python3 -c "
+import json,sys,os
+d=json.load(sys.stdin)
+assert d['ok'] is True, d
+expect='keywords-'+os.environ['KWDATE']+'.csv'
+assert d['filename']==expect, (d['filename'], expect)
+assert d['contentType']=='text/csv; charset=utf-8', d['contentType']
+assert d['disposition']=='attachment; filename=\"%s\"' % expect, d['disposition']
+open('/tmp/14.8b-keywords.csv','w').write(d['csv'])
+" 2>/dev/null
+KWOK=$([ -f /tmp/14.8b-keywords.csv ] && cmp -s /tmp/14.8b-keywords.csv "$ROOT/backend/fixtures/14.8/keywords.csv" && echo y || echo n)
+chk "export-fixture-keywords" y "$KWOK"
+
+# 53. keywords latest-row fold: the DB really has two rankings for keyword
+# 9962 with ascending checked_at, and the CSV fold picked the LATER row
+# (position 3, https://rank.test/new — not 12/old).
+FOLD_DB=$(node -e "
+const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/data.db');
+const a=db.prepare('SELECT checked_at FROM keyword_rankings WHERE id=9971').get();
+const b=db.prepare('SELECT checked_at FROM keyword_rankings WHERE id=9972').get();
+console.log(b.checked_at > a.checked_at ? 'y' : 'n');
+" 2>/dev/null)
+FOLD_CSV=$(grep -c 'Seed Client,https://seed.test,"FIX148 ""quoted"", comma query",US,mobile,3,https://rank.test/new' /tmp/14.8b-keywords.csv 2>/dev/null || true)
+[ "$FOLD_DB" = "y" ] && [ "$FOLD_CSV" = "1" ] && chk "keywords-fold-latest-row" y y || chk "keywords-fold-latest-row" y n
+
+# 54. bespoke-escape \r semantics: the keywords route's local csvEscape has
+# trigger class [",\n] — a LONE \r must NOT quote (canonical routes DO).
+BESPOKE=$(grep -cF $'FIX148 pure CR\rquery,' /tmp/14.8b-keywords.csv 2>/dev/null || true)
+CANON=$(grep -cF $'"FIX148 title with CR\ronly"' /tmp/14.8b-tasks.csv 2>/dev/null || true)
+grep -cF $'"FIX148 pure CR' /tmp/14.8b-keywords.csv > /dev/null 2>&1 && BESPOKE_UNQUOTED_ONLY=0 || BESPOKE_UNQUOTED_ONLY=1
+[ "$BESPOKE" = "1" ] && [ "$CANON" = "1" ] && [ "$BESPOKE_UNQUOTED_ONLY" = "1" ] \
+  && chk "bespoke-escape-cr-unquoted-canonical-quoted" y y || chk "bespoke-escape-cr-unquoted-canonical-quoted" y n
+rm -f /tmp/14.8b-tasks.csv /tmp/14.8b-outreach.csv /tmp/14.8b-reports.csv /tmp/14.8b-monitor.csv /tmp/14.8b-keywords.csv
+
+# 55. disavow: envelope + both variants byte-compared (Generated normalized)
+curl -s -X POST "${AUTH[@]}" -d '{}' "$B/api/internal/exports/disavow" > /tmp/14.8b-disavow-all.json
+curl -s -X POST "${AUTH[@]}" -d '{"clientId":1,"filename":"disavow-client-1.txt"}' "$B/api/internal/exports/disavow" > /tmp/14.8b-disavow-c1.json
+python3 - <<'PYEOF' 2>/dev/null
+import json
+d=json.load(open('/tmp/14.8b-disavow-all.json'))
+assert d['ok'] is True and d['filename']=='disavow-all.txt', d['filename']
+assert d['contentType']=='text/plain; charset=utf-8', d['contentType']
+assert d['disposition']=='attachment; filename="disavow-all.txt"', d['disposition']
+body=d['csv']
+assert body.split('\n')[1].startswith('# Generated: ') and len(body.split('\n')[1])==37, body.split('\n')[1]
+assert body.endswith('\n') and not body.endswith('\n\n'), repr(body[-3:])
+open('/tmp/14.8b-disavow.txt','w').write(body)
+d=json.load(open('/tmp/14.8b-disavow-c1.json'))
+assert d['ok'] is True and d['filename']=='disavow-client-1.txt', d['filename']
+open('/tmp/14.8b-disavow-client-1.txt','w').write(d['csv'])
+PYEOF
+for v in "disavow:disavow-all" "disavow-client-1:disavow-client-1"; do
+  file="${v%%:*}"; name="${v##*:}"
+  if [ -f "/tmp/14.8b-$file.txt" ]; then
+    sed -E 's/^# Generated: .*$/# Generated: X/' "/tmp/14.8b-$file.txt" > "/tmp/14.8b-$file.norm"
+    sed -E 's/^# Generated: .*$/# Generated: X/' "$ROOT/backend/fixtures/14.8/$file.txt" > "/tmp/14.8b-$file.fixture.norm"
+    cmp -s "/tmp/14.8b-$file.norm" "/tmp/14.8b-$file.fixture.norm" && chk "export-fixture-$name" y y || chk "export-fixture-$name" y n
+  else
+    chk "export-fixture-$name" y n
+  fi
+done
+
+# 56. disavow grouping: the duplicate source_domain rows collapse — the
+# preamble must count 6 disavow entries across 5 domains, AAA-first first
+# (localeCompare fold: byte order would put Spam-A before fix148), the
+# multi-line notes collapsed to ONE space, and the 'active' row excluded.
+GROUP=$(grep -cF '# 6 entries across 5 domains' "/tmp/14.8b-disavow.txt" 2>/dev/null || true)
+FOLD=$(grep -cF 'domain:AAA-first.test' "/tmp/14.8b-disavow.txt" 2>/dev/null || true)
+NOTES=$(grep -cF '# Spam ring, "bad" second line =lead' "/tmp/14.8b-disavow.txt" 2>/dev/null || true)
+ACTIVE=$(grep -cF 'domain:keep.test' "/tmp/14.8b-disavow.txt" 2>/dev/null || true)
+[ "$GROUP" = "1" ] && [ "$FOLD" = "1" ] && [ "$NOTES" = "1" ] && [ "$ACTIVE" = "0" ] \
+  && chk "disavow-grouping-fold-filter" y y || chk "disavow-grouping-fold-filter" y n
+
+# 57. disavow scope slice: clientId=9901 → exactly that client's disavowed
+# backlinks (1 entry / 1 domain — spam-b.test; 14.8a's fix148 row belongs
+# to client 9902).
+curl -s -X POST "${AUTH[@]}" -d '{"clientId":9901,"filename":"disavow-client-9901.txt"}' "$B/api/internal/exports/disavow" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+assert d['filename']=='disavow-client-9901.txt', d['filename']
+open('/tmp/14.8b-disavow-9901.txt','w').write(d['csv'])
+" 2>/dev/null
+S1=$(grep -cF '# 1 entries across 1 domains' /tmp/14.8b-disavow-9901.txt 2>/dev/null || true)
+S2=$(grep -cF 'domain:spam-b.test' /tmp/14.8b-disavow-9901.txt 2>/dev/null || true)
+[ "$S1" = "1" ] && [ "$S2" = "1" ] && chk "disavow-scope-client-slice" y y || chk "disavow-scope-client-slice" y n
+rm -f /tmp/14.8b-disavow*.json /tmp/14.8b-disavow*.txt /tmp/14.8b-*.norm /tmp/14.8b-*.fixture.norm
+
 echo "----"
 echo "PASS=$pass FAIL=$fail"
 [ $fail -eq 0 ]

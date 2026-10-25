@@ -28,6 +28,33 @@
  *   backlinks    9901..9903 (CRLF+quotes+unicode notes, NULL columns, tab
  *                           char that must NOT trigger quoting, DA 0)
  *
+ * Task 14.8b adds the FIX148B wave (ids 9911..9989 — disjoint from the 14.8a
+ * 9901..9903 range so the earlier fixtures stay valid; the only 14.8a fixture
+ * that sees new rows is backlinks.csv, which is re-captured from the ORIGINAL
+ * Next implementation with the extended seed):
+ *   tasks        9911..9915 (pure-\r title — quoted by the CANONICAL escape,
+ *                           tab title — not quoted, NULL due/recurring/minutes,
+ *                           1969/2000-02-29/2100 due dates, unicode)
+ *   outreach     9921..9923 (CRLF+quotes notes, all-NULL optional columns,
+ *                           REAL fractional last_contacted_at .5)
+ *   reports      9931..9933 (pinned 1/0 → "true"/"false", NULL template/
+ *                           periods/execSummary/pdfBytes, pdf_bytes 0, CRLF
+ *                           exec summary, negative + 2100 period epochs)
+ *   pages+changes 9941..9942 + 9951..9954 (INNER JOIN data: every change has
+ *                           a page; severity NULL, CRLF old/new values, tab)
+ *   keywords     9961..9965 + rankings 9971..9978 (≥2 keywords with multiple
+ *                           rankings so the latest-row fold is exercised —
+ *                           later checked_at overwrites earlier; one same-
+ *                           checked_at tie pair proving last-scan-row-wins;
+ *                           pure-\r query cell — NOT quoted by the BESPOKE
+ *                           keywords escape while the canonical routes quote
+ *                           the same byte; position 0 and NULL position)
+ *   backlinks    9981..9986 disavow rows (duplicate source_domain → one
+ *                           domain: group; mixed-case domain vs lowercase
+ *                           proving the localeCompare fold; notes with
+ *                           newlines collapsed to one space; one ACTIVE row
+ *                           that must be filtered out; empty-string notes)
+ *
  * Run with Bun (bun:sqlite — better-sqlite3 does not load under Bun):
  *   bun run backend/tools/seed-14.8.ts
  */
@@ -50,6 +77,40 @@ const E = {
   blC: 951782460, // 2000-02-29T00:01:00.000Z
   clientA: 1714979289, // 2024-05-06T07:08:09.000Z
   clientB: 0, // 1970-01-01T00:00:00.000Z
+  // ---- 14.8b (FIX148B wave) ----
+  taskA: 1700000400,
+  taskB: 1700000401,
+  taskC: 1700000402,
+  taskD: 1700000403,
+  taskE: 1700000404,
+  ocA: 1700000500,
+  ocB: 1700000501,
+  ocC: 1700000502,
+  repA: 1700000600,
+  repB: 1700000601,
+  repC: 1700000602,
+  pageA: 1700000700,
+  pageB: 1700000701,
+  chA: 1700000800,
+  chB: 1700000801,
+  chC: 1700000802,
+  kwA: 1700000900,
+  kwB: 1700000901,
+  kwC: 1700000902,
+  kwD: 1700000903,
+  kwE: 1700000904,
+  rankOld: 1700000950, // earlier checked_at (overwritten by the fold)
+  rankNew: 1700001050, // later checked_at (must win the fold)
+  rankA: 1700001000,
+  rankTie: 1700001100, // tie pair — last scan row wins
+  rankNull: 1700001200, // later than rankA → overwrites with NULLs
+  rankZero: 1700001300,
+  blD: 1700001400,
+  blE: 1700001401,
+  blF: 1700001402,
+  blG: 1700001403,
+  blH: 1700001404,
+  blI: 1700001405,
 };
 
 function seed(): void {
@@ -60,6 +121,9 @@ function seed(): void {
   db.prepare(
     "DELETE FROM clients WHERE (name LIKE 'Smoke Client %' AND url LIKE 'https://smoke-client-%') OR url LIKE 'https://smoke-qa-%'",
   ).run();
+  // section 3 of internal-smoke.sh creates one wall-clock task per run;
+  // tasks.csv has no other non-deterministic rows.
+  db.prepare("DELETE FROM tasks WHERE title LIKE 'smoke task %'").run();
 
   // 2. previous FIX148 rows (children first; client delete also cascades).
   db.prepare("DELETE FROM backlinks WHERE id >= 9901 AND id <= 9999").run();
@@ -73,6 +137,21 @@ function seed(): void {
     .run();
   db.prepare("DELETE FROM competitors WHERE name LIKE 'FIX148%'").run();
   db.prepare("DELETE FROM clients WHERE name LIKE 'FIX148%'").run();
+
+  // 2b. previous FIX148B rows (14.8b wave — children before parents).
+  db.prepare("DELETE FROM keyword_rankings WHERE id >= 9971 AND id <= 9989").run();
+  db.prepare("DELETE FROM keywords WHERE id >= 9961 AND id <= 9969").run();
+  db.prepare("DELETE FROM page_changes WHERE id >= 9951 AND id <= 9959").run();
+  db.prepare("DELETE FROM monitored_pages WHERE id >= 9941 AND id <= 9949").run();
+  db.prepare("DELETE FROM report_archives WHERE id >= 9931 AND id <= 9939").run();
+  db.prepare("DELETE FROM outreach_contacts WHERE id >= 9921 AND id <= 9929").run();
+  db.prepare("DELETE FROM tasks WHERE id >= 9911 AND id <= 9919").run();
+  db.prepare("DELETE FROM backlinks WHERE id >= 9911 AND id <= 9999").run();
+  // marker-based safety nets for the 14.8b tables (backlinks markers only —
+  // the other FIX148B tables never collide with the 14.8a FIX148 prefix set).
+  db.prepare(
+    "DELETE FROM backlinks WHERE source_url LIKE 'https://spam-%.test/%' OR source_url LIKE 'https://aaa-first.test/%'",
+  ).run();
 
   // 3. clients --------------------------------------------------------------
   db.prepare(
@@ -204,6 +283,164 @@ function seed(): void {
     E.blC,
     E.blC,
   );
+
+  // 7. tasks (14.8b) ---------------------------------------------------------
+  // 9912's title contains a LONE \r: the CANONICAL csvEscape quotes it
+  // (/[",\n\r]/) — the keywords route's bespoke escape would not.
+  const task = db.prepare(
+    `INSERT INTO tasks (id, client_id, title, why_it_matters, priority, status, due_date, recurring_interval, estimated_minutes, actual_minutes, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  );
+  task.run(
+    9911, 1, 'FIX148 Task, "Q" title',
+    'why =equals, -dash\r\nnew "line" 😀',
+    "high", "todo", E.compC, "weekly", 30, 45, E.taskA, E.taskA,
+  );
+  task.run(
+    9912, 9901, "FIX148 title with CR\ronly",
+    null, "medium", "in_progress", null, null, null, null, E.taskB, E.taskB,
+  );
+  task.run(
+    9913, 9902, "FIX148 =cmd @at +plus",
+    "why\tdoes it matter (tab)",
+    "low", "done", -86400, "monthly", 0, 0, E.taskC, E.taskC,
+  );
+  task.run(
+    9914, 1, "FIX148 Ünïcode 😀 görev",
+    "@handle leading at",
+    "medium", "skipped", 4102444800, "quarterly", null, null, E.taskD, E.taskD,
+  );
+  task.run(
+    9915, 9901, "FIX148 all nulls",
+    null, "high", "todo", null, null, null, null, E.taskE, E.taskE,
+  );
+
+  // 8. outreach contacts (14.8b) ----------------------------------------------
+  const oc = db.prepare(
+    `INSERT INTO outreach_contacts (id, client_id, name, email, website, status, notes, last_contacted_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  );
+  oc.run(
+    9921, 1, 'FIX148 Contact, "C" name', "fix148b@a.test",
+    "https://fix148b.test/x,y", "contacted",
+    'line1\r\nline2 "q", end =lead',
+    E.ocA, E.ocA, E.ocA,
+  );
+  oc.run(
+    9922, 9902, "FIX148 Null Columns", null, null, "prospect",
+    null, null, E.ocB, E.ocB,
+  );
+  oc.run(
+    9923, 9901, "FIX148 REAL fractional", "fix148b@c.test", null, "replied",
+    "tab\there", E.auditC, E.ocC, E.ocC, // 1714979289.5 REAL → .500 ms
+  );
+
+  // 9. report archives (14.8b) ------------------------------------------------
+  const rep = db.prepare(
+    `INSERT INTO report_archives (id, client_id, title, period_start, period_end, template, pdf_bytes, exec_summary, pinned, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  );
+  rep.run(
+    9931, 1, 'FIX148 Report, "R" 😀', E.compA, E.compA + 1000, "monthly",
+    12345, 'exec =lead\r\n"quoted", comma', 1, E.repA,
+  );
+  rep.run(
+    9932, 9901, "FIX148 Null Report", null, null, null, null, null, 0, E.repB,
+  );
+  rep.run(
+    9933, 9902, "FIX148 Zero Bytes, pinned", -86400, 4102444800, "annual",
+    0, "", 1, E.repC,
+  );
+
+  // 10. monitored pages + page changes (14.8b) --------------------------------
+  const page = db.prepare(
+    `INSERT INTO monitored_pages (id, client_id, url, label, status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, 'active', ?, ?)`,
+  );
+  page.run(9941, 1, "https://fix148b.test/page,1", 'FIX148 Page, "P"',
+    E.pageA, E.pageA);
+  page.run(9942, 9901, "https://fix148b.test/page2", null, E.pageB, E.pageB);
+
+  const change = db.prepare(
+    `INSERT INTO page_changes (id, monitored_page_id, field, severity, old_value, new_value, detected_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  );
+  change.run(9951, 9941, "title", "critical", 'Old, "value"',
+    'New\r\nvalue =x', E.chA);
+  change.run(9952, 9941, "content", null, null, null, E.chB);
+  change.run(9953, 9942, "description", "warning", "old\tdesc",
+    "new, desc", E.chC);
+  change.run(9954, 9942, "status", "info", "200", "404, gone", E.compC);
+
+  // 11. keywords + rankings (14.8b) -------------------------------------------
+  // 9961's query contains a LONE \r: the BESPOKE keywords csvEscape does NOT
+  // quote it (trigger class [",\n] — no \r, unlike the canonical one).
+  const kw = db.prepare(
+    `INSERT INTO keywords (id, client_id, query, country, device, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  );
+  kw.run(9961, 1, "FIX148 pure CR\rquery", "TR", "desktop", E.kwA, E.kwA);
+  kw.run(9962, 1, 'FIX148 "quoted", comma query', "US", "mobile", E.kwB, E.kwB);
+  kw.run(9963, 9901, "FIX148 Ünïcode 😀 sorgu", "TR", "desktop", E.kwC, E.kwC);
+  kw.run(9964, 9902, "FIX148 no rankings", "US", "mobile", E.kwD, E.kwD);
+  kw.run(9965, 1, "FIX148 zero position", "US", "desktop", E.kwE, E.kwE);
+
+  const rank = db.prepare(
+    `INSERT INTO keyword_rankings (id, keyword_id, position, url, checked_at, device)
+     VALUES (?, ?, ?, ?, ?, 'desktop')`,
+  );
+  // fold exercise A: keyword 9962 ranked twice — the LATER checked_at row
+  // (9972: position 3) must win over 9971 (position 12).
+  rank.run(9971, 9962, 12, "https://rank.test/old", E.rankOld);
+  rank.run(9972, 9962, 3, "https://rank.test/new", E.rankNew);
+  // fold exercise B: tie on checked_at — the LAST row in scan order (9974)
+  // overwrites 9973 (Map.set overwrite semantics).
+  rank.run(9973, 9963, 5, "https://rank.test/tie-a", E.rankTie);
+  rank.run(9974, 9963, 7, "https://rank.test/tie-b", E.rankTie);
+  // fold exercise C: a later NULL ranking overwrites an earlier positioned one
+  // (9961 → position 8 @ rankA, then NULL/NULL @ rankNull wins).
+  rank.run(9975, 9961, null, null, E.rankNull);
+  rank.run(9976, 9961, 8, "https://rank.test/a,1", E.rankA);
+  // position 0 with NULL url (renders "0" and "" — 0 is not nullish).
+  rank.run(9978, 9965, 0, null, E.rankZero);
+  // keyword 9964 deliberately has NO rankings → empty latest cells.
+
+  // 12. backlinks for disavow.txt (14.8b) --------------------------------------
+  // 9981+9982 share the EXACT source_domain 'Spam-A.test' (duplicate → one
+  // domain: group, first link's notes inlined). 'AAA-first.test' vs the rest
+  // proves the localeCompare FOLD: byte order would put 'S' before 'f',
+  // folded order puts fix148 before spam-a. 9985 is status 'active' — must be
+  // filtered out. 9984's notes are "" (falsy → no note line).
+  const bld = db.prepare(
+    `INSERT INTO backlinks (id, client_id, source_url, source_domain, target_url, anchor_text, domain_authority, status, source, notes, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  );
+  bld.run(
+    9981, 1, "https://spam-a.test/link,1", "Spam-A.test", "https://fix148b.test/t",
+    'anchor, "a"', 20, "disavow", "manual",
+    'Spam ring, "bad"\r\nsecond line =lead',
+    E.blD, E.blD,
+  );
+  bld.run(
+    9982, 1, "https://spam-a.test/link2", "Spam-A.test", null, null, null,
+    "disavow", "manual", null, E.blE, E.blE,
+  );
+  bld.run(
+    9983, 9901, "https://spam-b.test/x", "spam-b.test", null, "b anchor", null,
+    "disavow", "ahrefs_wmt", "single line", E.blF, E.blF,
+  );
+  bld.run(
+    9984, 9902, "https://spam-c.test/y", "spam-c.test", null, null, 5,
+    "disavow", "manual", "", E.blG, E.blG,
+  );
+  bld.run(
+    9985, 1, "https://keep.test/z", "keep.test", null, null, null,
+    "active", "manual", "not disavowed", E.blH, E.blH,
+  );
+  bld.run(
+    9986, 1, "https://aaa-first.test/w", "AAA-first.test", null, null, null,
+    "disavow", "manual", null, E.blI, E.blI,
+  );
 }
 
 db.exec("BEGIN");
@@ -222,6 +459,6 @@ const count = (t: string) =>
       .get() as { n: number }
   ).n;
 console.log(
-  `seed-14.8: clients=${count("clients")} competitors=${count("competitors")} audits=${count("audits")} backlinks=${count("backlinks")} (ids 9901+)`,
+  `seed-14.8: clients=${count("clients")} competitors=${count("competitors")} audits=${count("audits")} backlinks=${count("backlinks")} tasks=${count("tasks")} outreach=${count("outreach_contacts")} reports=${count("report_archives")} pages=${count("monitored_pages")} changes=${count("page_changes")} keywords=${count("keywords")} rankings=${count("keyword_rankings")} (ids 9901+)`,
 );
 db.close();
