@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { ArrowLeft, Search } from "lucide-react";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { clients } from "@/db/schema";
 import { asc } from "drizzle-orm";
 import { PageHeader } from "@/components/shell/page-header";

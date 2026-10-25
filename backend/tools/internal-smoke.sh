@@ -291,6 +291,64 @@ MAPDB=$(node -e "const db=require('$ROOT/node_modules/better-sqlite3')('$ROOT/da
 [ "$MAPDB" = "migration-map|5 → 4 URLs · 5 matched|{\"oldCount\":5,\"newCount\":4}" ] && chk "migration-tool-run-db" y y || chk "migration-tool-run-db" y n
 echo "$MAPR" | grep -q '"matched":2' && chk "migration-tool-run-result" y y || chk "migration-tool-run-result" y n
 
+# ---- 14.7a: query gateway (backend/src/query.rs — drizzle sqlite-proxy read path) ----
+
+# 36. token middleware covers the gateway (401 without X-Internal-Token)
+chk "query-401" 401 "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"sql":"SELECT 1"}' $B/api/internal/query)"
+
+# 37. SELECT roundtrip incl. params — positional rows, columns, value types
+Q1=$(curl -s -X POST "${AUTH[@]}" -d "{\"sql\":\"SELECT id, name FROM clients WHERE id = ?\",\"params\":[$CID]}" $B/api/internal/query)
+echo "$Q1" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+assert d['ok'] is True, d
+assert d['columns']==['id','name'], d['columns']
+assert len(d['rows'])==1 and isinstance(d['rows'][0][0],int) and isinstance(d['rows'][0][1],str), d['rows']
+assert d['rows'][0][1]=='Seed Client', d['rows']
+" 2>/dev/null && chk "query-select-params" y y || chk "query-select-params" y n
+
+# 38. readonly guard (authoritative sqlite3_stmt_readonly) → 403
+chk "query-403-insert" 403 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "${AUTH[@]}" -d '{"sql":"INSERT INTO clients (name, url) VALUES (''x'',''y'')"}' $B/api/internal/query)"
+chk "query-403-update" 403 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "${AUTH[@]}" -d '{"sql":"UPDATE clients SET name=''x''"}' $B/api/internal/query)"
+chk "query-403-delete" 403 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "${AUTH[@]}" -d '{"sql":"DELETE FROM clients"}' $B/api/internal/query)"
+chk "query-403-drop" 403 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "${AUTH[@]}" -d '{"sql":"DROP TABLE clients"}' $B/api/internal/query)"
+chk "query-403-pragma" 403 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "${AUTH[@]}" -d '{"sql":"PRAGMA journal_mode"}' $B/api/internal/query)"
+# WITH-smuggled write passes the textual guard, is caught by stmt.readonly()
+chk "query-403-with-delete" 403 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "${AUTH[@]}" -d '{"sql":"WITH x AS (SELECT 1) DELETE FROM clients"}' $B/api/internal/query)"
+
+# 39. multi-statement textual reject → 403
+chk "query-403-multistmt" 403 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "${AUTH[@]}" -d '{"sql":"SELECT 1; SELECT 2"}' $B/api/internal/query)"
+chk "query-403-trailing-junk" 403 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "${AUTH[@]}" -d '{"sql":"SELECT 1; DROP TABLE clients"}' $B/api/internal/query)"
+
+# 40. WITH cte allowed (positional rows)
+Q2=$(curl -s -X POST "${AUTH[@]}" -d '{"sql":"WITH cte AS (SELECT 1 AS x) SELECT * FROM cte"}' $B/api/internal/query)
+echo "$Q2" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+assert d['ok'] is True and d['columns']==['x'] and d['rows']==[[1]], d
+" 2>/dev/null && chk "query-with-cte" y y || chk "query-with-cte" y n
+
+# 41. value types: NULL / REAL / INTEGER / TEXT / bool→1 (JSON surface)
+Q3=$(curl -s -X POST "${AUTH[@]}" -d '{"sql":"SELECT ? AS n, ? AS r, ? AS t, ? AS i, ? AS b","params":[null,1.5,"txt",7,true]}' $B/api/internal/query)
+echo "$Q3" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+assert d['ok'] is True, d
+row=d['rows'][0]
+assert row[0] is None and isinstance(row[1],float) and row[1]==1.5, row
+assert isinstance(row[2],str) and row[2]=='txt', row
+assert isinstance(row[3],int) and not isinstance(row[3],bool) and row[3]==7, row
+assert row[4]==1 and isinstance(row[4],int), row
+" 2>/dev/null && chk "query-value-types" y y || chk "query-value-types" y n
+
+# 42. body contract: non-array params → 400, empty sql → 400
+chk "query-400-bad-params" 400 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "${AUTH[@]}" -d '{"sql":"SELECT 1","params":"x"}' $B/api/internal/query)"
+chk "query-400-empty-sql" 400 "$(curl -s -o /dev/null -w '%{http_code}' -X POST "${AUTH[@]}" -d '{"sql":""}' $B/api/internal/query)"
+
+# 43. prepare failure → 500 ok:false (bare sqlite message, db_error_response envelope)
+Q4=$(curl -s -w '|%{http_code}' -X POST "${AUTH[@]}" -d '{"sql":"SELECT * FROM missing_table_xyz"}' $B/api/internal/query)
+echo "$Q4" | grep -q '|500$' && echo "$Q4" | grep -q '"ok":false,"error":"no such table' && chk "query-500-missing-table" y y || chk "query-500-missing-table" y n
+
 echo "----"
 echo "PASS=$pass FAIL=$fail"
 [ $fail -eq 0 ]

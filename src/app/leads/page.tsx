@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { desc } from "drizzle-orm";
 import { Inbox } from "lucide-react";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { graderLeads } from "@/db/schema";
 import { PageHeader } from "@/components/shell/page-header";
 import { LeadsInbox } from "./inbox";

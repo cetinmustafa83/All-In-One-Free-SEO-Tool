@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { newsFeeds } from "@/db/schema";
 import { desc } from "drizzle-orm";
 import { ExternalLink, Newspaper, Rss } from "lucide-react";

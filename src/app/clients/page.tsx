@@ -4,7 +4,7 @@ import { desc } from "drizzle-orm";
 export const dynamic = "force-dynamic";
 
 import { Users, Globe, Plus, Sparkles } from "lucide-react";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { clients } from "@/db/schema";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";

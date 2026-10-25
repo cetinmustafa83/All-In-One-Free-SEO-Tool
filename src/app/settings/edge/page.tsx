@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { ArrowLeft, Globe } from "lucide-react";
 import { PageHeader } from "@/components/shell/page-header";
 import { getEdgeToken } from "@/lib/edge-token";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { clients } from "@/db/schema";
 import { EdgeSetup } from "./setup";
 

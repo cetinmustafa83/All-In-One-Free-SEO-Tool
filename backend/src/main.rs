@@ -32,6 +32,12 @@
 //! `tools/*` actions (utm-attribution runAttribution over pasted touch
 //! data, migration-map runMapping fuzzy mapper + renderers) plus their
 //! saveToolRun bookkeeping, in tools_compute.rs.
+//!
+//! 14.7a scope: the query gateway (/api/internal/query) — the read
+//! transport for the Next-side drizzle sqlite-proxy driver: pages keep
+//! their exact drizzle syntax, rows come back as positional arrays and
+//! drizzle core maps them as before. SELECT-only, two-layer guard, in
+//! query.rs.
 
 mod audits;
 mod auth;
@@ -48,6 +54,7 @@ mod keywords;
 mod misc;
 mod notifications;
 mod password;
+mod query;
 mod ratelimit;
 mod session;
 mod tasks;
@@ -204,6 +211,8 @@ async fn main() {
             "/api/internal/tools/utm-attribution/run",
             post(tools_compute::utm_run),
         )
+        // ---- 14.7a: query gateway (drizzle sqlite-proxy read path) ----
+        .route("/api/internal/query", post(query::run))
         .route(
             "/api/internal/tools/migration-map/run",
             post(tools_compute::migration_run),

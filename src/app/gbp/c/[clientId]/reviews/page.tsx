@@ -13,7 +13,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { ArrowLeft, MessageSquare } from "lucide-react";
-import { db } from "@/db/client";
+import { db } from "@/lib/db-gateway";
 import { clients } from "@/db/schema";
 import { PageHeader } from "@/components/shell/page-header";
 import { loadReviewDesk } from "./actions";
