@@ -100,3 +100,62 @@ API surface that stays stable for the frontend.
 | Turbopack dev-server memory limits | `backend/` lives outside `src/`, no impact on Next compile |
 | Response-envelope drift | contract doc + curl-diff harness before each cutover |
 | Sandbox resets losing toolchain | rustup install reproducible; scaffold is committed (rebuild = `cargo build`) |
+
+## 6. Progress log (updated per phase)
+
+| Phase | Status | Evidence |
+|---|---|---|
+| 14.0 scaffold | ✅ done | `/health` 200, db.ok, gateway probe |
+| 14.1 inventory | ✅ done | docs/api-contract.md, parity harness |
+| 14.2 core | ✅ done | middleware probed |
+| 14.3 read-only | ✅ done | parity 34/34 |
+| 14.4 settings/auth | ✅ done | parity 34/34, scrypt interop IDENTICAL |
+| 14.5 domain CRUD | ✅ done | 24 endpoints (17 tasks-family + 7 clients), smoke 29/29, UI E2E |
+| 14.6 tools wave | ✅ done (2026 batch) | see decision below + 14.6a/b/c worklog entries; smoke 82/82 |
+| 14.7 RSC renewal | next | 110 page.tsx + 3 components still import `db` directly |
+| 14.8 exports | pending | CSV ×11 → Rust; PDF/screenshot stay Next BFF |
+| 14.9 cutover | pending | `/api/*` rewrite behind `API_BACKEND_URL` |
+| 14.10 devops | pending | compose, CI, desktop bundle |
+
+Internal endpoint count: 38 (`/api/internal/*`) + v1/misc/auth surface; Rust ~7.9k lines.
+
+## 7. Phase 14.6 decision record — NET/AI tools stay in Next BFF
+
+**Decision**: tools/* actions whose call graph performs outbound network
+(crawls, PSI/Google/Bing APIs, DNS), AI-provider calls, OAuth, browser
+automation, SMTP, or native deps (PDF/playwright) are **NOT ported to Rust**
+and remain in Next as the thin BFF (same rationale as the 14.8 native-deps
+decision and the 14.5b "NO new Cargo deps" precedent — `backend/Cargo.toml`
+gains no HTTP client crate).
+
+**14.6a ported (pure DB, 14 endpoints)**: redirects-manager (5), uptime CRUD
+(3 of 4), person-schema, migration-map import, serp-features removeSnapshot,
+robots-history loadSnapshots, bing/youtube key save+clear.
+
+**14.6b ported (provably-local COMPUTE, 2 endpoints, fixture-parity verified
+8/8 identical)**: utm-attribution `runAttribution`, migration-map `runMapping`
+(URL shaping stays Next-side verdicts-over-the-wire).
+
+**14.6b triage skip list (call-graph evidence in worklog Task 14.6b)**:
+- AI: meta-tag-generator (callAI), link-recommender, cluster
+- NET crawl: social-preview, anchor-distribution, schema-validate, ai-robots,
+  link-graph, link-intersect, content-grader
+- NET (external APIs): bing insights/submit/sites, youtube research,
+  serp-features runCapture, robots-history runSnapshot, uptime runPingNow
+- Remaining tools/* (canonical-audit, headers, hreflang, robots, link-checker,
+  security, mobile-friendly, freshness, soft-404, facet-trap, health-check,
+  domain-overview, bulk-scan, eeat-audit, internal-linking, migration-parity,
+  redirects-bulk, reputation-abuse-risk, wp-hack-scan, traffic-drop,
+  aio-passage, llms-txt, indexnow, wayback, dns-whois, reddit-research,
+  pagerank, perf-budget, crux, geo-score, sxo, local-cwv, gsc-coverage,
+  cannibalization, branded-split, gbp-reply, ads-funnel, ai-overview,
+  ai-schema, image-gen, screenshot-import, plagiarism, intent-classifier,
+  keyword-difficulty, summarizer, news-headline, auto-link, bulk-alt,
+  outreach-personalize, content-score, content-helpers, code-generator,
+  github-pr, browser-agent, render, trending) fall under the same
+  BFF-retention rule until a dedicated HTTP-client phase (optionally reqwest)
+  is decided.
+
+**Exit criteria met**: "spot E2E per batch" — 14.6a verified 8 tool pages
+render + action golden paths via smoke; 14.6b verified via TS↔Rust fixture
+diffs (0 diff) + tool_runs DB assertions.

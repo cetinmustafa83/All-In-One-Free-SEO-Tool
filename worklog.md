@@ -381,3 +381,20 @@ Stage Summary:
 - Parity kanıtı: iki harness da diff'i JSON.stringify düzeyinde karşılaştırır; sonuç "5 identical, 0 diff" / "3 identical, 0 diff". Eşit-timestamp V8 comparator davranışı (a<b?-1:1) Rust stable-sort ile F3 fixture'ında birebir örtüştü. Kanal sözlüğü sıralaması last-touch-önce-assisted ekleme sırasıyla F1'de doğrulandı.
 - Sapmalar: (1) tool_runs yazım hatası warn-log'a düşer, kullanıcı sonucu yine alır (orijinal .catch-undocumented sözleşmesi — 14.5a primary-effect kuralının bilinçli istisnası, module doc'da gerekçeli). (2) Direct API caller plain-string olds/news gönderirse ok:false fallback yolu (orijinal catch kolları). (3) Smoke bölümündeki shell-quoting bug'ı bu task'te düzeltildi — bölümü ilk kez gerçekten koşan task bu.
 - Kalanlar: 10 tools action'ı NET/AI çağrı grafikleriyle 14.7+ planına (kalan wave'ler); RSC read tarafı (sayfa verisi) 14.7 planına göre. Git commit/push YOK (talimat gereği).
+
+---
+Task ID: 14.6c
+Agent: Z.ai Code (main)
+Task: Faz 14.6 kapanışı — NET/AI tools karar kaydı + skip-list dokümantasyonu + progress log
+
+Work Log:
+- Sandbox reset recovery tekrar: rustup reinstall (minimal), data.db 72 migration'dan yeniden kuruldu, backend + Next dev server restart. Baseline: parity 34/34, smoke 29/29 (fresh DB için seed client eklendi).
+- 14.6a (sub-agent): 8 pure-DB tools dosyası → backend/src/tools_basic.rs, 14 endpoint (16 action): redirects-manager ×5, uptime CRUD ×3, person-schema, migration-map import, serp-features removeSnapshot, robots-history loadSnapshots, bing/youtube key save+clear. Proxy'ler callBackend'e çevrildi; guardAction/zod/revalidatePath korundu. Smoke +41 assertion. Bağımsız doğrulama: smoke 70/70, parity 34/34, tsc src 0 hata. Push def5494.
+- 14.6b (sub-agent, 2 deneme — ilk deneme context timeout, resume ile tamamlandı): COMPUTE triage (12 aday, call-graph kanıtlı): 2 PORTED (utm-attribution runAttribution, migration-map runMapping — JS-exact primitiveler: js_trim, js_str_lt UTF-16, OrdMap insertion-order; URL shaping Next-side verdicts-over-the-wire), 10 SKIP (AI/NET kanıt satırlarıyla). backend/src/tools_compute.rs (~900 satır, 0 yeni crate, regex crate yok). Parity fixture script'leri: utm 5/5 identical, migration 3/3 identical (TS↔Rust diff 0). Smoke +12 → 82/82 ×2 koşu. Push ac4d2a8.
+- 14.6c: docs/architecture-split-plan.md'e "## 6. Progress log" (14.0–14.6 ✅, 14.7–14.10 durumları) + "## 7. Phase 14.6 decision record" eklendi: NET/AI/OAuth/browser/SMTP tools Next BFF'te kalır (14.8 native-deps kararı + 14.5b NO-new-deps precedentiyle tutarlı; Cargo.toml'a reqwest EKLENMEDİ). Tüm tools/* skip listesi belgelendi. api-inventory regenerate (docs/api-inventory.json refresh).
+
+Stage Summary:
+- Faz 14.6 TAMAM (a+b+c). Toplam internal endpoint: 24→38. Rust ~7.9k satır.
+- Ported tools: 10 action dosyası (16+2 fn), kalan ~75 dosya skip-list'te BFF'te kalıyor — davranış değişikliği yok, cutover (14.9) sonrası da Next BFF olarak çalışmaya devam eder.
+- Smoke 82/82, parity 34/34, tsc src 0, lint temiz. Her faz sonu push gereksinimi karşılandı (14.6a def5494, 14.6b ac4d2a8, 14.6c bu commit).
+- Sıradaki faz 14.7 (RSC renewal): 110 page.tsx + 3 component doğrudan db import ediyor → @/lib/backend server fetch helper.
